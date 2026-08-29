@@ -36,9 +36,10 @@ Local terminal ──show / approve / reject──┘
 
 ## Start here
 
-1. Follow [Getting started](getting-started.md) to connect Proton Bridge and an MCP client.
-2. Review the [security model](security-model.md) before combining the server with other tools.
-3. Use the [MCP tool reference](mcp-tools.md) for exact inputs and limits.
-4. Read the [attachment](attachments.md) and [draft approval](draft-approval.md) workflows before creating drafts.
+1. Follow [Getting started](getting-started.md) to install the server and connect Proton Bridge.
+2. Use the [client setup guides](clients.md) for Claude Code, Cursor, or VS Code.
+3. Review the [security model](security-model.md) before combining the server with other tools.
+4. Use the [MCP tool reference](mcp-tools.md) for exact inputs and limits.
+5. Read the [attachment](attachments.md) and [draft approval](draft-approval.md) workflows before creating drafts.
 
-The current stable version is [v1.0.0](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v1.0.0).
+The current stable version is [v1.0.1](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v1.0.1).

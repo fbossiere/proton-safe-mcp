@@ -1,0 +1,47 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.fbossiere/proton-safe-mcp",
+  "title": "Proton Safe MCP",
+  "description": "Read and search Proton Mail, then create human-approved drafts without send capability.",
+  "version": "1.0.1",
+  "websiteUrl": "https://fbossiere.github.io/proton-safe-mcp/",
+  "repository": {
+    "url": "https://github.com/fbossiere/proton-safe-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "proton-safe-mcp",
+      "version": "1.0.1",
+      "runtimeHint": "uvx",
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "serve"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PROTON_BRIDGE_USER",
+          "description": "Proton address configured in Proton Mail Bridge",
+          "format": "string",
+          "isRequired": true,
+          "isSecret": false,
+          "placeholder": "your-address@proton.me"
+        },
+        {
+          "name": "PROTON_IMAP_PORT",
+          "description": "Local IMAP port shown by Proton Mail Bridge",
+          "format": "number",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "1143"
+        }
+      ]
+    }
+  ]
+}

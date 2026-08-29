@@ -72,6 +72,7 @@ include = [
   "/mkdocs.yml",
   "/README.md",
   "/SECURITY.md",
+  "/server.json",
   "/pyproject.toml",
   "/uv.lock",
 ]

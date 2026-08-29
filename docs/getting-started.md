@@ -13,13 +13,14 @@ This guide installs Proton Safe MCP from a reviewed release and registers its lo
 ## 1. Install a reviewed release
 
 ```bash
-git clone https://github.com/fbossiere/proton-safe-mcp.git
-cd proton-safe-mcp
-git checkout v1.0.0
-uv sync
+uv tool install proton-safe-mcp==1.0.1
 ```
 
-Pin production use to a release tag. Return to `main` only when you deliberately want unreleased changes.
+This installs the `proton-safe-mcp` command in uv's tool directory. Run
+`command -v proton-safe-mcp` to obtain its absolute path for graphical MCP clients that do not
+inherit your shell `PATH`.
+
+To work on the project itself, clone the repository and use `uv sync --extra dev` instead.
 
 ## 2. Configure the local Bridge account
 
@@ -45,7 +46,7 @@ The port shown by your Bridge installation is authoritative if it differs from `
 ## 3. Store the credential
 
 ```bash
-uv run proton-safe-mcp setup
+proton-safe-mcp setup
 ```
 
 Enter the Bridge-generated IMAP password twice. It is stored under the service name `proton-safe-mcp` in the operating-system keyring.
@@ -58,7 +59,7 @@ Configure a local STDIO server in your MCP client. The exact file format varies 
 {
   "name": "proton-safe",
   "transport": "stdio",
-  "command": "/absolute/path/to/proton-safe-mcp/.venv/bin/proton-safe-mcp",
+  "command": "/absolute/path/to/proton-safe-mcp",
   "args": ["serve"],
   "env": {
     "PROTON_BRIDGE_USER": "your-address@proton.me",
@@ -68,6 +69,8 @@ Configure a local STDIO server in your MCP client. The exact file format varies 
 ```
 
 Do not put `PROTON_BRIDGE_PASSWORD` in a desktop client configuration. The server reads the credential from the keyring established by `setup`.
+
+See [Client setup](clients.md) for exact Claude Code, Cursor, and VS Code configurations.
 
 ## 5. Verify the connection
 
