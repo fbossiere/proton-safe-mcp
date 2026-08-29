@@ -20,7 +20,8 @@ on:
 
 permissions:
   contents: read
-
+  pages: write
+  id-token: write
 concurrency:
   group: documentation-${{ github.ref }}
   cancel-in-progress: true
