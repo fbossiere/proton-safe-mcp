@@ -6,6 +6,8 @@
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-blue)](https://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+<img width="1774" height="887" alt="proton-mcp-safe" src="https://github.com/user-attachments/assets/d82bc47f-4574-4e95-9c09-b6e62e7c8106" />
+
 A client-agnostic [FastMCP](https://gofastmcp.com) server for Proton Mail through the official [Proton Mail Bridge](https://proton.me/mail/bridge). It can read and search mail and create **drafts with attachments**. It deliberately **cannot send email** — you review every draft in Proton Mail and press Send yourself.
 
 The server runs locally over STDIO for any MCP-compatible client (Claude Desktop, Claude Code, or anything else that speaks MCP). Attachments are uploaded as bounded base64 chunks through MCP tools, so the server never receives or reads a client filesystem path.
