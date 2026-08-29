@@ -1,16 +1,19 @@
 # Proton Safe MCP
 
 [![CI](https://github.com/fbossiere/proton-safe-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/fbossiere/proton-safe-mcp/actions/workflows/ci.yml)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-4051b5)](https://fbossiere.github.io/proton-safe-mcp/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-blue)](https://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-<img width="1774" height="887" alt="proton-mcp-safe" src="https://github.com/user-attachments/assets/d82bc47f-4574-4e95-9c09-b6e62e7c8106" />
+<img width="1774" height="887" alt="Proton Safe MCP — draft-only email tools, human-approved" src="docs/assets/proton-mcp-safe.png" />
 
 A client-agnostic [FastMCP](https://gofastmcp.com) server for Proton Mail through the official [Proton Mail Bridge](https://proton.me/mail/bridge). It can read and search mail and create **drafts with attachments**. It deliberately **cannot send email** — you review every draft in Proton Mail and press Send yourself.
 
 The server runs locally over STDIO for any MCP-compatible client (Claude Desktop, Claude Code, or anything else that speaks MCP). Attachments are uploaded as bounded base64 chunks through MCP tools, so the server never receives or reads a client filesystem path.
+
+Read the [full documentation](https://fbossiere.github.io/proton-safe-mcp/) for setup, configuration, tool inputs, security boundaries, and troubleshooting.
 
 ## Why "safe"?
 

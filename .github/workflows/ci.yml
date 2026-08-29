@@ -71,7 +71,7 @@ jobs:
         with:
           python-version: "3.12"
           version: "latest-known"
-      - run: uv sync --frozen --extra dev
+      - run: uv sync --frozen --extra dev --extra docs
       - run: uv run pip-audit
 
   build:

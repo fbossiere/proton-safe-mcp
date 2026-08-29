@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Version-controlled MkDocs documentation with strict pull-request builds and automatic GitHub Pages deployment from `main`.
+
 ## [1.0.0] - 2026-08-29
 
 ### Added
