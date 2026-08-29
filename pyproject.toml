@@ -35,6 +35,7 @@ dependencies = [
 Homepage = "https://github.com/fbossiere/proton-safe-mcp"
 Repository = "https://github.com/fbossiere/proton-safe-mcp"
 Issues = "https://github.com/fbossiere/proton-safe-mcp/issues"
+Documentation = "https://fbossiere.github.io/proton-safe-mcp/"
 Changelog = "https://github.com/fbossiere/proton-safe-mcp/blob/main/CHANGELOG.md"
 Security = "https://github.com/fbossiere/proton-safe-mcp/blob/main/SECURITY.md"
 
@@ -45,6 +46,9 @@ dev = [
   "ruff>=0.12,<0.13",
   "mypy>=1.14,<2",
   "pip-audit>=2.9,<3",
+]
+docs = [
+  "mkdocs-material>=9.6,<10",
 ]
 
 [project.scripts]
@@ -61,9 +65,11 @@ include = [
   "/src",
   "/tests",
   "/.github",
+  "/docs",
   "/CHANGELOG.md",
   "/CONTRIBUTING.md",
   "/LICENSE",
+  "/mkdocs.yml",
   "/README.md",
   "/SECURITY.md",
   "/pyproject.toml",
