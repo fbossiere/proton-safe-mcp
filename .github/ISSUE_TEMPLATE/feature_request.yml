@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Note: this project deliberately excludes send, delete, move, and
+        attachment-download capabilities. Requests to add them will be
+        declined — that constraint is the point of the project.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that you cannot do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security impact
+      description: How does this interact with the threat model in the README?
+    validations:
+      required: true
