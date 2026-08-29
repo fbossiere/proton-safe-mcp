@@ -1,0 +1,107 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "proton-safe-mcp"
+dynamic = ["version"]
+description = "Client-agnostic, draft-only Proton Mail MCP server with secure attachment staging"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Francois Bossiere" }]
+keywords = ["mcp", "proton", "protonmail", "proton-bridge", "imap", "llm", "ai-agents", "security"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Communications :: Email",
+  "Topic :: Security",
+  "Typing :: Typed",
+]
+dependencies = [
+  "fastmcp==3.4.7",
+  "keyring>=25.6,<26",
+]
+
+[project.urls]
+Homepage = "https://github.com/fbossiere/proton-safe-mcp"
+Repository = "https://github.com/fbossiere/proton-safe-mcp"
+Issues = "https://github.com/fbossiere/proton-safe-mcp/issues"
+Changelog = "https://github.com/fbossiere/proton-safe-mcp/blob/main/CHANGELOG.md"
+Security = "https://github.com/fbossiere/proton-safe-mcp/blob/main/SECURITY.md"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.0.3,<10",
+  "pytest-cov>=6.2,<7",
+  "ruff>=0.12,<0.13",
+  "mypy>=1.14,<2",
+  "pip-audit>=2.9,<3",
+]
+
+[project.scripts]
+proton-safe-mcp = "proton_safe_mcp.cli:main"
+
+[tool.hatch.version]
+path = "src/proton_safe_mcp/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/proton_safe_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/.github",
+  "/CHANGELOG.md",
+  "/CONTRIBUTING.md",
+  "/LICENSE",
+  "/README.md",
+  "/SECURITY.md",
+  "/pyproject.toml",
+  "/uv.lock",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["proton_safe_mcp"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S108"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+files = ["src/proton_safe_mcp"]
+
+[[tool.mypy.overrides]]
+module = "fastmcp.*"
+follow_untyped_imports = true
