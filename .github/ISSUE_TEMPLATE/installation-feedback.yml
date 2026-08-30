@@ -1,0 +1,120 @@
+name: Installation feedback
+description: Report the outcome of the 10-minute external test
+title: "[Installation feedback]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing Proton Safe MCP. Follow the
+        [external testing protocol](https://fbossiere.github.io/proton-safe-mcp/external-testing/)
+        before completing this form.
+
+        **Do not include** email addresses, folder names, sender names, subjects, message bodies,
+        attachments, passwords, recovery data, 2FA data, or hardware-key material. Report a
+        suspected vulnerability through GitHub private vulnerability reporting instead.
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials, identifiers, message content, and other private data.
+          required: true
+        - label: This report is installation feedback, not a security vulnerability.
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Proton Safe MCP version
+      description: Copy the installed version shown by `uv tool list`.
+      placeholder: "proton-safe-mcp v1.0.1"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Linux distribution, Python version, Proton Mail Bridge version, and keyring.
+      placeholder: "Ubuntu 24.04, Python 3.12, Proton Mail Bridge 3.x, GNOME Keyring"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      options:
+        - Claude Code
+        - Cursor
+        - VS Code
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: first_result_time
+    attributes:
+      label: Time to the first connected `mailbox_status`
+      options:
+        - Less than 5 minutes
+        - 5 to 10 minutes
+        - More than 10 minutes
+        - Not achieved
+    validations:
+      required: true
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Overall outcome
+      options:
+        - Core test completed
+        - Core test completed with friction
+        - Partially completed
+        - Could not connect
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks completed
+      description: Leave any incomplete or failed check unchecked and explain it below.
+      options:
+        - label: Installed the reviewed PyPI release with `uv tool install`.
+        - label: Stored the Bridge-generated password with `proton-safe-mcp setup`.
+        - label: "Received `connected: true` from `mailbox_status`."
+        - label: Confirmed that `read_message` did not mark the test message as read.
+        - label: Confirmed that draft creation failed before local approval.
+        - label: Approved the exact proposal in a separate terminal.
+        - label: "Confirmed that the approved draft appeared in Proton Mail with `sent: false`."
+        - label: Confirmed that no send, delete, move, or attachment-download tool was exposed.
+        - label: Completed the optional attachment check.
+
+  - type: textarea
+    id: friction
+    attributes:
+      label: First point of friction
+      description: Describe the first confusing, slow, or failing step and what you expected.
+      placeholder: |
+        Step:
+        Expected:
+        Observed:
+        What would have made this easier:
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Redacted diagnostic output
+      description: Optional. Include only the minimum output needed and redact all private data.
+      render: text
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Client-specific behavior, documentation gaps, or other observations.
