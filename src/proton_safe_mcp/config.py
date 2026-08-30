@@ -48,7 +48,7 @@ class Settings:
         return self.state_dir / "approvals"
 
     @classmethod
-    def from_env(cls) -> Settings:
+    def from_env(cls, *, create_directories: bool = True) -> Settings:
         user = os.environ.get("PROTON_BRIDGE_USER", "").strip()
         if not user or "\r" in user or "\n" in user:
             raise ConfigurationError("PROTON_BRIDGE_USER is required")
@@ -67,7 +67,8 @@ class Settings:
             draft_ttl_seconds=_positive_int("PROTON_MCP_DRAFT_TTL_SECONDS", 900, 3600),
             max_body_chars=_positive_int("PROTON_MCP_MAX_BODY_CHARS", 100_000, 500_000),
         )
-        settings.ensure_directories()
+        if create_directories:
+            settings.ensure_directories()
         return settings
 
     def ensure_directories(self) -> None:
