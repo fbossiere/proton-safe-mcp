@@ -12,7 +12,7 @@ site/
 .env
 
 # Account-specific ChatGPT app mappings must stay local.
-plugins/proton-safe/.app.json
+.app.json
 
 # IDE / editors
 .idea/
