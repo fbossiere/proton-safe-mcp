@@ -82,6 +82,22 @@ def test_doctor_reports_bridge_failure(settings, monkeypatch, capsys):
 def test_doctor_rejects_unsupported_platform(settings, monkeypatch, capsys):
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Darwin")
+
+    def unexpected_call(*_args):
+        raise AssertionError("unsupported platforms must not access credentials or Bridge")
+
+    monkeypatch.setattr(doctor, "get_bridge_password", unexpected_call)
+    monkeypatch.setattr(doctor.ProtonBridgeClient, "status", unexpected_call)
+
+    assert cli.main(["doctor"]) == 1
+    assert "[FAIL] Platform: Darwin (Linux required)" in capsys.readouterr().out
+
+
+def test_doctor_does_not_create_the_state_directory(tmp_path, monkeypatch, capsys):
+    state_dir = tmp_path / "missing" / "state"
+    monkeypatch.setenv("PROTON_BRIDGE_USER", "bridge-user")
+    monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(state_dir))
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
     monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
     monkeypatch.setattr(
         doctor.ProtonBridgeClient,
@@ -89,5 +105,7 @@ def test_doctor_rejects_unsupported_platform(settings, monkeypatch, capsys):
         lambda _self: {"connected": True},
     )
 
-    assert cli.main(["doctor"]) == 1
-    assert "[FAIL] Platform: Darwin (Linux required)" in capsys.readouterr().out
+    assert cli.main(["doctor"]) == 0
+    output = capsys.readouterr().out
+    assert "[WARN] State directory: not created yet" in output
+    assert not state_dir.exists()
