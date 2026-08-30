@@ -12,6 +12,59 @@ counts, or message content.
 
 ## Startup and configuration
 
+### ChatGPT desktop on Ubuntu cannot find `codex`
+
+The ChatGPT desktop package can use Codex and share MCP configuration without installing a separate
+system-wide `codex` command. On the Ubuntu package tested by this project, first verify the bundled
+binary:
+
+```bash
+test -x /usr/lib/chatgpt/resources/codex
+/usr/lib/chatgpt/resources/codex --version
+/usr/lib/chatgpt/resources/codex plugin --help
+```
+
+The `/usr/lib/chatgpt/resources/codex` path is package-specific and may change. Do not install a
+same-named third-party package solely because the shell's command-not-found helper suggests it.
+
+### `unexpected argument 'marketplace'` or `unrecognized subcommand 'add'`
+
+A different or older `codex` executable is probably first in `PATH`. Inspect every candidate and
+require the plugin help to work:
+
+```bash
+type -a codex
+codex --version
+codex plugin --help
+```
+
+If the Ubuntu ChatGPT bundled command passes the check, use its absolute path for installation:
+
+```bash
+/usr/lib/chatgpt/resources/codex plugin marketplace add fbossiere/proton-safe-mcp --ref main
+/usr/lib/chatgpt/resources/codex plugin add proton-safe@personal
+```
+
+### Bash still points to a removed `/snap/bin/codex`
+
+Clear the command cache or start a fresh login shell:
+
+```bash
+hash -r
+exec bash -l
+```
+
+If `codex` is still unavailable, use the verified app-owned absolute path instead of installing an
+unrelated package.
+
+### The plugin is installed but ChatGPT cannot see its settings
+
+An app launched from the Ubuntu desktop menu does not inherit variables exported later in an
+unrelated terminal. Follow the `environment.d` procedure in the
+[OpenAI plugin guide](openai-plugin.md#3-make-non-secret-settings-available-to-the-desktop-app),
+sign out and back in, quit ChatGPT completely, and start a new task. Type `/mcp` to inspect the
+connected servers.
+
 ### `PROTON_BRIDGE_USER is required`
 
 Set the address in the environment inherited by the CLI or MCP client:

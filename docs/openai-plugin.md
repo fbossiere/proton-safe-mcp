@@ -71,24 +71,97 @@ Complete [Getting started](getting-started.md) first. Proton Mail Bridge must be
 `proton-safe-mcp setup` must have stored the Bridge-generated IMAP password in the operating-system
 keyring.
 
-Clone the repository, then add its repo marketplace:
+### 1. Find the plugin-capable Codex command
+
+OpenAI documents that ChatGPT desktop and Codex share MCP configuration on the same Codex host.
+The ChatGPT package may nevertheless leave the `codex` command outside the terminal's `PATH`.
+
+First try the normal command:
 
 ```bash
-codex plugin marketplace add /absolute/path/to/proton-safe-mcp
-codex plugin add proton-safe@personal
+codex --version
+codex plugin --help
 ```
 
-Restart the ChatGPT desktop app and start a new task after installation. Ensure the app process can
-inherit these non-secret variables:
+On the Ubuntu ChatGPT desktop package tested by this project, the app-owned executable is currently
+available at `/usr/lib/chatgpt/resources/codex`. This is a package layout detail, not a stable
+cross-platform interface. Use it only after verifying it exists and exposes the plugin commands:
 
 ```bash
-export PROTON_BRIDGE_USER="your-address@proton.me"
-export PROTON_IMAP_PORT="1143"
+test -x /usr/lib/chatgpt/resources/codex
+/usr/lib/chatgpt/resources/codex --version
+/usr/lib/chatgpt/resources/codex plugin --help
 ```
 
-Do not add `PROTON_BRIDGE_PASSWORD` to the plugin configuration. The plugin passes through only the
-non-secret account name, port, limits, and desktop-session variables needed to reach the OS
-keyring.
+Set `CODEX_BIN` to whichever verified command works for the rest of this guide:
+
+```bash
+CODEX_BIN=codex
+```
+
+or, for the tested Ubuntu package:
+
+```bash
+CODEX_BIN=/usr/lib/chatgpt/resources/codex
+```
+
+Do not install an unrelated distribution or Snap package merely because the shell suggests one
+after `command not found`. A same-named third-party or older binary may not implement
+`codex plugin`. Verify the publisher separately and require `plugin --help` to succeed.
+
+### 2. Add the marketplace and plugin
+
+For a normal installation, add the public Git repository and install the plugin:
+
+```bash
+"$CODEX_BIN" plugin marketplace add fbossiere/proton-safe-mcp --ref main
+"$CODEX_BIN" plugin add proton-safe@personal
+"$CODEX_BIN" plugin list
+```
+
+For local plugin development, replace the first command with the absolute path to a reviewed
+checkout:
+
+```bash
+"$CODEX_BIN" plugin marketplace add /absolute/path/to/proton-safe-mcp
+```
+
+### 3. Make non-secret settings available to the desktop app
+
+Shell `export` commands affect ChatGPT only when the app is launched from that same shell. For an
+Ubuntu app launched from the desktop menu, create `~/.config/environment.d/90-proton-safe.conf`
+after ensuring its parent directory exists:
+
+```bash
+mkdir -p ~/.config/environment.d
+```
+
+Put only these non-secret values in the file:
+
+```ini
+PROTON_BRIDGE_USER=your-address@proton.me
+PROTON_IMAP_PORT=1143
+```
+
+Then sign out of the Ubuntu desktop session and sign back in. On a systemd-managed user session,
+verify the imported values before restarting ChatGPT:
+
+```bash
+systemctl --user show-environment | grep -E '^PROTON_(BRIDGE_USER|IMAP_PORT)='
+```
+
+Do not put `PROTON_BRIDGE_PASSWORD` in this file or the plugin configuration. The plugin passes
+through only the non-secret account name, port, limits, and desktop-session variables needed to
+reach the OS keyring.
+
+### 4. Restart and verify
+
+Quit ChatGPT completely, reopen it, and start a new task. Type `/mcp` to confirm that
+`proton-safe` is connected. Also verify the installation from the same Codex command:
+
+```bash
+"$CODEX_BIN" plugin list
+```
 
 Test with:
 

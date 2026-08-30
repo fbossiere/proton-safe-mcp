@@ -89,6 +89,22 @@ def test_plugin_docs_are_local_first_and_tunnel_optional():
     assert "optional: connect chatgpt web or a remote bridge host" in guide
     assert 'control_plane_api_key="sk-' not in guide
     assert "read -rsp" in guide
+    assert "/usr/lib/chatgpt/resources/codex" in guide
+    assert "codex plugin --help" in guide
+    assert "fbossiere/proton-safe-mcp --ref main" in guide
+    assert ".config/environment.d/90-proton-safe.conf" in guide
+    assert "do not install an unrelated" in guide
+
+
+def test_ubuntu_plugin_install_failures_are_documented():
+    troubleshooting = (ROOT / "docs" / "troubleshooting.md").read_text(encoding="utf-8").lower()
+
+    assert "unexpected argument 'marketplace'" in troubleshooting
+    assert "unrecognized subcommand 'add'" in troubleshooting
+    assert "/snap/bin/codex" in troubleshooting
+    assert "hash -r" in troubleshooting
+    assert "exec bash -l" in troubleshooting
+    assert "/mcp" in troubleshooting
 
 
 def test_account_specific_app_mappings_are_ignored_repo_wide():
