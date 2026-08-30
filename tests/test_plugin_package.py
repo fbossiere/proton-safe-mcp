@@ -91,6 +91,8 @@ def test_plugin_docs_are_local_first_and_tunnel_optional():
     assert "read -rsp" in guide
     assert "/usr/lib/chatgpt/resources/codex" in guide
     assert "codex plugin --help" in guide
+    assert "codex plugin marketplace --help" in guide
+    assert "codex plugin add --help" in guide
     assert "fbossiere/proton-safe-mcp --ref main" in guide
     assert ".config/environment.d/90-proton-safe.conf" in guide
     assert "do not install an unrelated" in guide
@@ -101,6 +103,8 @@ def test_ubuntu_plugin_install_failures_are_documented():
 
     assert "unexpected argument 'marketplace'" in troubleshooting
     assert "unrecognized subcommand 'add'" in troubleshooting
+    assert "codex plugin marketplace --help" in troubleshooting
+    assert "codex plugin add --help" in troubleshooting
     assert "/snap/bin/codex" in troubleshooting
     assert "hash -r" in troubleshooting
     assert "exec bash -l" in troubleshooting
