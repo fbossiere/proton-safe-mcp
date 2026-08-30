@@ -13,7 +13,7 @@ This guide installs Proton Safe MCP from a reviewed release and registers its lo
 ## 1. Install a reviewed release
 
 ```bash
-uv tool install proton-safe-mcp==1.0.1
+uv tool install proton-safe-mcp==1.0.2
 ```
 
 This installs the `proton-safe-mcp` command in uv's tool directory. Run
@@ -51,7 +51,19 @@ proton-safe-mcp setup
 
 Enter the Bridge-generated IMAP password twice. It is stored under the service name `proton-safe-mcp` in the operating-system keyring.
 
-## 4. Register the MCP server
+## 4. Diagnose the local setup
+
+Run the non-destructive diagnostic before registering the server:
+
+```bash
+proton-safe-mcp doctor
+```
+
+The report verifies the runtime, platform, configuration, private state directory, credential
+lookup, and authenticated Bridge connection. It does not print credentials, email addresses,
+mailbox counts, or message content, so its output can be safely attached to installation feedback.
+
+## 5. Register the MCP server
 
 Configure a local STDIO server in your MCP client. The exact file format varies by client, but the logical fields are:
 
@@ -72,7 +84,7 @@ Do not put `PROTON_BRIDGE_PASSWORD` in a desktop client configuration. The serve
 
 See [Client setup](clients.md) for exact Claude Code, Cursor, and VS Code configurations.
 
-## 5. Verify the connection
+## 6. Verify the connection
 
 Start or reload the MCP client, then call `mailbox_status`. A successful result includes:
 

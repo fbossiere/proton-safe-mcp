@@ -34,7 +34,7 @@ ChatGPT desktop / Codex ── STDIO ──> proton-safe-mcp
 ```
 
 No tunnel or dedicated server is required. The checked-in `.mcp.json` launches the pinned
-`proton-safe-mcp==1.0.1` release with `uvx`. ChatGPT desktop, Codex CLI, and the Codex IDE
+`proton-safe-mcp==1.0.2` release with `uvx`. ChatGPT desktop, Codex CLI, and the Codex IDE
 extension support local STDIO servers and share the MCP configuration for the same Codex host; see
 OpenAI's [MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=desktop).
 
@@ -106,7 +106,7 @@ If you only need the MCP tools, the plugin is not required. In ChatGPT desktop:
 3. Choose **STDIO** and configure `uvx` with these arguments:
 
    ```text
-   --from proton-safe-mcp==1.0.1 proton-safe-mcp serve
+   --from proton-safe-mcp==1.0.2 proton-safe-mcp serve
    ```
 
 4. Forward `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT`, but never a Proton or Bridge password.
@@ -122,7 +122,7 @@ direct path provides the server tools but not the two workflow skills packaged b
 On the Linux machine that will run Bridge:
 
 ```bash
-uv tool install proton-safe-mcp==1.0.1
+uv tool install proton-safe-mcp==1.0.2
 export PROTON_BRIDGE_USER="your-address@proton.me"
 export PROTON_IMAP_PORT="1143"
 proton-safe-mcp setup
