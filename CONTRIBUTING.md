@@ -12,6 +12,10 @@ Pull requests that violate these will be declined regardless of code quality:
 4. **No received-attachment download tool.** The server returns attachment metadata, never bytes.
 5. **The Bridge host stays `127.0.0.1`.** TLS verification is disabled only because the host is unchangeable; making the host configurable would silently break that safety argument.
 6. **Draft approval stays out-of-band.** The approval step must not be reachable through any MCP tool.
+7. **Plugin instructions are not authorization.** Skills may guide safe workflows but cannot weaken
+   tool validation, infer recipients from mail content, or approve a draft.
+8. **Private connection material stays private.** Never commit a Bridge credential, tunnel runtime
+   API key, or account-specific `.app.json` mapping.
 
 ## Development setup
 
@@ -32,6 +36,7 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy
 uv run pytest --cov
+uv run mkdocs build --strict
 ```
 
 Guidelines:
