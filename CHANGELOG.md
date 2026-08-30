@@ -7,18 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Repo-local `proton-safe` plugin for ChatGPT and Codex with guarded mail-review and draft-preparation skills.
-- Pinned STDIO MCP configuration and a local marketplace entry for plugin testing.
-- Local-first ChatGPT desktop and Codex setup, plus an optional OpenAI Secure MCP Tunnel guide for
-  ChatGPT web and external Bridge-host deployments.
-- Plugin package tests that enforce manifest consistency, secret exclusion, loopback assumptions, and out-of-band approval language.
-
 ## [1.0.2] - 2026-08-30
 
 ### Added
 
+- Repo-local `proton-safe` plugin for ChatGPT and Codex with guarded mail-review and
+  draft-preparation skills.
+- Pinned STDIO MCP configuration and a local marketplace entry for plugin testing.
+- Local-first ChatGPT desktop and Codex setup, plus an optional OpenAI Secure MCP Tunnel guide for
+  ChatGPT web and external Bridge-host deployments.
+- Plugin package tests that enforce manifest consistency, secret exclusion, loopback assumptions,
+  and out-of-band approval language.
 - Non-destructive, privacy-safe `proton-safe-mcp doctor` diagnostics for runtime, configuration,
   credential, private-state, and Bridge connectivity checks, with system-error redaction.
 - A safety-constrained `llms-install.md` guide for AI-assisted installation.
