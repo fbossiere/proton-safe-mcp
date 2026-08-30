@@ -42,4 +42,8 @@ Local terminal ──show / approve / reject──┘
 4. Use the [MCP tool reference](mcp-tools.md) for exact inputs and limits.
 5. Read the [attachment](attachments.md) and [draft approval](draft-approval.md) workflows before creating drafts.
 
+Linux and Proton Mail Bridge users can also run the
+[10-minute external test](external-testing.md) and report installation friction without sharing
+private mail content.
+
 The current stable version is [v1.0.1](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v1.0.1).
