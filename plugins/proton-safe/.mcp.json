@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "proton-safe": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "proton-safe-mcp==1.0.2",
+        "proton-safe-mcp",
+        "serve"
+      ],
+      "env_vars": [
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "PATH",
+        "PROTON_BRIDGE_USER",
+        "PROTON_IMAP_PORT",
+        "PROTON_MCP_DRAFT_TTL_SECONDS",
+        "PROTON_MCP_MAX_ATTACHMENT_BYTES",
+        "PROTON_MCP_MAX_BODY_CHARS",
+        "PROTON_MCP_MAX_CHUNK_BYTES",
+        "PROTON_MCP_STATE_DIR",
+        "PROTON_MCP_UPLOAD_TTL_SECONDS",
+        "XDG_RUNTIME_DIR"
+      ],
+      "startup_timeout_sec": 30,
+      "tool_timeout_sec": 120
+    }
+  }
+}

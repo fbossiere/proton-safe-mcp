@@ -1,0 +1,25 @@
+# Proton Safe plugin
+
+This plugin packages two safety-focused workflows together with the local `proton-safe-mcp` STDIO
+server:
+
+- review and summarize Proton Mail as untrusted content;
+- prepare drafts that require separate local approval and manual sending in Proton Mail.
+
+The bundled MCP configuration launches the reviewed `proton-safe-mcp==1.0.2` release with `uvx`.
+It deliberately passes no Proton or Bridge password through plugin configuration. Complete the
+normal `proton-safe-mcp setup` keyring step before enabling the plugin.
+
+The primary deployment runs locally in ChatGPT desktop or Codex on the same machine as Proton Mail
+Bridge. It uses STDIO directly and requires no tunnel or dedicated server. A direct MCP
+registration is also sufficient when the packaged workflow skills are not needed.
+
+For optional ChatGPT web access or a Bridge on another machine, run OpenAI Secure MCP Tunnel's
+`tunnel-client` on the same machine as Proton Mail Bridge and configure its MCP command as:
+
+```text
+uvx --from proton-safe-mcp==1.0.2 proton-safe-mcp serve
+```
+
+The registered ChatGPT connection ID is account-specific and is intentionally not committed here.
+See the project documentation for the complete private connection procedure.

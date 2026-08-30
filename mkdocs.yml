@@ -53,6 +53,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Client setup: clients.md
+  - OpenAI plugin: openai-plugin.md
   - External testing: external-testing.md
   - User guide:
       - Configuration: configuration.md
