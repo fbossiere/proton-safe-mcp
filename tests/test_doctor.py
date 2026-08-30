@@ -44,6 +44,20 @@ def test_doctor_reports_missing_configuration_without_crashing(monkeypatch, caps
     assert "[SKIP] Bridge" in output
 
 
+def test_doctor_redacts_configuration_os_errors(monkeypatch, capsys):
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
+
+    def fail_configuration(_cls, **_kwargs):
+        raise OSError(5, "private path not printed")
+
+    monkeypatch.setattr(doctor.Settings, "from_env", classmethod(fail_configuration))
+
+    assert cli.main(["doctor"]) == 1
+    output = capsys.readouterr().out
+    assert "[FAIL] Configuration: could not read local configuration (OSError)" in output
+    assert "private path not printed" not in output
+
+
 def test_doctor_warns_when_environment_credential_is_used(settings, monkeypatch, capsys):
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
