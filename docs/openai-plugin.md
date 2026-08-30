@@ -142,7 +142,9 @@ With the non-secret Proton variables and runtime key available to the process, i
 STDIO profile:
 
 ```bash
-export CONTROL_PLANE_API_KEY="sk-..."
+read -rsp "Tunnel runtime API key: " CONTROL_PLANE_API_KEY
+printf '\n'
+export CONTROL_PLANE_API_KEY
 export PROTON_BRIDGE_USER="your-address@proton.me"
 export PROTON_IMAP_PORT="1143"
 

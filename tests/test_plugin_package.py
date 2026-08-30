@@ -87,6 +87,8 @@ def test_plugin_docs_are_local_first_and_tunnel_optional():
     assert "direct mcp registration without the plugin" in guide
     assert "no tunnel or dedicated server is required" in guide
     assert "optional: connect chatgpt web or a remote bridge host" in guide
+    assert 'control_plane_api_key="sk-' not in guide
+    assert "read -rsp" in guide
 
 
 def test_account_specific_app_mappings_are_ignored_repo_wide():
