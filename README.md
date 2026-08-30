@@ -33,15 +33,15 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 ```text
 ┌────────────┐  STDIO / MCP   ┌───────────────────┐  IMAP (loopback)  ┌───────────────┐
-│ MCP client │ ─────────────► │  proton-safe-mcp  │ ────────────────► │ Proton Bridge │
+│ MCP client │ ─────────────► │  proton-safe-mcp  │ ───────────────► │ Proton Bridge │
 │ (any)      │   tools only   │                   │   127.0.0.1 only  │ (local)       │
 └────────────┘                │  ├─ read tools    │                   └──────┬────────┘
                               │  ├─ chunked       │                          │ E2E-encrypted
       you, in a terminal      │  │  attachment    │                          ▼
-┌────────────────────────┐    │  │  staging       │                   ┌───────────────┐
+┌───────────────────────┐    │  │  staging       │                   ┌───────────────┐
 │ proton-safe-mcp        │───►│  └─ draft         │                   │  Proton Mail  │
 │   approve <draft_id>   │    │     proposals     │                   │  (Drafts)     │
-└────────────────────────┘    └───────────────────┘                   └───────────────┘
+└────────────────────────┘    └───────────────────┘                   └──────────────┘
         out-of-band approval — not an MCP tool
 ```
 
@@ -119,6 +119,10 @@ to obtain the absolute command path when your client does not inherit your shell
 Do not put `PROTON_BRIDGE_PASSWORD` in the client configuration. The server reads it from the OS keyring established by `setup`.
 
 Copy-paste instructions are available for [Claude Code, Cursor, and VS Code](https://fbossiere.github.io/proton-safe-mcp/clients/).
+
+> **Help test the onboarding.** Linux and Proton Mail Bridge users can run the
+> [10-minute external test](https://fbossiere.github.io/proton-safe-mcp/external-testing/) and
+> submit privacy-safe [installation feedback](https://github.com/fbossiere/proton-safe-mcp/issues/new?template=installation-feedback.yml).
 
 ## Available MCP tools
 
