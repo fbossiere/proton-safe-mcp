@@ -58,7 +58,7 @@ def test_doctor_warns_when_environment_credential_is_used(settings, monkeypatch,
     assert cli.main(["doctor"]) == 0
     output = capsys.readouterr().out
     assert "[WARN] Credential" in output
-    assert "environment fallback in use" in output
+    assert "PROTON_BRIDGE_PASSWORD is set; unset it" in output
     assert "not-printed" not in output
 
 
@@ -109,3 +109,32 @@ def test_doctor_does_not_create_the_state_directory(tmp_path, monkeypatch, capsy
     output = capsys.readouterr().out
     assert "[WARN] State directory: not created yet" in output
     assert not state_dir.exists()
+
+
+def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
+
+    class UnreadableStateDirectory:
+        def stat(self):
+            raise PermissionError("private path not printed")
+
+    class DiagnosticSettings:
+        bridge_user = "bridge-user"
+        state_dir = UnreadableStateDirectory()
+
+    monkeypatch.setattr(
+        doctor.Settings,
+        "from_env",
+        classmethod(lambda _cls, **_kwargs: DiagnosticSettings()),
+    )
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(
+        doctor.ProtonBridgeClient,
+        "status",
+        lambda _self: {"connected": True},
+    )
+
+    assert cli.main(["doctor"]) == 1
+    output = capsys.readouterr().out
+    assert "[FAIL] State directory: could not inspect permissions" in output
+    assert "private path not printed" not in output
