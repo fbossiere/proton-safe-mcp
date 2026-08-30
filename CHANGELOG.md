@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Privacy-safe `proton-safe-mcp doctor` diagnostics for runtime, configuration, credential, private-state, and Bridge connectivity checks.
+- Non-destructive, privacy-safe `proton-safe-mcp doctor` diagnostics for runtime, configuration,
+  credential, private-state, and Bridge connectivity checks, with system-error redaction.
 - A safety-constrained `llms-install.md` guide for AI-assisted installation.
 
 ## [1.0.1] - 2026-08-29
