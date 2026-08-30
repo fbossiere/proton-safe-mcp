@@ -67,7 +67,15 @@ def run_checks() -> list[CheckResult]:
     settings: Settings | None = None
     try:
         settings = Settings.from_env(create_directories=False)
-    except (OSError, ProtonMCPError) as exc:
+    except OSError as exc:
+        results.append(
+            CheckResult(
+                "Configuration",
+                "FAIL",
+                f"could not read local configuration ({type(exc).__name__})",
+            )
+        )
+    except ProtonMCPError as exc:
         results.append(CheckResult("Configuration", "FAIL", str(exc)))
     else:
         results.append(
@@ -92,7 +100,7 @@ def run_checks() -> list[CheckResult]:
                 CheckResult(
                     "State directory",
                     "FAIL",
-                    f"could not inspect permissions ({exc.strerror or type(exc).__name__})",
+                    f"could not inspect permissions ({type(exc).__name__})",
                 )
             )
         else:
@@ -116,7 +124,15 @@ def run_checks() -> list[CheckResult]:
     else:
         try:
             get_bridge_password(settings.bridge_user)
-        except (ProtonMCPError, keyring.errors.KeyringError) as exc:
+        except keyring.errors.KeyringError as exc:
+            results.append(
+                CheckResult(
+                    "Credential",
+                    "FAIL",
+                    f"OS keyring lookup failed ({type(exc).__name__})",
+                )
+            )
+        except ProtonMCPError as exc:
             results.append(CheckResult("Credential", "FAIL", str(exc)))
         else:
             credential_available = True
