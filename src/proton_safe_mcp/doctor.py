@@ -52,18 +52,21 @@ def run_checks() -> list[CheckResult]:
     results.append(CheckResult("Package", "PASS", _package_version()))
 
     operating_system = platform.system() or "unknown"
-    platform_detail = "supported" if operating_system == "Linux" else "Linux required"
+    linux_supported = operating_system == "Linux"
+    platform_detail = "supported" if linux_supported else "Linux required"
     results.append(
         CheckResult(
             "Platform",
-            "PASS" if operating_system == "Linux" else "FAIL",
+            "PASS" if linux_supported else "FAIL",
             f"{operating_system} ({platform_detail})",
         )
     )
+    if not linux_supported:
+        return results
 
     settings: Settings | None = None
     try:
-        settings = Settings.from_env()
+        settings = Settings.from_env(create_directories=False)
     except (OSError, ProtonMCPError) as exc:
         results.append(CheckResult("Configuration", "FAIL", str(exc)))
     else:
@@ -74,15 +77,28 @@ def run_checks() -> list[CheckResult]:
                 "Bridge account and loopback IMAP port are configured",
             )
         )
-        mode = stat.S_IMODE(settings.state_dir.stat().st_mode)
-        private = mode & 0o077 == 0
-        results.append(
-            CheckResult(
-                "State directory",
-                "PASS" if private else "FAIL",
-                "private permissions" if private else "must not be accessible by group or others",
+        if settings.state_dir.exists():
+            mode = stat.S_IMODE(settings.state_dir.stat().st_mode)
+            private = settings.state_dir.is_dir() and mode & 0o077 == 0
+            results.append(
+                CheckResult(
+                    "State directory",
+                    "PASS" if private else "FAIL",
+                    (
+                        "private permissions"
+                        if private
+                        else "must be a private directory inaccessible to group and others"
+                    ),
+                )
             )
-        )
+        else:
+            results.append(
+                CheckResult(
+                    "State directory",
+                    "WARN",
+                    "not created yet; first use will create it with private permissions",
+                )
+            )
 
     credential_available = False
     if settings is None:
