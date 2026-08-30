@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ChatGPT web and external Bridge-host deployments.
 - Plugin package tests that enforce manifest consistency, secret exclusion, loopback assumptions, and out-of-band approval language.
 
+## [1.0.2] - 2026-08-30
+
+### Added
+
+- Non-destructive, privacy-safe `proton-safe-mcp doctor` diagnostics for runtime, configuration,
+  credential, private-state, and Bridge connectivity checks, with system-error redaction.
+- A safety-constrained `llms-install.md` guide for AI-assisted installation.
+
 ## [1.0.1] - 2026-08-29
 
 ### Added
@@ -41,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/fbossiere/proton-safe-mcp/releases/tag/v1.0.0

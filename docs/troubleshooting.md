@@ -1,5 +1,15 @@
 # Troubleshooting
 
+Start with the privacy-safe diagnostic:
+
+```bash
+proton-safe-mcp doctor
+```
+
+It checks the supported runtime and platform, configuration, state-directory permissions,
+credential lookup, and Bridge connectivity without printing email addresses, credentials, mailbox
+counts, or message content.
+
 ## Startup and configuration
 
 ### `PROTON_BRIDGE_USER is required`

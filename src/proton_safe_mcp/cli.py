@@ -86,12 +86,19 @@ def _cmd_serve() -> int:
     return 0
 
 
+def _cmd_doctor() -> int:
+    from .doctor import run
+
+    return run()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="proton-safe-mcp",
         description="Draft-only Proton Mail MCP server with secure attachment staging.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("doctor", help="Check the local setup without showing private data")
     sub.add_parser("setup", help="Store the Bridge-generated IMAP password in the OS keyring")
     sub.add_parser("serve", help="Run the MCP server over STDIO")
     for name, help_text in (
@@ -107,6 +114,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "doctor":
+            return _cmd_doctor()
         settings = Settings.from_env()
         if args.command == "setup":
             return _cmd_setup(settings)

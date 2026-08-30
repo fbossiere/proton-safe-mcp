@@ -3,7 +3,7 @@
   "name": "io.github.fbossiere/proton-safe-mcp",
   "title": "Proton Safe MCP",
   "description": "Read and search Proton Mail, then create human-approved drafts without send capability.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "websiteUrl": "https://fbossiere.github.io/proton-safe-mcp/",
   "repository": {
     "url": "https://github.com/fbossiere/proton-safe-mcp",
@@ -13,7 +13,7 @@
     {
       "registryType": "pypi",
       "identifier": "proton-safe-mcp",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "runtimeHint": "uvx",
       "packageArguments": [
         {
