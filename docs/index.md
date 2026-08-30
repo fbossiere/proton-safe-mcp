@@ -34,6 +34,10 @@ Local terminal ──show / approve / reject──┘
                                       └──> Proton Mail Drafts (never Sent)
 ```
 
+The optional [Proton Safe OpenAI plugin](openai-plugin.md) packages guarded workflows around this
+same server. OpenAI Secure MCP Tunnel can make the STDIO server available to a private ChatGPT app
+without exposing an inbound port; it does not change the loopback-only Bridge boundary.
+
 ## Start here
 
 1. Follow [Getting started](getting-started.md) to install the server and connect Proton Bridge.
@@ -41,6 +45,7 @@ Local terminal ──show / approve / reject──┘
 3. Review the [security model](security-model.md) before combining the server with other tools.
 4. Use the [MCP tool reference](mcp-tools.md) for exact inputs and limits.
 5. Read the [attachment](attachments.md) and [draft approval](draft-approval.md) workflows before creating drafts.
+6. Use the [OpenAI plugin guide](openai-plugin.md) for local Codex installation or private ChatGPT tunnel access.
 
 Linux and Proton Mail Bridge users can also run the
 [10-minute external test](external-testing.md) and report installation friction without sharing

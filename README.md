@@ -120,6 +120,19 @@ Do not put `PROTON_BRIDGE_PASSWORD` in the client configuration. The server read
 
 Copy-paste instructions are available for [Claude Code, Cursor, and VS Code](https://fbossiere.github.io/proton-safe-mcp/clients/).
 
+## OpenAI plugin
+
+The repository includes a private, local-first **Proton Safe** plugin for ChatGPT and Codex. It
+packages safety-focused mail review and draft workflows with the same restricted MCP server:
+
+- Codex can launch the bundled STDIO configuration directly on the Bridge machine;
+- ChatGPT can reach a Bridge machine through OpenAI Secure MCP Tunnel without an inbound port;
+- a remote deployment still keeps `proton-safe-mcp` and Proton Mail Bridge together, with IMAP
+  fixed to `127.0.0.1`.
+
+See the [OpenAI plugin and Secure MCP Tunnel guide](https://fbossiere.github.io/proton-safe-mcp/openai-plugin/)
+for local installation, private ChatGPT connection, and always-on Bridge-host deployment.
+
 > **Help test the onboarding.** Linux and Proton Mail Bridge users can run the
 > [10-minute external test](https://fbossiere.github.io/proton-safe-mcp/external-testing/) and
 > submit privacy-safe [installation feedback](https://github.com/fbossiere/proton-safe-mcp/issues/new?template=installation-feedback.yml).
@@ -212,6 +225,8 @@ Read this before relying on the server in an autonomous workflow:
 - A model necessarily sees any mail it reads and any attachment it creates or uploads.
 - Uploaded attachment bytes are stored temporarily in files readable only by the Unix account. Use full-disk encryption.
 - If the MCP client also has unrestricted shell access as the same Unix user, it can potentially write an approval marker itself. Keep shell/file-writing tools out of the same autonomous agent session when approval integrity matters.
+- Secure MCP Tunnel keeps the server off the public internet, but mail content returned to an
+  OpenAI product still crosses the local Bridge boundary and is processed by that product.
 - Tool annotations are hints for clients, not authorization controls. The server enforces its own validation and local approval.
 - Proton Bridge's self-signed TLS certificate is not verified. This is acceptable here only because the target host is unchangeably `127.0.0.1`.
 

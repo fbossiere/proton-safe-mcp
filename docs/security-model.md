@@ -11,6 +11,8 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 - Oversized, reordered, truncated, substituted, or expired attachment uploads.
 - Draft changes after human approval.
 - Accidental exposure of the Proton account password.
+- Leakage of the Bridge credential, tunnel runtime API key, or account-specific ChatGPT app ID.
+- A remote client attempting to turn the tunnel into general access to the Bridge host.
 
 ## Enforced controls
 
@@ -26,15 +28,42 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 | State | `0700` directories, `0600` files, defensive no-follow behavior |
 | Inputs | Length, format, recipient, header, folder, and search validation |
 
+## Plugin and tunnel boundary
+
+The Proton Safe plugin adds workflow instructions and install metadata. It does not add authority.
+The code-enforced MCP tool surface remains the authorization boundary, and the plugin cannot
+approve or send a draft.
+
+For private ChatGPT access, OpenAI Secure MCP Tunnel is an outbound transport from the Bridge
+machine. The supported remote layout keeps `tunnel-client`, `proton-safe-mcp`, and Proton Mail
+Bridge in the same host trust boundary:
+
+```text
+ChatGPT ── OpenAI tunnel endpoint ── tunnel-client ── STDIO MCP ── Bridge on 127.0.0.1
+```
+
+The tunnel does not justify a configurable Bridge host. Direct remote IMAP is prohibited because
+Bridge's self-signed TLS certificate is accepted only under the enforced loopback assumption.
+
+The plugin does not contain a Bridge password, tunnel API key, or ChatGPT connection ID. The
+Bridge-generated password remains in the host keyring. The runtime API key remains in the
+`tunnel-client` host's secret environment, and the account-specific app mapping is generated only
+in the user's private plugin copy.
+
 ## Non-goals and limitations
 
 - The server is not an antivirus, phishing detector, spam filter, or sender-authentication product.
 - A model sees the content of mail it reads and attachments it uploads.
+- A tunnel keeps the MCP server private but does not keep returned mail content from the OpenAI
+  product that requested it. Proton end-to-end encryption no longer applies after Bridge decrypts
+  the message locally.
 - Attachment bytes are temporarily readable by the local Unix account; use full-disk encryption.
 - An MCP client with unrestricted shell access as the same user may be able to forge local approval state.
 - Tool annotations are client hints, not authorization controls.
 - Bridge uses a self-signed TLS certificate. Verification is disabled only because the target is fixed to loopback.
 - Unrelated write-capable tools in the same autonomous workflow can defeat the project's intended blast-radius reduction.
+- Availability depends on the Bridge host, Proton Mail Bridge, `tunnel-client`, the keyring session,
+  and outbound HTTPS all remaining available.
 
 ## Credential boundary
 

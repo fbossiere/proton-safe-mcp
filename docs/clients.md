@@ -18,6 +18,16 @@ command -v proton-safe-mcp
 
 Use the returned absolute path wherever an example shows `/absolute/path/to/proton-safe-mcp`.
 
+## ChatGPT and Codex plugin
+
+The repository includes a local marketplace and the `proton-safe` plugin. It can launch the same
+STDIO server directly in Codex, or supply the canonical skills for a private ChatGPT connection
+through OpenAI Secure MCP Tunnel.
+
+Follow the dedicated [OpenAI plugin guide](openai-plugin.md). The tunnel option is the supported
+way to reach a different Bridge machine: run both Proton Mail Bridge and `proton-safe-mcp` on that
+machine rather than exposing Bridge IMAP over the network.
+
 ## Claude Code
 
 Register the server at user scope so the configuration stays private and is available in all of
