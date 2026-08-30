@@ -72,7 +72,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==1.0.1
+uv tool install proton-safe-mcp==1.0.2
 ```
 
 For development from source instead:
@@ -119,6 +119,13 @@ to obtain the absolute command path when your client does not inherit your shell
 Do not put `PROTON_BRIDGE_PASSWORD` in the client configuration. The server reads it from the OS keyring established by `setup`.
 
 Copy-paste instructions are available for [Claude Code, Cursor, and VS Code](https://fbossiere.github.io/proton-safe-mcp/clients/).
+AI coding agents can follow the safety-constrained [`llms-install.md`](llms-install.md) guide.
+
+Verify the complete local setup without printing credentials, addresses, or mailbox data:
+
+```bash
+proton-safe-mcp doctor
+```
 
 > **Help test the onboarding.** Linux and Proton Mail Bridge users can run the
 > [10-minute external test](https://fbossiere.github.io/proton-safe-mcp/external-testing/) and
