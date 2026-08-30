@@ -21,6 +21,9 @@ from .config import Settings
 from .errors import BridgeError
 from .secrets import get_bridge_password
 
+_IMAP_ABORT = imaplib.IMAP4.abort
+_IMAP_ERROR = imaplib.IMAP4.error
+
 
 class _HTMLTextExtractor(HTMLParser):
     def __init__(self) -> None:
@@ -106,11 +109,17 @@ class ProtonBridgeClient:
             if "UTF8=ACCEPT" in capabilities:
                 client.enable("UTF8=ACCEPT")
             yield client
-        except (OSError, UnicodeError, imaplib.IMAP4.error, ssl.SSLError) as exc:
-            raise BridgeError(f"Proton Bridge IMAP error: {exc}") from exc
+        except ssl.SSLError as exc:
+            raise BridgeError("Proton Bridge TLS error") from exc
+        except _IMAP_ABORT as exc:
+            raise BridgeError("Proton Bridge connection closed unexpectedly") from exc
+        except _IMAP_ERROR as exc:
+            raise BridgeError("Proton Bridge IMAP protocol error") from exc
+        except (OSError, UnicodeError) as exc:
+            raise BridgeError("Proton Bridge connection failed") from exc
         finally:
             if client is not None:
-                with contextlib.suppress(OSError, imaplib.IMAP4.error):
+                with contextlib.suppress(OSError, _IMAP_ERROR):
                     client.logout()
 
     def status(self) -> dict[str, Any]:
