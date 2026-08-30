@@ -11,6 +11,8 @@ site/
 *.egg-info/
 .env
 
+# Account-specific ChatGPT app mappings must stay local.
+.app.json
 
 # IDE / editors
 .idea/

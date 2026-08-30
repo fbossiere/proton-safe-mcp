@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (for example, v1.0.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify distributions
+    if: startsWith(github.event.release.tag_name || inputs.tag, 'v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          version: "latest-known"
+          enable-cache: false
+      - name: Verify release versions agree
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          PACKAGE_VERSION=$(uv run --no-project python -c 'import pathlib, re; text = pathlib.Path("src/proton_safe_mcp/__init__.py").read_text(); print(re.search(r"__version__ = \"([^\"]+)\"", text).group(1))')
+          REGISTRY_VERSION=$(jq -r .version server.json)
+          test "$RELEASE_TAG" = "v$PACKAGE_VERSION"
+          test "$REGISTRY_VERSION" = "$PACKAGE_VERSION"
+          test "$(jq -r '.packages[0].version' server.json)" = "$PACKAGE_VERSION"
+      - run: uv sync --frozen --extra dev --extra docs
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest --cov
+      - run: uv run mkdocs build --strict
+      - run: uv build --no-sources
+      - run: uvx --from twine twine check dist/*
+      - name: Upload distributions
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/proton-safe-mcp
+    permissions:
+      id-token: write # PyPI trusted publishing; no long-lived API token is used.
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-distributions
+          path: dist/
+      - name: Publish distributions with OIDC
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+
+  publish-mcp-registry:
+    name: Publish to MCP Registry
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # MCP Registry GitHub OIDC authentication.
+    env:
+      MCP_PUBLISHER_VERSION: "1.8.1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - name: Install verified MCP publisher
+        run: |
+          curl --fail --location --silent --show-error \
+            --output mcp-publisher_linux_amd64.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output checksums.txt \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/registry_${MCP_PUBLISHER_VERSION}_checksums.txt"
+          grep 'mcp-publisher_linux_amd64.tar.gz$' checksums.txt | sha256sum --check --strict
+          tar --extract --gzip --no-same-owner \
+            --file mcp-publisher_linux_amd64.tar.gz mcp-publisher
+      - name: Authenticate with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+      - name: Validate server metadata
+        run: ./mcp-publisher validate
+      - name: Publish server metadata
+        run: ./mcp-publisher publish

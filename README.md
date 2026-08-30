@@ -1,13 +1,15 @@
 # Proton Safe MCP
 
+<!-- mcp-name: io.github.fbossiere/proton-safe-mcp -->
+
 [![CI](https://github.com/fbossiere/proton-safe-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/fbossiere/proton-safe-mcp/actions/workflows/ci.yml)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-4051b5)](https://fbossiere.github.io/proton-safe-mcp/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/fbossiere/proton-safe-mcp/blob/main/LICENSE)
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-blue)](https://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-<img width="1774" height="887" alt="Proton Safe MCP — draft-only email tools, human-approved" src="docs/assets/proton-mcp-safe.png" />
+<img width="1774" height="887" alt="Proton Safe MCP — draft-only email tools, human-approved" src="https://raw.githubusercontent.com/fbossiere/proton-safe-mcp/main/docs/assets/proton-mcp-safe.png" />
 
 A client-agnostic [FastMCP](https://gofastmcp.com) server for Proton Mail through the official [Proton Mail Bridge](https://proton.me/mail/bridge). It can read and search mail and create **drafts with attachments**. It deliberately **cannot send email** — you review every draft in Proton Mail and press Send yourself.
 
@@ -31,15 +33,15 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 ```text
 ┌────────────┐  STDIO / MCP   ┌───────────────────┐  IMAP (loopback)  ┌───────────────┐
-│ MCP client │ ─────────────► │  proton-safe-mcp  │ ────────────────► │ Proton Bridge │
+│ MCP client │ ─────────────► │  proton-safe-mcp  │ ───────────────► │ Proton Bridge │
 │ (any)      │   tools only   │                   │   127.0.0.1 only  │ (local)       │
 └────────────┘                │  ├─ read tools    │                   └──────┬────────┘
                               │  ├─ chunked       │                          │ E2E-encrypted
       you, in a terminal      │  │  attachment    │                          ▼
-┌────────────────────────┐    │  │  staging       │                   ┌───────────────┐
+┌───────────────────────┐    │  │  staging       │                   ┌───────────────┐
 │ proton-safe-mcp        │───►│  └─ draft         │                   │  Proton Mail  │
 │   approve <draft_id>   │    │     proposals     │                   │  (Drafts)     │
-└────────────────────────┘    └───────────────────┘                   └───────────────┘
+└────────────────────────┘    └───────────────────┘                   └──────────────┘
         out-of-band approval — not an MCP tool
 ```
 
@@ -67,10 +69,18 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 ## Installation
 
+Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install proton-safe-mcp==1.0.1
+```
+
+For development from source instead:
+
 ```bash
 git clone https://github.com/fbossiere/proton-safe-mcp.git
 cd proton-safe-mcp
-uv sync
+uv sync --extra dev
 ```
 
 Set only the Proton address and Bridge IMAP port in the MCP process environment:
@@ -83,20 +93,21 @@ export PROTON_IMAP_PORT="1143"
 Store the **Bridge-generated IMAP password** (shown in the Bridge UI), not your Proton account password:
 
 ```bash
-uv run proton-safe-mcp setup
+proton-safe-mcp setup
 ```
 
 The value shown by Bridge is installation-specific and works only against the local Bridge.
 
 ## Register with an MCP client
 
-Configure a local STDIO server with these logical fields. The exact configuration syntax belongs to the MCP client, not to this project:
+Configure a local STDIO server with these logical fields. Use `command -v proton-safe-mcp`
+to obtain the absolute command path when your client does not inherit your shell `PATH`:
 
 ```json
 {
   "name": "proton-safe",
   "transport": "stdio",
-  "command": "/absolute/path/to/proton-safe-mcp/.venv/bin/proton-safe-mcp",
+  "command": "/absolute/path/to/proton-safe-mcp",
   "args": ["serve"],
   "env": {
     "PROTON_BRIDGE_USER": "your-address@proton.me",
@@ -106,6 +117,28 @@ Configure a local STDIO server with these logical fields. The exact configuratio
 ```
 
 Do not put `PROTON_BRIDGE_PASSWORD` in the client configuration. The server reads it from the OS keyring established by `setup`.
+
+Copy-paste instructions are available for [Claude Code, Cursor, and VS Code](https://fbossiere.github.io/proton-safe-mcp/clients/).
+
+## OpenAI plugin
+
+The repository includes a private, local-first **Proton Safe** plugin for ChatGPT and Codex. It
+packages safety-focused mail review and draft workflows with the same restricted MCP server:
+
+- ChatGPT desktop and Codex can launch the bundled STDIO configuration directly on the Bridge
+  machine, with no tunnel or dedicated server;
+- direct MCP registration remains available when the packaged workflow skills are not needed;
+- ChatGPT web or a client on another machine can optionally reach the Bridge host through OpenAI
+  Secure MCP Tunnel without an inbound port;
+- a remote deployment still keeps `proton-safe-mcp` and Proton Mail Bridge together, with IMAP
+  fixed to `127.0.0.1`.
+
+See the [OpenAI plugin guide](https://fbossiere.github.io/proton-safe-mcp/openai-plugin/) for local
+ChatGPT desktop/Codex installation, direct MCP registration, and the optional remote tunnel.
+
+> **Help test the onboarding.** Linux and Proton Mail Bridge users can run the
+> [10-minute external test](https://fbossiere.github.io/proton-safe-mcp/external-testing/) and
+> submit privacy-safe [installation feedback](https://github.com/fbossiere/proton-safe-mcp/issues/new?template=installation-feedback.yml).
 
 ## Available MCP tools
 
@@ -139,7 +172,7 @@ The MCP client only needs the ability to obtain the bytes of a file and call too
 
    ```bash
    export PROTON_BRIDGE_USER="your-address@proton.me"
-   /absolute/path/to/.venv/bin/proton-safe-mcp approve <draft_id>
+   proton-safe-mcp approve <draft_id>
    ```
 
 8. Allow the MCP client to call `commit_approved_draft(draft_id)`.
@@ -186,7 +219,7 @@ uv run mypy              # strict type checking
 
 Proton Bridge is not needed for development: the test suite fakes the IMAP layer. Tests cover path rejection, MIME restrictions, ordered chunks, size/hash verification, token consumption, header injection, approval digest integrity, CLI approval flow, and HTML-to-text sanitization.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the design rules that reviews enforce.
+See [CONTRIBUTING.md](https://github.com/fbossiere/proton-safe-mcp/blob/main/CONTRIBUTING.md) for the design rules that reviews enforce.
 
 ## Threat-model limitations
 
@@ -195,15 +228,17 @@ Read this before relying on the server in an autonomous workflow:
 - A model necessarily sees any mail it reads and any attachment it creates or uploads.
 - Uploaded attachment bytes are stored temporarily in files readable only by the Unix account. Use full-disk encryption.
 - If the MCP client also has unrestricted shell access as the same Unix user, it can potentially write an approval marker itself. Keep shell/file-writing tools out of the same autonomous agent session when approval integrity matters.
+- Secure MCP Tunnel keeps the server off the public internet, but mail content returned to an
+  OpenAI product still crosses the local Bridge boundary and is processed by that product.
 - Tool annotations are hints for clients, not authorization controls. The server enforces its own validation and local approval.
 - Proton Bridge's self-signed TLS certificate is not verified. This is acceptable here only because the target host is unchangeably `127.0.0.1`.
 
 ## Security
 
-To report a vulnerability, use [GitHub private vulnerability reporting](https://github.com/fbossiere/proton-safe-mcp/security/advisories/new) — never a public issue. See [SECURITY.md](SECURITY.md).
+To report a vulnerability, use [GitHub private vulnerability reporting](https://github.com/fbossiere/proton-safe-mcp/security/advisories/new) — never a public issue. See [SECURITY.md](https://github.com/fbossiere/proton-safe-mcp/blob/main/SECURITY.md).
 
 ## License
 
-[MIT](LICENSE) © 2026 Francois Bossiere.
+[MIT](https://github.com/fbossiere/proton-safe-mcp/blob/main/LICENSE) © 2026 Francois Bossiere.
 
 This project is not affiliated with or endorsed by Proton AG. "Proton Mail" and "Proton Mail Bridge" are trademarks of Proton AG.

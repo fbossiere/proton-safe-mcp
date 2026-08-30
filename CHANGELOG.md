@@ -9,7 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Repo-local `proton-safe` plugin for ChatGPT and Codex with guarded mail-review and draft-preparation skills.
+- Pinned STDIO MCP configuration and a local marketplace entry for plugin testing.
+- Local-first ChatGPT desktop and Codex setup, plus an optional OpenAI Secure MCP Tunnel guide for
+  ChatGPT web and external Bridge-host deployments.
+- Plugin package tests that enforce manifest consistency, secret exclusion, loopback assumptions, and out-of-band approval language.
+
+## [1.0.1] - 2026-08-29
+
+### Added
+
 - Version-controlled MkDocs documentation with strict pull-request builds and automatic GitHub Pages deployment from `main`.
+- PyPI trusted-publishing and official MCP Registry release automation.
+- Copy-paste setup guides for Claude Code, Cursor, and VS Code.
+- Official MCP Registry metadata for the PyPI distribution.
+
+### Changed
+
+- Recommended installation now uses a version-pinned `uv tool install` instead of a source checkout.
 
 ## [1.0.0] - 2026-08-29
 
@@ -24,5 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/fbossiere/proton-safe-mcp/releases/tag/v1.0.0

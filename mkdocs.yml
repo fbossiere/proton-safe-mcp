@@ -52,6 +52,9 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Client setup: clients.md
+  - OpenAI plugin: openai-plugin.md
+  - External testing: external-testing.md
   - User guide:
       - Configuration: configuration.md
       - MCP tools: mcp-tools.md
@@ -60,4 +63,5 @@ nav:
   - Security model: security-model.md
   - Troubleshooting: troubleshooting.md
   - Development: development.md
+  - Releasing: releasing.md
   - Changelog: https://github.com/fbossiere/proton-safe-mcp/blob/main/CHANGELOG.md
