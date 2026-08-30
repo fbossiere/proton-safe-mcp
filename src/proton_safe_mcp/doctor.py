@@ -105,7 +105,9 @@ def run_checks() -> list[CheckResult]:
             )
         else:
             mode = stat.S_IMODE(state_metadata.st_mode)
-            private = stat.S_ISDIR(state_metadata.st_mode) and mode & 0o077 == 0
+            private = (
+                stat.S_ISDIR(state_metadata.st_mode) and mode & 0o700 == 0o700 and mode & 0o077 == 0
+            )
             results.append(
                 CheckResult(
                     "State directory",
@@ -113,7 +115,7 @@ def run_checks() -> list[CheckResult]:
                     (
                         "private permissions"
                         if private
-                        else "must be a private directory inaccessible to group and others"
+                        else ("must grant rwx to the owner and be inaccessible to group and others")
                     ),
                 )
             )

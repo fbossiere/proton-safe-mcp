@@ -152,3 +152,23 @@ def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "[FAIL] State directory: could not inspect permissions" in output
     assert "private path not printed" not in output
+
+
+def test_doctor_rejects_private_but_unusable_state_directory(settings, monkeypatch, capsys):
+    _configure(settings, monkeypatch)
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(
+        doctor.ProtonBridgeClient,
+        "status",
+        lambda _self: {"connected": True},
+    )
+    settings.state_dir.chmod(0o000)
+
+    try:
+        assert cli.main(["doctor"]) == 1
+        output = capsys.readouterr().out
+        assert "[FAIL] State directory" in output
+        assert "must grant rwx to the owner" in output
+    finally:
+        settings.state_dir.chmod(0o700)
