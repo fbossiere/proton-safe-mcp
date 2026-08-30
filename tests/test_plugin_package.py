@@ -20,7 +20,10 @@ def test_plugin_manifest_and_marketplace_are_consistent():
     marketplace = _load_json(ROOT / ".agents" / "plugins" / "marketplace.json")
 
     assert manifest["name"] == "proton-safe"
-    assert manifest["version"] == "0.1.0"
+    base_version, separator, cachebuster = manifest["version"].partition("+")
+    assert base_version == "0.1.0"
+    assert separator == "+"
+    assert cachebuster.startswith("codex.")
     assert manifest["skills"] == "./skills/"
     assert manifest["mcpServers"] == "./.mcp.json"
     assert "apps" not in manifest
@@ -74,3 +77,13 @@ def test_plugin_skills_preserve_untrusted_mail_and_out_of_band_approval_boundari
     assert "never attempt to send, delete, move" in text
     assert "proton_bridge_password" not in text
     assert "plugin_asdk_app_" not in text
+
+
+def test_plugin_docs_are_local_first_and_tunnel_optional():
+    guide = (ROOT / "docs" / "openai-plugin.md").read_text(encoding="utf-8").lower()
+
+    assert "chatgpt desktop and codex on the bridge machine" in guide
+    assert "settings → mcp servers" in guide
+    assert "direct mcp registration without the plugin" in guide
+    assert "no tunnel or dedicated server is required" in guide
+    assert "optional: connect chatgpt web or a remote bridge host" in guide

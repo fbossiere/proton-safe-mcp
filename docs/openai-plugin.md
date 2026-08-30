@@ -1,4 +1,4 @@
-# OpenAI plugin and private tunnel
+# OpenAI plugin: local first, tunnel optional
 
 The repository ships a local-first **Proton Safe** plugin for ChatGPT and Codex. It packages two
 skills around the existing MCP server:
@@ -11,6 +11,10 @@ The plugin adds guidance and install metadata. It does not add tools or weaken t
 capability boundary. Sending, deleting, moving, downloading received attachments, and approving a
 draft through MCP remain unavailable.
 
+The plugin is optional. A direct MCP registration is enough to connect Proton Safe MCP. Install the
+plugin when you also want the reusable mail-review and draft-preparation workflows packaged with
+the server configuration.
+
 OpenAI's [plugin packaging documentation](https://developers.openai.com/plugins/build/plugins)
 distinguishes bundled local MCP servers (`.mcp.json`) from registered MCP connections
 (`.app.json`). This project supports both deployment shapes without committing an account-specific
@@ -18,20 +22,26 @@ connection ID.
 
 ## Choose a deployment
 
-### Local Codex
+### ChatGPT desktop and Codex on the Bridge machine
 
-Use this when Codex, `proton-safe-mcp`, and Proton Mail Bridge run under the same Linux user:
+This is the primary and simplest deployment. Use it when ChatGPT desktop or Codex,
+`proton-safe-mcp`, and Proton Mail Bridge run on the same machine under the same Linux user:
 
 ```text
-Codex plugin ── STDIO ──> proton-safe-mcp ── IMAP 127.0.0.1 ──> Proton Mail Bridge
+ChatGPT desktop / Codex ── STDIO ──> proton-safe-mcp
+                                             │
+                                             └── IMAP 127.0.0.1 ──> Proton Mail Bridge
 ```
 
 No tunnel or dedicated server is required. The checked-in `.mcp.json` launches the pinned
-`proton-safe-mcp==1.0.1` release with `uvx`.
+`proton-safe-mcp==1.0.1` release with `uvx`. ChatGPT desktop, Codex CLI, and the Codex IDE
+extension support local STDIO servers and share the MCP configuration for the same Codex host; see
+OpenAI's [MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=desktop).
 
-### Private ChatGPT or an external Bridge host
+### ChatGPT web or a Bridge on another machine
 
-Use this when the OpenAI product is remote, or when Bridge runs on an always-on machine:
+Use the optional tunnel only when the requesting OpenAI product is remote from the Bridge host,
+such as ChatGPT web, or when Bridge runs on a separate always-on machine:
 
 ```text
 ChatGPT or Codex
@@ -55,7 +65,7 @@ supports private STDIO MCP servers and developer-mode testing. It does not suppo
 submission; a public plugin would require a stable public HTTPS MCP endpoint and a separate threat
 model.
 
-## Install the local plugin
+## Install the local plugin (recommended local path)
 
 Complete [Getting started](getting-started.md) first. Proton Mail Bridge must be running and
 `proton-safe-mcp setup` must have stored the Bridge-generated IMAP password in the operating-system
@@ -87,7 +97,25 @@ Test with:
 3. Inspect the exposed tools and confirm there is no send, delete, move, received-attachment
    download, or MCP approval tool.
 
-## Connect a private ChatGPT app through the tunnel
+### Direct MCP registration without the plugin
+
+If you only need the MCP tools, the plugin is not required. In ChatGPT desktop:
+
+1. Open **Settings → MCP servers**.
+2. Select **Add server**.
+3. Choose **STDIO** and configure `uvx` with these arguments:
+
+   ```text
+   --from proton-safe-mcp==1.0.1 proton-safe-mcp serve
+   ```
+
+4. Forward `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT`, but never a Proton or Bridge password.
+5. Save the server, restart the app, and use `/mcp` to verify the exposed tools.
+
+The same configuration is available to Codex CLI and the IDE extension on that Codex host. This
+direct path provides the server tools but not the two workflow skills packaged by the plugin.
+
+## Optional: connect ChatGPT web or a remote Bridge host
 
 ### 1. Prepare the Bridge host
 

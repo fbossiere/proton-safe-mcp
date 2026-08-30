@@ -10,8 +10,12 @@ The bundled MCP configuration launches the reviewed `proton-safe-mcp==1.0.1` rel
 It deliberately passes no Proton or Bridge password through plugin configuration. Complete the
 normal `proton-safe-mcp setup` keyring step before enabling the plugin.
 
-For ChatGPT access through OpenAI Secure MCP Tunnel, run `tunnel-client` on the same machine as
-Proton Mail Bridge and configure its MCP command as:
+The primary deployment runs locally in ChatGPT desktop or Codex on the same machine as Proton Mail
+Bridge. It uses STDIO directly and requires no tunnel or dedicated server. A direct MCP
+registration is also sufficient when the packaged workflow skills are not needed.
+
+For optional ChatGPT web access or a Bridge on another machine, run OpenAI Secure MCP Tunnel's
+`tunnel-client` on the same machine as Proton Mail Bridge and configure its MCP command as:
 
 ```text
 uvx --from proton-safe-mcp==1.0.1 proton-safe-mcp serve

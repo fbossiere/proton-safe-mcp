@@ -21,12 +21,16 @@ Use the returned absolute path wherever an example shows `/absolute/path/to/prot
 ## ChatGPT and Codex plugin
 
 The repository includes a local marketplace and the `proton-safe` plugin. It can launch the same
-STDIO server directly in Codex, or supply the canonical skills for a private ChatGPT connection
-through OpenAI Secure MCP Tunnel.
+STDIO server directly in ChatGPT desktop and Codex while packaging the canonical mail-review and
+draft-preparation skills. This is the primary OpenAI setup when the client and Proton Mail Bridge
+run on the same machine.
 
-Follow the dedicated [OpenAI plugin guide](openai-plugin.md). The tunnel option is the supported
-way to reach a different Bridge machine: run both Proton Mail Bridge and `proton-safe-mcp` on that
-machine rather than exposing Bridge IMAP over the network.
+The plugin is optional: ChatGPT desktop can also register the STDIO command directly under
+**Settings → MCP servers**, and that configuration is shared with Codex on the same host. Follow
+the dedicated [OpenAI plugin guide](openai-plugin.md) for both paths.
+
+Use the tunnel only for ChatGPT web or to reach a different Bridge machine. Run Proton Mail Bridge
+and `proton-safe-mcp` together on that machine rather than exposing Bridge IMAP over the network.
 
 ## Claude Code
 

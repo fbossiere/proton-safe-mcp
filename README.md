@@ -125,13 +125,16 @@ Copy-paste instructions are available for [Claude Code, Cursor, and VS Code](htt
 The repository includes a private, local-first **Proton Safe** plugin for ChatGPT and Codex. It
 packages safety-focused mail review and draft workflows with the same restricted MCP server:
 
-- Codex can launch the bundled STDIO configuration directly on the Bridge machine;
-- ChatGPT can reach a Bridge machine through OpenAI Secure MCP Tunnel without an inbound port;
+- ChatGPT desktop and Codex can launch the bundled STDIO configuration directly on the Bridge
+  machine, with no tunnel or dedicated server;
+- direct MCP registration remains available when the packaged workflow skills are not needed;
+- ChatGPT web or a client on another machine can optionally reach the Bridge host through OpenAI
+  Secure MCP Tunnel without an inbound port;
 - a remote deployment still keeps `proton-safe-mcp` and Proton Mail Bridge together, with IMAP
   fixed to `127.0.0.1`.
 
-See the [OpenAI plugin and Secure MCP Tunnel guide](https://fbossiere.github.io/proton-safe-mcp/openai-plugin/)
-for local installation, private ChatGPT connection, and always-on Bridge-host deployment.
+See the [OpenAI plugin guide](https://fbossiere.github.io/proton-safe-mcp/openai-plugin/) for local
+ChatGPT desktop/Codex installation, direct MCP registration, and the optional remote tunnel.
 
 > **Help test the onboarding.** Linux and Proton Mail Bridge users can run the
 > [10-minute external test](https://fbossiere.github.io/proton-safe-mcp/external-testing/) and
