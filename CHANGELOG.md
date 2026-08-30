@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Documented Ubuntu ChatGPT desktop plugin installation, including the bundled Codex fallback,
+  third-party binary conflicts, GUI environment inheritance, and post-install verification.
+
 ## [1.0.2] - 2026-08-30
 
 ### Added
