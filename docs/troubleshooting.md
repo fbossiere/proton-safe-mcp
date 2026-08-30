@@ -22,6 +22,8 @@ binary:
 test -x /usr/lib/chatgpt/resources/codex
 /usr/lib/chatgpt/resources/codex --version
 /usr/lib/chatgpt/resources/codex plugin --help
+/usr/lib/chatgpt/resources/codex plugin marketplace --help
+/usr/lib/chatgpt/resources/codex plugin add --help
 ```
 
 The `/usr/lib/chatgpt/resources/codex` path is package-specific and may change. Do not install a
@@ -36,6 +38,8 @@ require the plugin help to work:
 type -a codex
 codex --version
 codex plugin --help
+codex plugin marketplace --help
+codex plugin add --help
 ```
 
 If the Ubuntu ChatGPT bundled command passes the check, use its absolute path for installation:

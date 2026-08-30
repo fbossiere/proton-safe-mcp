@@ -81,6 +81,8 @@ First try the normal command:
 ```bash
 codex --version
 codex plugin --help
+codex plugin marketplace --help
+codex plugin add --help
 ```
 
 On the Ubuntu ChatGPT desktop package tested by this project, the app-owned executable is currently
@@ -91,6 +93,8 @@ cross-platform interface. Use it only after verifying it exists and exposes the 
 test -x /usr/lib/chatgpt/resources/codex
 /usr/lib/chatgpt/resources/codex --version
 /usr/lib/chatgpt/resources/codex plugin --help
+/usr/lib/chatgpt/resources/codex plugin marketplace --help
+/usr/lib/chatgpt/resources/codex plugin add --help
 ```
 
 Set `CODEX_BIN` to whichever verified command works for the rest of this guide:
@@ -108,6 +112,8 @@ CODEX_BIN=/usr/lib/chatgpt/resources/codex
 Do not install an unrelated distribution or Snap package merely because the shell suggests one
 after `command not found`. A same-named third-party or older binary may not implement
 `codex plugin`. Verify the publisher separately and require `plugin --help` to succeed.
+Also require `plugin marketplace --help` and `plugin add --help`, because those are the exact
+subcommands used below.
 
 ### 2. Add the marketplace and plugin
 
