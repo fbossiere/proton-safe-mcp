@@ -35,6 +35,12 @@ Publishing the GitHub release starts `.github/workflows/release.yml`. The workfl
 consistency, rebuilds and tests the distributions, publishes them to PyPI, and only then publishes
 `server.json` to the MCP Registry.
 
+If PyPI succeeds but the MCP Registry rejects the metadata, fix and merge `server.json`, then run
+the **Release** workflow manually from `main` with the original release tag and
+**Republish only MCP Registry metadata** enabled. This recovery path checks that both versions in
+`server.json` still match the requested tag and does not rebuild or re-upload the immutable PyPI
+distribution.
+
 ## Verify publication
 
 - PyPI: `https://pypi.org/project/proton-safe-mcp/`
