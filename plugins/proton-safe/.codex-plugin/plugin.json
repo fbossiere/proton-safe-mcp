@@ -1,6 +1,6 @@
 {
   "name": "proton-safe",
-  "version": "0.1.0+codex.20260901065257",
+  "version": "0.1.0+codex.20260901072229",
   "description": "Read Proton Mail safely and prepare drafts that require local human approval.",
   "author": {
     "name": "Francois Bossiere",
