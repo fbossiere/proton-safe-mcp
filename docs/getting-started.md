@@ -38,6 +38,9 @@ export PROTON_IMAP_PORT="1143"
 ```
 
 The port shown by your Bridge installation is authoritative if it differs from `1143`.
+These exports affect only the current shell and processes started from it. If ChatGPT desktop or
+another graphical client starts the server, follow that client's environment procedure instead;
+for the Proton Safe plugin, use the [OpenAI plugin guide](openai-plugin.md).
 
 !!! danger "Use the Bridge credential only"
 

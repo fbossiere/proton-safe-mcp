@@ -143,6 +143,15 @@ packages safety-focused mail review and draft workflows with the same restricted
 See the [OpenAI plugin guide](https://fbossiere.github.io/proton-safe-mcp/openai-plugin/) for local
 ChatGPT desktop/Codex installation, direct MCP registration, and the optional remote tunnel.
 
+> **Plugin installed but no Proton tools?** The bundled MCP configuration forwards
+> `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT` from the environment that started Codex; it does not
+> define their values. On Ubuntu, a correct `~/.config/environment.d/*.conf` file can still require
+> a user-manager reload, while GNOME and already-running terminals can keep their earlier
+> environment. If a menu relaunch still has no tools, start ChatGPT once from a terminal that has
+> loaded the file. Follow the privacy-safe
+> [Ubuntu recovery procedure](https://fbossiere.github.io/proton-safe-mcp/troubleshooting/#plugin-is-installed-but-mcp-shows-no-proton-tools)
+> or the [FAQ](https://fbossiere.github.io/proton-safe-mcp/faq/) before reinstalling anything.
+
 > **Help test the onboarding.** Linux and Proton Mail Bridge users can run the
 > [10-minute external test](https://fbossiere.github.io/proton-safe-mcp/external-testing/) and
 > submit privacy-safe [installation feedback](https://github.com/fbossiere/proton-safe-mcp/issues/new?template=installation-feedback.yml).

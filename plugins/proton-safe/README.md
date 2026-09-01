@@ -14,6 +14,11 @@ The primary deployment runs locally in ChatGPT desktop or Codex on the same mach
 Bridge. It uses STDIO directly and requires no tunnel or dedicated server. A direct MCP
 registration is also sufficient when the packaged workflow skills are not needed.
 
+The bundled `.mcp.json` forwards `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT` from Codex's local
+environment; it does not embed personal values. If the plugin is installed but exposes no tools,
+use the documented [Ubuntu environment recovery](https://fbossiere.github.io/proton-safe-mcp/troubleshooting/#plugin-is-installed-but-mcp-shows-no-proton-tools)
+and [FAQ](https://fbossiere.github.io/proton-safe-mcp/faq/) before reinstalling anything.
+
 For optional ChatGPT web access or a Bridge on another machine, run OpenAI Secure MCP Tunnel's
 `tunnel-client` on the same machine as Proton Mail Bridge and configure its MCP command as:
 

@@ -10,7 +10,99 @@ It checks the supported runtime and platform, configuration, state-directory per
 credential lookup, and Bridge connectivity without printing email addresses, credentials, mailbox
 counts, or message content.
 
+## Quick symptom map
+
+| Symptom | Likely layer | First check |
+| --- | --- | --- |
+| Plugin is installed but `/mcp` shows no Proton tools | MCP server exited before tool discovery | Check the user-manager variables below |
+| `PROTON_BRIDGE_USER is required` | Codex did not inherit the account variable | Reload `environment.d` and verify names |
+| `echo "$PROTON_BRIDGE_USER"` is empty after a reload | Current shell kept its old environment | Check `systemctl --user show-environment`; source the file only for a CLI test |
+| `doctor` passes through `systemd-run` but the plugin has no tools | GNOME or ChatGPT kept an older environment | Fully quit, then launch ChatGPT once from the prepared terminal |
+| `NoKeyringError` appears only inside a sandbox | That process cannot reach the desktop keyring | Run `doctor` from the normal user session; do not copy the password into plugin JSON |
+| Bridge authentication fails everywhere | Bridge, port, or stored Bridge credential | Check Bridge and rerun `setup` if its credential changed |
+
 ## Startup and configuration
+
+### Plugin is installed but `/mcp` shows no Proton tools
+
+This means installation and MCP startup are different states. The bundled plugin can be present
+while its local STDIO server exits before returning its tool list. OpenAI's Codex MCP configuration
+distinguishes between `env`, which sets a value, and `env_vars`, which only allows and forwards a
+value already present in Codex's local environment. Proton Safe deliberately uses `env_vars` so a
+personal address is not committed to the plugin package.
+
+Use this sequence on Ubuntu:
+
+1. Confirm the plugin is installed with the same verified Codex binary used during installation:
+
+   ```bash
+   "$CODEX_BIN" plugin list
+   ```
+
+2. Confirm the non-secret file exists and contains assignments in `KEY=VALUE` form, without
+   `export`:
+
+   ```ini
+   PROTON_BRIDGE_USER=your-address@proton.me
+   PROTON_IMAP_PORT=1143
+   ```
+
+3. Reload the user environment generator:
+
+   ```bash
+   systemctl --user daemon-reload
+   ```
+
+4. Verify only the variable names, without printing their values:
+
+   ```bash
+   systemctl --user show-environment |
+     awk -F= '$1 == "PROTON_BRIDGE_USER" || $1 == "PROTON_IMAP_PORT" { print $1 "=<set>" }'
+   ```
+
+   Both names must appear. Logging out and back in is not a substitute for this check; the user
+   manager may have retained its earlier environment.
+
+5. Test the corrected user-manager environment with the plugin's pinned runtime:
+
+   ```bash
+   systemd-run --user --wait --pipe \
+     uvx --from proton-safe-mcp==1.0.2 proton-safe-mcp doctor
+   ```
+
+   This privacy-safe command separates environment, keyring, and Bridge failures before ChatGPT is
+   involved. It does **not** prove that GNOME or an already-running ChatGPT process inherited the
+   same variables.
+
+6. Quit ChatGPT completely, including background processes, reopen it, start a new task, and type
+   `/mcp`. The `proton-safe` server should now list its tools.
+
+7. If the menu relaunch still has no tools, quit ChatGPT again. Confirm that no old application
+   process remains:
+
+   ```bash
+   pgrep -a -x ChatGPT
+   ```
+
+   Wait until the command prints nothing. Then launch ChatGPT from a terminal that explicitly
+   loads the same non-secret file:
+
+   ```bash
+   set -a
+   . ~/.config/environment.d/90-proton-safe.conf
+   set +a
+   chatgpt
+   ```
+
+   An Electron single-instance launch can hand control to an older process, so starting this
+   command before the previous instance exits will not repair its environment. After the app
+   opens, create a new task and check `/mcp` again.
+
+Do not add `PROTON_BRIDGE_PASSWORD` to `.mcp.json`, `environment.d`, or a checked-in file. Do not
+reinstall the Bridge or plugin unless the commands above identify an installation failure.
+
+See the [FAQ](faq.md) for why the current terminal may still show an empty variable and how to
+collect privacy-safe evidence.
 
 ### ChatGPT desktop on Ubuntu cannot find `codex`
 
@@ -64,10 +156,8 @@ unrelated package.
 ### The plugin is installed but ChatGPT cannot see its settings
 
 An app launched from the Ubuntu desktop menu does not inherit variables exported later in an
-unrelated terminal. Follow the `environment.d` procedure in the
-[OpenAI plugin guide](openai-plugin.md#3-make-non-secret-settings-available-to-the-desktop-app),
-sign out and back in, quit ChatGPT completely, and start a new task. Type `/mcp` to inspect the
-connected servers.
+unrelated terminal. Follow the complete procedure under
+[Plugin is installed but `/mcp` shows no Proton tools](#plugin-is-installed-but-mcp-shows-no-proton-tools).
 
 ### `PROTON_BRIDGE_USER is required`
 
