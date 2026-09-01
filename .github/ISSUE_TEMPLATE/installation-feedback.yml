@@ -28,7 +28,7 @@ body:
     attributes:
       label: Proton Safe MCP version
       description: Copy the installed version shown by `uv tool list`.
-      placeholder: "proton-safe-mcp v1.0.2"
+      placeholder: "proton-safe-mcp v1.1.0"
     validations:
       required: true
 

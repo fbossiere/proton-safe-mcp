@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-01
+
 ### Added
 
 - Added `extract_attachment_text` for bounded, read-only text extraction from selected received
@@ -64,7 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/fbossiere/proton-safe-mcp/releases/tag/v1.0.0
