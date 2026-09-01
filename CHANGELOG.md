@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replaced the README ASCII architecture diagram with version-controlled Mermaid source and a
+  rendered PNG asset.
 - Documented Ubuntu ChatGPT desktop plugin installation, including the bundled Codex fallback,
   third-party binary conflicts, GUI environment inheritance, and post-install verification.
 - Added a privacy-safe Ubuntu recovery workflow for plugins that install successfully but expose
