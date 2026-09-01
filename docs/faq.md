@@ -66,6 +66,16 @@ If every check passes there but `/mcp` still has no tools, fully quit ChatGPT. W
 `~/.config/environment.d/90-proton-safe.conf`, as shown in the
 [troubleshooting procedure](troubleshooting.md#plugin-is-installed-but-mcp-shows-no-proton-tools).
 
+## Do I have to start ChatGPT from a terminal every time?
+
+No. The prepared-terminal command is a one-time diagnostic that proves environment inheritance is
+the remaining problem. After it succeeds, install the
+[persistent per-user menu launcher](troubleshooting.md#make-the-menu-launch-permanent). The normal
+ChatGPT icon will then load `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT` automatically.
+
+The launcher deliberately parses only those two non-secret settings. It does not source arbitrary
+shell code and never reads, stores, or exports the Bridge password.
+
 ## Why can restarting ChatGPT from the menu still fail?
 
 The `systemd` user manager, GNOME Shell, terminals, and ChatGPT are separate processes. Reloading

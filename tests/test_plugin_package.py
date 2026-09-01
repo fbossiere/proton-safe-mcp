@@ -117,6 +117,9 @@ def test_ubuntu_plugin_install_failures_are_documented():
     assert "systemd-run --user --wait --pipe" in troubleshooting
     assert "pgrep -a -x chatgpt" in troubleshooting
     assert "chatgpt\n" in troubleshooting
+    assert "make the menu launch permanent" in troubleshooting
+    assert ".local/bin/chatgpt-proton-safe" in troubleshooting
+    assert "exec /usr/bin/chatgpt" in troubleshooting
     assert "do not add `proton_bridge_password`" in troubleshooting
 
 
@@ -130,6 +133,8 @@ def test_plugin_faq_documents_environment_lifecycle_without_secrets():
     assert "systemctl --user daemon-reload" in faq
     assert "systemd-run --user --wait --pipe" in faq
     assert "why can restarting chatgpt from the menu still fail?" in faq
+    assert "do i have to start chatgpt from a terminal every time?" in faq
+    assert "persistent per-user menu launcher" in faq
     assert "single-instance" in faq
     assert "nokeyringerror" in faq
     assert "faq: faq.md" in navigation

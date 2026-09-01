@@ -148,7 +148,8 @@ ChatGPT desktop/Codex installation, direct MCP registration, and the optional re
 > define their values. On Ubuntu, a correct `~/.config/environment.d/*.conf` file can still require
 > a user-manager reload, while GNOME and already-running terminals can keep their earlier
 > environment. If a menu relaunch still has no tools, start ChatGPT once from a terminal that has
-> loaded the file. Follow the privacy-safe
+> loaded the file. That terminal launch is a diagnostic, not a requirement for every start; the
+> troubleshooting guide also provides a persistent per-user menu launcher. Follow the privacy-safe
 > [Ubuntu recovery procedure](https://fbossiere.github.io/proton-safe-mcp/troubleshooting/#plugin-is-installed-but-mcp-shows-no-proton-tools)
 > or the [FAQ](https://fbossiere.github.io/proton-safe-mcp/faq/) before reinstalling anything.
 
