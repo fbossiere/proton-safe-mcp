@@ -31,19 +31,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 ## Architecture
 
-```text
-┌────────────┐  STDIO / MCP   ┌───────────────────┐  IMAP (loopback)  ┌───────────────┐
-│ MCP client │ ─────────────► │  proton-safe-mcp  │ ───────────────► │ Proton Bridge │
-│ (any)      │   tools only   │                   │   127.0.0.1 only  │ (local)       │
-└────────────┘                │  ├─ read tools    │                   └──────┬────────┘
-                              │  ├─ chunked       │                          │ E2E-encrypted
-      you, in a terminal      │  │  attachment    │                          ▼
-┌───────────────────────┐    │  │  staging       │                   ┌───────────────┐
-│ proton-safe-mcp        │───►│  └─ draft         │                   │  Proton Mail  │
-│   approve <draft_id>   │    │     proposals     │                   │  (Drafts)     │
-└────────────────────────┘    └───────────────────┘                   └──────────────┘
-        out-of-band approval — not an MCP tool
-```
+![Architecture diagram: MCP client (tools-only over STDIO) → proton-safe-mcp (read tools, chunked attachment staging, draft proposals) → Proton Mail Bridge (IMAP loopback 127.0.0.1) → Proton Mail Drafts; out-of-band terminal approval via `proton-safe-mcp approve <draft_id>`](https://raw.githubusercontent.com/fbossiere/proton-safe-mcp/main/docs/assets/architecture.png)
 
 ## Security properties
 
