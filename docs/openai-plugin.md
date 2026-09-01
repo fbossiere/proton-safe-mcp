@@ -224,6 +224,11 @@ Do not run this while an older ChatGPT instance is open: the new command can han
 that process and preserve its stale environment. Start a new task after the app opens and check
 `/mcp` again.
 
+This terminal launch is a one-time proof, not the intended everyday startup method. If it fixes
+the plugin, install the
+[persistent per-user menu launcher](troubleshooting.md#make-the-menu-launch-permanent) so the
+normal ChatGPT icon loads the two settings automatically on later starts.
+
 Also verify the plugin installation from the same Codex command:
 
 ```bash

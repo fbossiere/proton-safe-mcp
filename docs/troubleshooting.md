@@ -98,6 +98,93 @@ Use this sequence on Ubuntu:
    command before the previous instance exits will not repair its environment. After the app
    opens, create a new task and check `/mcp` again.
 
+#### Make the menu launch permanent
+
+The terminal launch above is only a diagnostic. You do **not** need to type it every time. If it
+restores the plugin, create a per-user launcher that keeps the normal `ChatGPT` desktop ID and
+loads only the two allowed settings.
+
+Create the private executable directory if needed:
+
+```bash
+mkdir -p ~/.local/bin
+```
+
+Then create `~/.local/bin/chatgpt-proton-safe` with this content:
+
+```sh
+#!/bin/sh
+
+set -eu
+
+settings_file="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/90-proton-safe.conf"
+
+if [ ! -r "$settings_file" ]; then
+    printf 'ChatGPT launcher: cannot read %s\n' "$settings_file" >&2
+    exit 1
+fi
+
+proton_bridge_user=""
+proton_imap_port=""
+
+# Parse only the two non-secret settings; never evaluate the file as shell code.
+while IFS='=' read -r setting_name setting_value; do
+    # environment.d accepts quoted values. Remove one matching outer quote pair
+    # without evaluating substitutions, commands, or backslash escapes.
+    case "$setting_value" in
+        \"*\") setting_value=${setting_value#\"}; setting_value=${setting_value%\"} ;;
+        \'*\') setting_value=${setting_value#\'}; setting_value=${setting_value%\'} ;;
+    esac
+
+    case "$setting_name" in
+        PROTON_BRIDGE_USER) proton_bridge_user=$setting_value ;;
+        PROTON_IMAP_PORT) proton_imap_port=$setting_value ;;
+    esac
+done < "$settings_file"
+
+if [ -z "$proton_bridge_user" ]; then
+    printf 'ChatGPT launcher: PROTON_BRIDGE_USER is missing from %s\n' "$settings_file" >&2
+    exit 1
+fi
+
+case "$proton_imap_port" in
+    ''|*[!0-9]*)
+        printf 'ChatGPT launcher: PROTON_IMAP_PORT must be numeric in %s\n' "$settings_file" >&2
+        exit 1
+        ;;
+esac
+
+export PROTON_BRIDGE_USER="$proton_bridge_user"
+export PROTON_IMAP_PORT="$proton_imap_port"
+exec /usr/bin/chatgpt "$@"
+```
+
+Make the script executable, copy the system desktop entry to the per-user application directory,
+and replace only its launch command:
+
+```bash
+chmod 0755 ~/.local/bin/chatgpt-proton-safe
+mkdir -p ~/.local/share/applications
+cp /usr/share/applications/chatgpt.desktop ~/.local/share/applications/chatgpt.desktop
+sed -i "s|^Exec=.*|Exec=$HOME/.local/bin/chatgpt-proton-safe %U|" \
+  ~/.local/share/applications/chatgpt.desktop
+update-desktop-database ~/.local/share/applications
+```
+
+Verify that Ubuntu resolves the normal desktop ID to the per-user entry:
+
+```bash
+gio mime x-scheme-handler/codex
+```
+
+The default application should be `chatgpt.desktop`. Fully quit the stale ChatGPT process one last
+time, then use the normal icon. Future menu and dock launches will load the Proton settings without
+a terminal. The wrapper never reads or exports `PROTON_BRIDGE_PASSWORD`.
+
+The per-user desktop entry shadows the packaged one. After a ChatGPT package upgrade, compare
+`/usr/share/applications/chatgpt.desktop` with the per-user copy and refresh the copy if OpenAI
+added desktop-entry fields; then reapply the `Exec=` replacement above.
+
 Do not add `PROTON_BRIDGE_PASSWORD` to `.mcp.json`, `environment.d`, or a checked-in file. Do not
 reinstall the Bridge or plugin unless the commands above identify an installation failure.
 
