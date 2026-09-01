@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Shortened the official MCP Registry description to satisfy its 100-character limit and added a
+  registry-only recovery dispatch that cannot re-upload an existing PyPI distribution.
+
 ## [1.1.0] - 2026-09-01
 
 ### Added
