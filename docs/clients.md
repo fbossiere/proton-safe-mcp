@@ -27,7 +27,9 @@ run on the same machine.
 
 The plugin is optional: ChatGPT desktop can also register the STDIO command directly under
 **Settings → MCP servers**, and that configuration is shared with Codex on the same host. Follow
-the dedicated [OpenAI plugin guide](openai-plugin.md) for both paths.
+the dedicated [OpenAI plugin guide](openai-plugin.md) for both paths. If the plugin is listed but
+has no tools, use the [Ubuntu startup troubleshooting](troubleshooting.md#plugin-is-installed-but-mcp-shows-no-proton-tools)
+and [FAQ](faq.md) before reinstalling it.
 
 Use the tunnel only for ChatGPT web or to reach a different Bridge machine. Run Proton Mail Bridge
 and `proton-safe-mcp` together on that machine rather than exposing Bridge IMAP over the network.

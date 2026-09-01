@@ -61,6 +61,7 @@ nav:
       - Attachments: attachments.md
       - Draft approval: draft-approval.md
   - Security model: security-model.md
+  - FAQ: faq.md
   - Troubleshooting: troubleshooting.md
   - Development: development.md
   - Releasing: releasing.md

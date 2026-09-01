@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documented Ubuntu ChatGPT desktop plugin installation, including the bundled Codex fallback,
   third-party binary conflicts, GUI environment inheritance, and post-install verification.
+- Added a privacy-safe Ubuntu recovery workflow for plugins that install successfully but expose
+  no MCP tools, including `environment.d` reload verification, separate user-manager and desktop
+  diagnostics, a prepared-terminal launch fallback, and a dedicated FAQ.
 
 ## [1.0.2] - 2026-08-30
 

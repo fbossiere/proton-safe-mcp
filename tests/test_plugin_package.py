@@ -95,6 +95,9 @@ def test_plugin_docs_are_local_first_and_tunnel_optional():
     assert "codex plugin add --help" in guide
     assert "fbossiere/proton-safe-mcp --ref main" in guide
     assert ".config/environment.d/90-proton-safe.conf" in guide
+    assert "env_vars" in guide
+    assert "systemctl --user daemon-reload" in guide
+    assert "systemd-run --user --wait --pipe" in guide
     assert "do not install an unrelated" in guide
 
 
@@ -109,6 +112,27 @@ def test_ubuntu_plugin_install_failures_are_documented():
     assert "hash -r" in troubleshooting
     assert "exec bash -l" in troubleshooting
     assert "/mcp" in troubleshooting
+    assert "plugin is installed but `/mcp` shows no proton tools" in troubleshooting
+    assert "systemctl --user daemon-reload" in troubleshooting
+    assert "systemd-run --user --wait --pipe" in troubleshooting
+    assert "pgrep -a -x chatgpt" in troubleshooting
+    assert "chatgpt\n" in troubleshooting
+    assert "do not add `proton_bridge_password`" in troubleshooting
+
+
+def test_plugin_faq_documents_environment_lifecycle_without_secrets():
+    faq = (ROOT / "docs" / "faq.md").read_text(encoding="utf-8").lower()
+    navigation = (ROOT / "mkdocs.yml").read_text(encoding="utf-8").lower()
+
+    assert "why is the plugin installed but missing all proton tools?" in faq
+    assert 'echo "$proton_bridge_user"' in faq
+    assert "systemctl --user show-environment" in faq
+    assert "systemctl --user daemon-reload" in faq
+    assert "systemd-run --user --wait --pipe" in faq
+    assert "why can restarting chatgpt from the menu still fail?" in faq
+    assert "single-instance" in faq
+    assert "nokeyringerror" in faq
+    assert "faq: faq.md" in navigation
 
 
 def test_account_specific_app_mappings_are_ignored_repo_wide():
