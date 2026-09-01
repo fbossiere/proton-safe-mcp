@@ -31,7 +31,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 ## Architecture
 
-![Architecture diagram showing an MCP client connected over STDIO to proton-safe-mcp, which uses loopback-only IMAP to reach Proton Mail Bridge and Proton Mail drafts; draft approval happens separately in a local terminal](docs/assets/architecture.png)
+![Architecture diagram showing an MCP client connected over STDIO to proton-safe-mcp, which uses loopback-only IMAP to reach Proton Mail Bridge and Proton Mail drafts; draft approval happens separately in a local terminal](https://raw.githubusercontent.com/fbossiere/proton-safe-mcp/main/docs/assets/architecture.png)
 
 ## Security properties
 
