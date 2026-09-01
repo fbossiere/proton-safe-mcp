@@ -120,6 +120,8 @@ def test_ubuntu_plugin_install_failures_are_documented():
     assert "make the menu launch permanent" in troubleshooting
     assert ".local/bin/chatgpt-proton-safe" in troubleshooting
     assert "exec /usr/bin/chatgpt" in troubleshooting
+    assert "environment.d accepts quoted values" in troubleshooting
+    assert "never evaluate the file as shell code" in troubleshooting
     assert "do not add `proton_bridge_password`" in troubleshooting
 
 

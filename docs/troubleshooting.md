@@ -129,6 +129,13 @@ proton_imap_port=""
 
 # Parse only the two non-secret settings; never evaluate the file as shell code.
 while IFS='=' read -r setting_name setting_value; do
+    # environment.d accepts quoted values. Remove one matching outer quote pair
+    # without evaluating substitutions, commands, or backslash escapes.
+    case "$setting_value" in
+        \"*\") setting_value=${setting_value#\"}; setting_value=${setting_value%\"} ;;
+        \'*\') setting_value=${setting_value#\'}; setting_value=${setting_value%\'} ;;
+    esac
+
     case "$setting_name" in
         PROTON_BRIDGE_USER) proton_bridge_user=$setting_value ;;
         PROTON_IMAP_PORT) proton_imap_port=$setting_value ;;
