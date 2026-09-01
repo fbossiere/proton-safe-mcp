@@ -1,6 +1,6 @@
-# Attachments
+# Outgoing attachments
 
-Attachments enter through a bounded, client-neutral byte protocol. The MCP server never receives a local filesystem path.
+Outgoing attachments enter through a bounded, client-neutral byte protocol. The MCP server never receives a local filesystem path. For received PDF, TXT, or CSV inspection, use [Received attachment extraction](received-attachments.md); received bytes are never exported into this upload workflow.
 
 ## Accepted types
 

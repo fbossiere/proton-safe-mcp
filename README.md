@@ -13,7 +13,7 @@
 
 A client-agnostic [FastMCP](https://gofastmcp.com) server for Proton Mail through the official [Proton Mail Bridge](https://proton.me/mail/bridge). It can read and search mail and create **drafts with attachments**. It deliberately **cannot send email** — you review every draft in Proton Mail and press Send yourself.
 
-The server runs locally over STDIO for any MCP-compatible client (Claude Desktop, Claude Code, or anything else that speaks MCP). Attachments are uploaded as bounded base64 chunks through MCP tools, so the server never receives or reads a client filesystem path.
+The server runs locally over STDIO for any MCP-compatible client (Claude Desktop, Claude Code, or anything else that speaks MCP). Received PDF, TXT, and CSV attachments can be inspected through bounded text extraction without exposing their raw bytes. Outgoing attachments are uploaded as bounded base64 chunks, so the server never receives or reads a client filesystem path.
 
 Read the [full documentation](https://fbossiere.github.io/proton-safe-mcp/) for setup, configuration, tool inputs, security boundaries, and troubleshooting.
 
@@ -22,7 +22,7 @@ Read the [full documentation](https://fbossiere.github.io/proton-safe-mcp/) for 
 Email is attacker-controlled input. Any sender can put adversarial instructions in a message body, and an AI agent that reads mail *and* holds write-capable tools is one prompt injection away from doing something you did not ask for. This project limits the blast radius by construction:
 
 - **No send.** There is no SMTP client and no `send_message` tool in the codebase — a test asserts it.
-- **No delete, no move,** no received-attachment download tool.
+- **No delete, no move,** and no raw received-attachment download tool.
 - **Human in the loop.** Creating a draft requires an interactive approval in a local terminal that is *not* exposed as an MCP tool.
 - **No filesystem access for clients.** Attachment bytes are streamed in chunks with declared size and SHA-256 verification; paths are rejected.
 - **Loopback only.** STDIO transport, no listening socket, and the Bridge host is hard-coded to `127.0.0.1`.
@@ -37,8 +37,9 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 - STDIO only: the server opens no listening network socket.
 - Proton Bridge host is hard-coded to `127.0.0.1` (`PROTON_BRIDGE_HOST` is intentionally unsupported).
-- No SMTP client, send tool, delete tool, move tool, or received-attachment download tool.
-- Message reads use `BODY.PEEK`, return plain text, omit attachment bytes, and cap body length.
+- No SMTP client, send tool, delete tool, move tool, or raw received-attachment download tool.
+- Message and attachment reads use `BODY.PEEK`; attachment inspection returns bounded extracted text,
+  metadata, and a SHA-256 digest, never raw bytes or files.
 - Attachment input is chunked base64 with declared size and SHA-256 verification.
 - Only PDF, DOCX, XLSX, PPTX, TXT, CSV, PNG, and JPEG uploads are accepted.
 - Attachment tokens are random, short-lived, single-use, and reverified before draft creation.
@@ -154,6 +155,7 @@ ChatGPT desktop/Codex installation, direct MCP registration, and the optional re
 | | `list_messages` | Never marks messages as read |
 | | `search_messages` | Injection-safe IMAP `TEXT` search |
 | | `read_message` | Bounded plain text; no attachment bytes |
+| | `extract_attachment_text` | Bounded PDF/TXT/CSV text; no raw bytes or files |
 | Attachment staging | `begin_attachment_upload` | Declares filename, type, size, SHA-256 |
 | | `upload_attachment_chunk` | Ordered base64 chunks |
 | | `finish_attachment_upload` | Verifies hash, returns single-use token |
@@ -201,6 +203,7 @@ proton-safe-mcp reject <draft_id>
 | `PROTON_IMAP_PORT` | `1143` | Local Bridge IMAP port |
 | `PROTON_MCP_STATE_DIR` | `~/.local/state/proton-safe-mcp` | Private staging and approval state |
 | `PROTON_MCP_MAX_ATTACHMENT_BYTES` | `20971520` | Per-file maximum, capped at 25 MiB |
+| `PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES` | `10485760` | Received-file extraction maximum, capped at 25 MiB |
 | `PROTON_MCP_MAX_CHUNK_BYTES` | `393216` | Decoded chunk maximum, capped at 1 MiB |
 | `PROTON_MCP_UPLOAD_TTL_SECONDS` | `1800` | Attachment staging lifetime |
 | `PROTON_MCP_DRAFT_TTL_SECONDS` | `900` | Pending draft lifetime |
@@ -222,7 +225,7 @@ uv run ruff format .     # format
 uv run mypy              # strict type checking
 ```
 
-Proton Bridge is not needed for development: the test suite fakes the IMAP layer. Tests cover path rejection, MIME restrictions, ordered chunks, size/hash verification, token consumption, header injection, approval digest integrity, CLI approval flow, and HTML-to-text sanitization.
+Proton Bridge is not needed for development: the test suite fakes the IMAP layer. Tests cover path rejection, MIME restrictions, received-attachment size and format rejection, bounded PDF/text extraction, ordered chunks, size/hash verification, token consumption, header injection, approval digest integrity, CLI approval flow, and HTML-to-text sanitization.
 
 See [CONTRIBUTING.md](https://github.com/fbossiere/proton-safe-mcp/blob/main/CONTRIBUTING.md) for the design rules that reviews enforce.
 
@@ -231,6 +234,8 @@ See [CONTRIBUTING.md](https://github.com/fbossiere/proton-safe-mcp/blob/main/CON
 Read this before relying on the server in an autonomous workflow:
 
 - A model necessarily sees any mail it reads and any attachment it creates or uploads.
+- Extracted attachment text is attacker-controlled and may contain prompt injection. The server
+  bounds the returned text but does not make it trustworthy or perform OCR or malware scanning.
 - Uploaded attachment bytes are stored temporarily in files readable only by the Unix account. Use full-disk encryption.
 - If the MCP client also has unrestricted shell access as the same Unix user, it can potentially write an approval marker itself. Keep shell/file-writing tools out of the same autonomous agent session when approval integrity matters.
 - Secure MCP Tunnel keeps the server off the public internet, but mail content returned to an

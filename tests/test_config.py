@@ -37,6 +37,7 @@ def test_bridge_host_is_loopback_and_not_configurable(monkeypatch, tmp_path):
         ("PROTON_IMAP_PORT", "0"),
         ("PROTON_IMAP_PORT", "70000"),
         ("PROTON_MCP_MAX_ATTACHMENT_BYTES", str(100 * 1024 * 1024)),
+        ("PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES", str(100 * 1024 * 1024)),
     ],
 )
 def test_from_env_rejects_out_of_range_values(monkeypatch, tmp_path, name, value):
@@ -45,6 +46,16 @@ def test_from_env_rejects_out_of_range_values(monkeypatch, tmp_path, name, value
     monkeypatch.setenv(name, value)
     with pytest.raises(ConfigurationError, match=name):
         Settings.from_env()
+
+
+def test_received_attachment_extraction_limit_is_configurable(monkeypatch, tmp_path):
+    monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
+    monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES", "123456")
+
+    settings = Settings.from_env()
+
+    assert settings.max_received_attachment_bytes == 123456
 
 
 def test_state_directories_are_private(monkeypatch, tmp_path):

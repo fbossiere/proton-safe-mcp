@@ -5,7 +5,8 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 ## Threats considered
 
 - Adversarial instructions embedded in email bodies or headers.
-- A model selecting recipients or attachments from untrusted mail content.
+- A model selecting recipients or outgoing attachments from untrusted mail or extracted attachment content.
+- Malformed, oversized, encrypted, active, or prompt-injected received attachments.
 - Header, folder, or IMAP search injection.
 - Client attempts to make the server read arbitrary local paths.
 - Oversized, reordered, truncated, substituted, or expired attachment uploads.
@@ -18,11 +19,12 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 
 | Boundary | Control |
 | --- | --- |
-| Email actions | No SMTP, send, delete, move, or received-attachment download implementation |
+| Email actions | No SMTP, send, delete, move, or raw received-attachment download implementation |
 | Transport | STDIO only; no listening network socket |
 | Bridge target | Host fixed to `127.0.0.1` |
-| Reads | `BODY.PEEK`, bounded plain text, no received attachment bytes |
-| Attachments | No paths; type, size, order, lifetime, and SHA-256 validation |
+| Reads | `BODY.PEEK`, bounded plain text, no received attachment bytes or persisted files |
+| Received attachments | Explicit index selection; PDF/TXT/CSV allowlist; byte, page, and character limits; SHA-256 result; no OCR or active content |
+| Outgoing attachments | No paths; type, size, order, lifetime, and SHA-256 validation |
 | Drafts | Exact out-of-band approval with digest binding and expiry |
 | Credentials | Bridge-generated IMAP password in the OS keyring |
 | State | `0700` directories, `0600` files, defensive no-follow behavior |
@@ -58,6 +60,10 @@ in the user's private plugin copy.
 ## Non-goals and limitations
 
 - The server is not an antivirus, phishing detector, spam filter, or sender-authentication product.
+- PDF parsing and bounded text extraction do not make a document safe or trustworthy. Encrypted,
+  scanned, malformed, and unsupported documents fail closed rather than invoking external tools.
+- Byte, page, and character limits reduce but do not eliminate CPU, memory, or parser-vulnerability
+  risk from adversarial PDFs.
 - A model sees the content of mail it reads and attachments it uploads.
 - A tunnel keeps the MCP server private but does not keep returned mail content from the OpenAI
   product that requested it. Proton end-to-end encryption no longer applies after Bridge decrypts
