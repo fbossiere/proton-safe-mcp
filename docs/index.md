@@ -15,7 +15,9 @@ Proton Safe MCP is a local, client-agnostic [Model Context Protocol](https://mod
 The capability restrictions are part of the product, not optional settings:
 
 - **No send tool** and no SMTP client.
-- **No delete or move tools** and no received-attachment download.
+- **No delete or move tools** and no raw received-attachment download.
+- **Bounded received-attachment text.** PDF, TXT, and CSV inspection returns text and metadata,
+  never attachment bytes or files.
 - **No client-supplied filesystem paths.** Attachments arrive as bounded base64 chunks.
 - **Human approval outside MCP.** A local terminal command must approve the exact draft proposal.
 - **Loopback only.** The server uses STDIO and the Bridge host is fixed to `127.0.0.1`.
@@ -25,7 +27,7 @@ The capability restrictions are part of the product, not optional settings:
 ```text
 MCP client ──STDIO──> proton-safe-mcp ──IMAP on 127.0.0.1──> Proton Bridge
                             │
-                            ├── read/search tools
+                            ├── read/search + bounded extraction tools
                             ├── bounded attachment staging
                             └── pending draft proposal
                                       │
@@ -45,7 +47,7 @@ on another machine; it does not change the loopback-only Bridge boundary.
 2. Use the [client setup guides](clients.md) for Claude Code, Cursor, or VS Code.
 3. Review the [security model](security-model.md) before combining the server with other tools.
 4. Use the [MCP tool reference](mcp-tools.md) for exact inputs and limits.
-5. Read the [attachment](attachments.md) and [draft approval](draft-approval.md) workflows before creating drafts.
+5. Read [received attachment extraction](received-attachments.md), [outgoing attachment staging](attachments.md), and [draft approval](draft-approval.md) before handling files or creating drafts.
 6. Use the [OpenAI plugin guide](openai-plugin.md) for local ChatGPT desktop/Codex installation,
    direct MCP registration, or optional remote tunnel access.
 7. Check the [FAQ](faq.md) and [Troubleshooting](troubleshooting.md) before reinstalling a client,

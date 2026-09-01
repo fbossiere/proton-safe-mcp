@@ -10,6 +10,7 @@ Proton Safe MCP intentionally exposes a small configuration surface. The transpo
 | `PROTON_IMAP_PORT` | `1143` | `1`–`65535` | Local Bridge IMAP port |
 | `PROTON_MCP_STATE_DIR` | `~/.local/state/proton-safe-mcp` | local directory | Private staging and approval state |
 | `PROTON_MCP_MAX_ATTACHMENT_BYTES` | `20971520` | `1`–`26214400` | Maximum for one file and for all files in one draft |
+| `PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES` | `10485760` | `1`–`26214400` | Maximum received attachment size accepted for text extraction |
 | `PROTON_MCP_MAX_CHUNK_BYTES` | `393216` | `1`–`1048576` | Maximum decoded attachment chunk |
 | `PROTON_MCP_UPLOAD_TTL_SECONDS` | `1800` | `1`–`86400` | Attachment staging lifetime |
 | `PROTON_MCP_DRAFT_TTL_SECONDS` | `900` | `1`–`3600` | Pending draft lifetime |

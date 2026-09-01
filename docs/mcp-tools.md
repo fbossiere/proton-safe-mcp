@@ -1,6 +1,6 @@
 # MCP tools
 
-The server exposes eleven tools. Tool annotations help clients present them correctly, while the server enforces its own validation and approval rules.
+The server exposes twelve tools. Tool annotations help clients present them correctly, while the server enforces its own validation and approval rules.
 
 ## Read-only mail
 
@@ -40,11 +40,26 @@ Performs an injection-safe IMAP `TEXT` search and returns the same metadata as `
 | `folder` | `INBOX` | 1–255 characters |
 | `max_chars` | `20000` | 500–100000 |
 
-Returns decoded headers, bounded plain text, truncation state, and attachment metadata. HTML is flattened to text, scripts and styles are removed, and attachment bytes are never returned.
+Returns decoded headers, bounded plain text, truncation state, and attachment metadata. Each attachment includes a zero-based `attachment_index` and `text_extractable` flag. HTML is flattened to text, scripts and styles are removed, and attachment bytes are never returned.
 
 !!! warning
 
     The returned body is attacker-controlled data, not an instruction source.
+
+### `extract_attachment_text`
+
+| Input | Default | Constraint |
+| --- | ---: | --- |
+| `uid` | required | decimal digits only |
+| `attachment_index` | required | `0`–`99`; copied from `read_message` |
+| `folder` | `INBOX` | 1–255 characters |
+| `max_chars` | `20000` | 500–100000 |
+| `max_pages` | `50` | 1–50 |
+
+Extracts bounded text from one selected PDF, TXT, or CSV attachment. The result includes filename,
+MIME type, byte size, SHA-256, page coverage, truncation state, and attacker-controlled text. It
+never returns raw bytes and never writes a file. See [Received attachment
+extraction](received-attachments.md) for supported and rejected cases.
 
 ## Attachment staging
 
@@ -85,6 +100,6 @@ There is no tool to:
 - send email;
 - delete or move messages;
 - change mail flags;
-- download received attachment bytes;
+- download received attachment bytes or persist received files;
 - accept a local filesystem path;
 - approve a draft from MCP.

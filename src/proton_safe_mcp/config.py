@@ -34,6 +34,7 @@ class Settings:
     imap_port: int
     state_dir: Path
     max_attachment_bytes: int
+    max_received_attachment_bytes: int
     max_chunk_bytes: int
     upload_ttl_seconds: int
     draft_ttl_seconds: int
@@ -61,6 +62,11 @@ class Settings:
             state_dir=_state_dir(),
             max_attachment_bytes=_positive_int(
                 "PROTON_MCP_MAX_ATTACHMENT_BYTES", 20 * 1024 * 1024, 25 * 1024 * 1024
+            ),
+            max_received_attachment_bytes=_positive_int(
+                "PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES",
+                10 * 1024 * 1024,
+                25 * 1024 * 1024,
             ),
             max_chunk_bytes=_positive_int("PROTON_MCP_MAX_CHUNK_BYTES", 384 * 1024, 1024 * 1024),
             upload_ttl_seconds=_positive_int("PROTON_MCP_UPLOAD_TTL_SECONDS", 1800, 86400),
