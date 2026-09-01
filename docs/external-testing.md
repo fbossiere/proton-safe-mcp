@@ -97,7 +97,8 @@ The core path is successful when:
 2. reading the prepared message does not mark it as read;
 3. draft creation fails before local approval;
 4. the approved draft appears in Proton Mail and is never sent;
-5. no send, delete, move, or received-attachment-download tool is exposed.
+5. bounded PDF/TXT/CSV text extraction returns no raw bytes or filesystem path;
+6. no send, delete, move, raw received-attachment-download, or MCP approval tool is exposed.
 
 Partial and failed tests are equally useful. Report the first point of friction rather than
 working around it silently.

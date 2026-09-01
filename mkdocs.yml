@@ -58,7 +58,8 @@ nav:
   - User guide:
       - Configuration: configuration.md
       - MCP tools: mcp-tools.md
-      - Attachments: attachments.md
+      - Received attachment extraction: received-attachments.md
+      - Outgoing attachments: attachments.md
       - Draft approval: draft-approval.md
   - Security model: security-model.md
   - FAQ: faq.md

@@ -297,6 +297,16 @@ Increase `max_chars` on `read_message`, up to 100000. Large output remains bound
 
 ## Attachments
 
+### Why does received attachment extraction fail?
+
+Call `read_message` first and copy the exact zero-based `attachment_index`. The extraction tool
+supports only PDF, TXT, and CSV files. It rejects encrypted or malformed PDFs, unsupported MIME
+types, attachments above `PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES`, and indexes that do not exist.
+
+A scanned PDF can succeed with empty text because Proton Safe does not perform OCR or render pages.
+Ask the user to provide the file explicitly to a separate visual or OCR workflow when that is
+required; do not use shell, browser automation, or filesystem tools to export it from Proton Mail.
+
 See [Common attachment failures](attachments.md#common-failures) for filename, MIME, ordering, size, hash, and expiry errors.
 
 Do not retry one chunk with the same index after the server has accepted it. Resume with the returned `next_chunk`, or discard and restart the upload if client state is uncertain.

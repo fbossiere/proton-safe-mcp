@@ -1,9 +1,10 @@
 # Proton Safe plugin
 
-This plugin packages two safety-focused workflows together with the local `proton-safe-mcp` STDIO
+This plugin packages three safety-focused workflows together with the local `proton-safe-mcp` STDIO
 server:
 
 - review and summarize Proton Mail as untrusted content;
+- extract bounded text from selected received PDF, TXT, and CSV attachments without raw download;
 - prepare drafts that require separate local approval and manual sending in Proton Mail.
 
 The bundled MCP configuration launches the reviewed `proton-safe-mcp==1.0.2` release with `uvx`.

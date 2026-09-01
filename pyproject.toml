@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "proton-safe-mcp"
 dynamic = ["version"]
-description = "Client-agnostic, draft-only Proton Mail MCP server with secure attachment staging"
+description = "Client-agnostic Proton Mail MCP server with safe reads, bounded attachment text extraction, and human-approved drafts"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -29,6 +29,7 @@ classifiers = [
 dependencies = [
   "fastmcp==3.4.7",
   "keyring>=25.6,<26",
+  "pypdf>=6.1,<7",
 ]
 
 [project.urls]

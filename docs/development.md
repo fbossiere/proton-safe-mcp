@@ -49,7 +49,8 @@ Contributions must preserve the restricted capability surface:
 1. No send capability.
 2. No destructive mail tools.
 3. No filesystem paths from MCP clients.
-4. No received-attachment download tool.
+4. No raw received-attachment download tool or received-file persistence; extraction returns only
+   bounded text and metadata.
 5. Bridge host fixed to `127.0.0.1`.
 6. Draft approval outside MCP.
 

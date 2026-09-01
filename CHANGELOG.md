@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `extract_attachment_text` for bounded, read-only text extraction from selected received
+  PDF, TXT, and CSV attachments without returning raw bytes or writing files.
+- Added the `extract-proton-attachment` plugin skill, received-attachment size limits, extraction
+  metadata and SHA-256 digests, rejection tests, and end-to-end user documentation.
+
 ### Changed
 
 - Documented Ubuntu ChatGPT desktop plugin installation, including the bundled Codex fallback,

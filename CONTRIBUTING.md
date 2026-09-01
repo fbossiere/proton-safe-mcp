@@ -9,7 +9,8 @@ Pull requests that violate these will be declined regardless of code quality:
 1. **No send capability.** No SMTP client, no `send_message` tool, no flag that turns drafting into sending.
 2. **No destructive mail tools.** No delete, no move, no flag mutation beyond what IMAP `PEEK` implies (nothing).
 3. **No filesystem paths from MCP clients.** Attachments enter as bounded base64 chunks only.
-4. **No received-attachment download tool.** The server returns attachment metadata, never bytes.
+4. **No raw received-attachment download tool.** Received files may expose bounded extracted text,
+   metadata, and a digest, but never bytes, filesystem paths, or persisted files.
 5. **The Bridge host stays `127.0.0.1`.** TLS verification is disabled only because the host is unchangeable; making the host configurable would silently break that safety argument.
 6. **Draft approval stays out-of-band.** The approval step must not be reachable through any MCP tool.
 7. **Plugin instructions are not authorization.** Skills may guide safe workflows but cannot weaken
@@ -43,7 +44,7 @@ Guidelines:
 
 - **Tests are required** for new behavior, especially validation and rejection paths. This codebase treats "rejects malformed input" as a feature worth a test, not an implementation detail.
 - **Type hints are required.** CI runs mypy in strict mode.
-- **Keep dependencies minimal.** The runtime dependency set is deliberately tiny (`fastmcp`, `keyring`). Adding a dependency needs a strong justification.
+- **Keep dependencies minimal.** The runtime dependency set is deliberately tiny. Adding a dependency needs a strong justification; `pypdf` exists solely for in-memory, bounded PDF text extraction.
 - **Update `CHANGELOG.md`** under the `[Unreleased]` heading using the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) categories.
 - Keep commits focused; one logical change per PR.
 

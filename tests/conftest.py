@@ -13,6 +13,7 @@ def settings(tmp_path):
         imap_port=1143,
         state_dir=tmp_path / "state",
         max_attachment_bytes=2 * 1024 * 1024,
+        max_received_attachment_bytes=1024 * 1024,
         max_chunk_bytes=1024,
         upload_ttl_seconds=1800,
         draft_ttl_seconds=900,
