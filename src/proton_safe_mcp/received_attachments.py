@@ -56,7 +56,7 @@ class ReceivedAttachmentTextExtractor:
 
     @staticmethod
     def _extract_pdf(*, data: bytes, max_chars: int, max_pages: int) -> dict[str, Any]:
-        if not data.startswith(b"%PDF-"):
+        if data[:1024].find(b"%PDF-") < 0:
             raise BridgeError("Attachment is not a valid PDF document")
         try:
             reader = PdfReader(io.BytesIO(data), strict=False)

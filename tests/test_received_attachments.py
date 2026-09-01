@@ -79,11 +79,42 @@ def test_real_blank_pdf_is_parsed_in_memory():
     }
 
 
+def test_pdf_header_may_appear_within_first_1024_bytes(monkeypatch):
+    class EmptyReader:
+        def __init__(self):
+            self.is_encrypted = False
+            self.pages = []
+
+    monkeypatch.setattr(
+        "proton_safe_mcp.received_attachments.PdfReader",
+        lambda *_args, **_kwargs: EmptyReader(),
+    )
+
+    result = ReceivedAttachmentTextExtractor().extract(
+        data=b"leading bytes\n%PDF-1.7 fake",
+        content_type="application/pdf",
+        charset=None,
+        max_chars=500,
+        max_pages=1,
+    )
+
+    assert result["total_pages"] == 0
+
+
 def test_pdf_magic_and_encryption_are_rejected(monkeypatch):
     extractor = ReceivedAttachmentTextExtractor()
     with pytest.raises(BridgeError, match="valid PDF"):
         extractor.extract(
             data=b"not a pdf",
+            content_type="application/pdf",
+            charset=None,
+            max_chars=500,
+            max_pages=1,
+        )
+
+    with pytest.raises(BridgeError, match="valid PDF"):
+        extractor.extract(
+            data=b"x" * 1024 + b"%PDF-1.7",
             content_type="application/pdf",
             charset=None,
             max_chars=500,
