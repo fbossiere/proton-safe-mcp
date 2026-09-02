@@ -3,6 +3,22 @@
 The default workflow uses explicit confirmation in the conversation. A separate local terminal
 approval remains available as an optional enhanced-security mode.
 
+## Choose the mode in ChatGPT or Codex
+
+There is no global approval switch, plugin checkbox, or `setup` option. The
+`proton-safe-mcp setup` command only stores the Bridge-generated IMAP password in the operating-
+system keyring; it does not enable or disable either draft workflow.
+
+The plugin uses conversational confirmation by default. To select terminal approval for one draft,
+ask for it explicitly before the draft is created, for example:
+
+> Use enhanced-security mode with terminal approval for this draft.
+
+The client should then use `prepare_draft` instead of `create_confirmed_draft`, return the approval
+command, and wait. After you run that command in a separate terminal, tell the client that approval
+is complete so it can call `commit_approved_draft`. Request the enhanced mode again for each draft
+that should use it.
+
 ## Default conversational-confirmation sequence
 
 1. The client presents the exact To, Cc, Bcc, subject, complete body, and attachment list.
@@ -38,6 +54,13 @@ confirms that bare address.
 
    ```bash
    proton-safe-mcp approve <draft_id>
+   ```
+
+   If the command is not installed globally, run the pinned release with `uvx` instead:
+
+   ```bash
+   uvx --from proton-safe-mcp==1.2.0 proton-safe-mcp show <draft_id>
+   uvx --from proton-safe-mcp==1.2.0 proton-safe-mcp approve <draft_id>
    ```
 
 6. The CLI prints recipients, subject, attachment names and hashes, a body preview, and the proposal digest. It then requires the exact confirmation `APPROVE <last-eight-id-characters>`.

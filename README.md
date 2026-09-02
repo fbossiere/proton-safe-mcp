@@ -183,6 +183,9 @@ The MCP client only needs the ability to obtain the bytes of a file and call too
 
 For enhanced security, replace steps 7–8 with the optional local approval path:
 
+Approval is selected per draft, not during `proton-safe-mcp setup`. In ChatGPT or Codex, ask:
+`Use enhanced-security mode with terminal approval for this draft.`
+
 1. Call `prepare_draft(..., attachment_tokens=[token])`.
 2. Inspect and approve the exact proposal in a local terminal:
 
