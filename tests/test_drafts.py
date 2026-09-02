@@ -5,7 +5,12 @@ import json
 import pytest
 
 from proton_safe_mcp.attachments import Attachment
-from proton_safe_mcp.drafts import DraftApprovalStore, approve_request, validate_address
+from proton_safe_mcp.drafts import (
+    DraftApprovalStore,
+    approve_request,
+    resolve_sender,
+    validate_address,
+)
 from proton_safe_mcp.errors import ApprovalError
 
 
@@ -92,3 +97,65 @@ def test_combined_attachment_size_is_bounded(settings):
             attachment_tokens=["token"],
             attachments=[attachment],
         )
+
+
+def test_sender_defaults_to_the_primary_address(settings):
+    assert resolve_sender(settings, None) == "user@example.com"
+    assert resolve_sender(settings, "   ") == "user@example.com"
+
+
+def test_configured_alias_is_accepted_in_its_configured_spelling(settings):
+    # Client casing never reaches the header: the configured spelling wins.
+    assert resolve_sender(settings, "ALIAS@Example.com") == "alias@example.com"
+
+
+@pytest.mark.parametrize(
+    "sender",
+    [
+        "attacker@example.com",
+        "Alias <alias@example.com>",
+        "alias@example.com\r\nFrom: attacker@example.com",
+    ],
+)
+def test_unconfigured_or_injected_sender_is_rejected(settings, sender):
+    with pytest.raises(ApprovalError):
+        resolve_sender(settings, sender)
+
+
+def test_approval_digest_binds_the_sender_address(settings):
+    store = DraftApprovalStore(settings)
+    common = {
+        "to": ["recipient@example.com"],
+        "cc": [],
+        "bcc": [],
+        "subject": "A safe draft",
+        "body_text": "Hello",
+        "attachment_tokens": [],
+        "attachments": [],
+    }
+
+    primary = store.prepare(**common)
+    alias = store.prepare(from_address="alias@example.com", **common)
+
+    assert primary["summary"]["from"] == "user@example.com"
+    assert alias["summary"]["from"] == "alias@example.com"
+    assert primary["digest"] != alias["digest"]
+
+    approve_request(settings, alias["draft_id"])
+    assert store.get_approved(alias["draft_id"]).from_address == "alias@example.com"
+
+
+def test_prepare_rejects_an_unconfigured_sender_before_writing_a_request(settings):
+    store = DraftApprovalStore(settings)
+    with pytest.raises(ApprovalError, match="not a configured sender address"):
+        store.prepare(
+            from_address="attacker@example.com",
+            to=["recipient@example.com"],
+            cc=[],
+            bcc=[],
+            subject="A safe draft",
+            body_text="Hello",
+            attachment_tokens=[],
+            attachments=[],
+        )
+    assert not list(settings.approvals_dir.iterdir())

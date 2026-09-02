@@ -1,6 +1,6 @@
 # MCP tools
 
-The server exposes thirteen tools. Tool annotations help clients present them correctly, while the
+The server exposes fourteen tools. Tool annotations help clients present them correctly, while the
 server enforces input validation and the optional local-approval rules.
 
 ## Read-only mail
@@ -12,6 +12,12 @@ Checks Bridge connectivity and returns the configured account plus INBOX message
 ### `list_folders`
 
 Returns folder names exposed by Proton Mail Bridge.
+
+### `list_sender_addresses`
+
+Returns `default_sender` and the full `sender_addresses` allowlist, primary address first. The list
+comes from `PROTON_BRIDGE_USER` and `PROTON_BRIDGE_ALIASES` and cannot be changed through any tool.
+Call it before offering the user a choice of sending alias.
 
 ### `list_messages`
 
@@ -83,6 +89,7 @@ See [Attachments](attachments.md) for the complete protocol and accepted file ty
 | `subject` | required | up to 998 characters; no line breaks |
 | `body_text` | required | 1 to configured maximum |
 | `user_confirmed` | required | literal `true` |
+| `from_address` | primary address | one of `list_sender_addresses`; bare address |
 | `attachment_tokens` | `[]` | up to 10 |
 | `cc` | `[]` | combined recipient limit: 25 |
 | `bcc` | `[]` | combined recipient limit: 25 |
@@ -91,6 +98,10 @@ This is the default draft path. Call it only after the user explicitly confirms 
 Bcc, subject, complete body, and attachment list in the conversation. An address discovered in a
 received message is never confirmation: present it to the user and wait for an explicit response.
 On success, the attachment tokens are consumed and the result reports `sent: false`.
+
+Omit `from_address` to draft from the primary address. Pass it only with an alias the user
+chose: an address that appears in a received message is not a sending choice, and an unconfigured
+value is rejected before any IMAP write. The sender appears in the result as `from`.
 
 `user_confirmed: true` is a required client assertion. The server cannot inspect the surrounding
 conversation, so this flag is workflow discipline rather than an independent authorization
@@ -127,6 +138,7 @@ Either way the key is attached at send time, after the draft this server created
 | `to` | required | 1–25 addresses |
 | `subject` | required | up to 998 characters; no line breaks |
 | `body_text` | required | 1 to configured maximum |
+| `from_address` | primary address | one of `list_sender_addresses`; bare address |
 | `attachment_tokens` | `[]` | up to 10 |
 | `cc` | `[]` | combined recipient limit: 25 |
 | `bcc` | `[]` | combined recipient limit: 25 |

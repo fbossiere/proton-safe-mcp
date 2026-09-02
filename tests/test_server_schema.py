@@ -18,6 +18,7 @@ from proton_safe_mcp.errors import AttachmentError, BridgeError
 def server(monkeypatch, tmp_path):
     """Reload the tool surface against a throwaway state directory."""
     monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
+    monkeypatch.setenv("PROTON_BRIDGE_ALIASES", "alias@example.com")
     monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
 
     import proton_safe_mcp.server as module
@@ -67,6 +68,7 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
     assert set(by_name) == {
         "mailbox_status",
         "list_folders",
+        "list_sender_addresses",
         "list_messages",
         "search_messages",
         "read_message",
@@ -96,7 +98,12 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
     for tool in tools:
         assert "path" not in tool.inputSchema.get("properties", {})
 
+    assert by_name["list_sender_addresses"].annotations.readOnlyHint is True
+
     direct_schema = by_name["create_confirmed_draft"].inputSchema
+    assert "from_address" in direct_schema["properties"]
+    assert "from_address" not in direct_schema["required"]
+    assert "from_address" in by_name["prepare_draft"].inputSchema["properties"]
     assert "user_confirmed" in direct_schema["required"]
     confirmation_schema = direct_schema["properties"]["user_confirmed"]
     assert confirmation_schema.get("const") is True or confirmation_schema.get("enum") == [True]
@@ -313,3 +320,70 @@ def test_draft_validation_rejects_a_recipient_with_a_display_name(server, monkey
             body_text="See attached.",
             user_confirmed=True,
         )
+
+
+def test_sender_addresses_are_listed_with_the_default_first(server):
+    assert server.list_sender_addresses() == {
+        "default_sender": "user@example.com",
+        "sender_addresses": ["user@example.com", "alias@example.com"],
+    }
+
+
+def test_confirmed_draft_uses_the_alias_the_call_names(server, monkeypatch):
+    captured: dict = {}
+    monkeypatch.setattr(server.bridge, "append_draft", _recording_append_draft(captured))
+
+    server.create_confirmed_draft(
+        to=["recipient@example.com"],
+        subject="Quarterly numbers",
+        body_text="See attached.",
+        user_confirmed=True,
+        from_address="ALIAS@example.com",
+    )
+
+    assert captured["from_address"] == "alias@example.com"
+
+
+def test_confirmed_draft_defaults_to_the_primary_sender(server, monkeypatch):
+    captured: dict = {}
+    monkeypatch.setattr(server.bridge, "append_draft", _recording_append_draft(captured))
+
+    server.create_confirmed_draft(
+        to=["recipient@example.com"],
+        subject="Quarterly numbers",
+        body_text="See attached.",
+        user_confirmed=True,
+    )
+
+    assert captured["from_address"] == "user@example.com"
+
+
+def test_confirmed_draft_rejects_an_unconfigured_sender(server, monkeypatch):
+    monkeypatch.setattr(server.bridge, "append_draft", _refusing_append_draft)
+
+    with pytest.raises(ToolError, match="not a configured sender address"):
+        server.create_confirmed_draft(
+            to=["recipient@example.com"],
+            subject="Quarterly numbers",
+            body_text="See attached.",
+            user_confirmed=True,
+            from_address="attacker@example.com",
+        )
+
+
+def test_approved_draft_keeps_the_alias_it_was_approved_with(server, monkeypatch):
+    captured: dict = {}
+    monkeypatch.setattr(server.bridge, "append_draft", _recording_append_draft(captured))
+
+    proposal = server.prepare_draft(
+        to=["recipient@example.com"],
+        subject="Quarterly numbers",
+        body_text="See attached.",
+        from_address="alias@example.com",
+    )
+    assert proposal["summary"]["from"] == "alias@example.com"
+
+    approve_request(server.settings, proposal["draft_id"])
+    server.commit_approved_draft(proposal["draft_id"])
+
+    assert captured["from_address"] == "alias@example.com"

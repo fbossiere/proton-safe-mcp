@@ -216,6 +216,7 @@ proton-safe-mcp reject <draft_id>
 | Variable | Default | Purpose |
 | --- | ---: | --- |
 | `PROTON_BRIDGE_USER` | required | Proton address configured in Bridge |
+| `PROTON_BRIDGE_ALIASES` | empty | Comma-separated additional From addresses a draft may use |
 | `PROTON_IMAP_PORT` | `1143` | Local Bridge IMAP port |
 | `PROTON_MCP_STATE_DIR` | `~/.local/state/proton-safe-mcp` | Private staging and approval state |
 | `PROTON_MCP_MAX_ATTACHMENT_BYTES` | `20971520` | Per-file maximum, capped at 25 MiB |

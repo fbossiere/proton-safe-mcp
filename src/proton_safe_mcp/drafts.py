@@ -12,10 +12,10 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from email.utils import parseaddr
 from pathlib import Path
 from typing import Any
 
+from .addresses import validate_address
 from .attachments import Attachment
 from .config import Settings
 from .errors import ApprovalError
@@ -31,26 +31,24 @@ def _write_all(fd: int, data: bytes) -> None:
         remaining = remaining[written:]
 
 
-def validate_address(value: str) -> str:
-    if not isinstance(value, str) or not value or "\r" in value or "\n" in value:
-        raise ApprovalError("Invalid email address")
-    display, address = parseaddr(value)
-    if display or address != value.strip() or len(address) > 254:
-        raise ApprovalError(f"Use a bare email address, without display name: {value!r}")
-    if address.count("@") != 1:
-        raise ApprovalError(f"Invalid email address: {value!r}")
-    local, domain = address.rsplit("@", 1)
-    if not local or not domain or "." not in domain or " " in address:
-        raise ApprovalError(f"Invalid email address: {value!r}")
-    if not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+", local):
-        raise ApprovalError(f"Unsupported email address syntax: {value!r}")
-    if not re.fullmatch(r"[A-Za-z0-9.-]+", domain) or ".." in domain:
-        raise ApprovalError(f"Invalid email domain: {value!r}")
-    return address
+def resolve_sender(settings: Settings, value: str | None) -> str:
+    """Return the configured From address a draft may use, defaulting to the primary one."""
+    if value is None or not value.strip():
+        return settings.default_sender
+    address = validate_address(value)
+    for configured in settings.sender_addresses:
+        if configured.casefold() == address.casefold():
+            # Return the configured spelling so the header never echoes client casing.
+            return configured
+    raise ApprovalError(
+        f"{address!r} is not a configured sender address. Configured senders: "
+        f"{', '.join(settings.sender_addresses)}."
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class DraftContent:
+    from_address: str
     to: tuple[str, ...]
     cc: tuple[str, ...]
     bcc: tuple[str, ...]
@@ -71,6 +69,7 @@ class DraftProposal(DraftContent):
 def validate_draft(
     settings: Settings,
     *,
+    from_address: str | None,
     to: list[str],
     cc: list[str],
     bcc: list[str],
@@ -80,6 +79,7 @@ def validate_draft(
     attachments: list[Attachment],
 ) -> DraftContent:
     """Validate and freeze the exact content of a draft before any IMAP write."""
+    sender = resolve_sender(settings, from_address)
     recipients = tuple(validate_address(item) for item in to)
     cc_values = tuple(validate_address(item) for item in cc)
     bcc_values = tuple(validate_address(item) for item in bcc)
@@ -100,6 +100,7 @@ def validate_draft(
     if len({item.upload_id for item in attachments}) != len(attachments):
         raise ApprovalError("Duplicate attachments are not allowed")
     return DraftContent(
+        from_address=sender,
         to=recipients,
         cc=cc_values,
         bcc=bcc_values,
@@ -119,6 +120,7 @@ class DraftApprovalStore:
     def prepare(
         self,
         *,
+        from_address: str | None = None,
         to: list[str],
         cc: list[str],
         bcc: list[str],
@@ -129,6 +131,7 @@ class DraftApprovalStore:
     ) -> dict[str, Any]:
         content = validate_draft(
             self.settings,
+            from_address=from_address,
             to=to,
             cc=cc,
             bcc=bcc,
@@ -143,6 +146,7 @@ class DraftApprovalStore:
         draft_id = uuid.uuid4().hex
         canonical = {
             "draft_id": draft_id,
+            "from": content.from_address,
             "to": content.to,
             "cc": content.cc,
             "bcc": content.bcc,
@@ -160,6 +164,7 @@ class DraftApprovalStore:
         ).hexdigest()
         proposal = DraftProposal(
             draft_id=draft_id,
+            from_address=content.from_address,
             to=content.to,
             cc=content.cc,
             bcc=content.bcc,

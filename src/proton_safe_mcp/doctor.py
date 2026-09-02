@@ -85,6 +85,18 @@ def run_checks() -> list[CheckResult]:
                 "Bridge account and loopback IMAP port are configured",
             )
         )
+        alias_count = len(settings.sender_addresses) - 1
+        results.append(
+            CheckResult(
+                "Sender addresses",
+                "PASS",
+                (
+                    f"primary address plus {alias_count} alias(es) from PROTON_BRIDGE_ALIASES"
+                    if alias_count
+                    else "primary address only; set PROTON_BRIDGE_ALIASES to draft as an alias"
+                ),
+            )
+        )
         try:
             state_metadata = settings.state_dir.stat()
         except FileNotFoundError:

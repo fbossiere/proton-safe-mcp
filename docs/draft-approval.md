@@ -21,7 +21,8 @@ that should use it.
 
 ## Default conversational-confirmation sequence
 
-1. The client presents the exact To, Cc, Bcc, subject, complete body, and attachment list.
+1. The client presents the exact sender address, To, Cc, Bcc, subject, complete body, and
+   attachment list.
 2. The user explicitly confirms those values in the conversation.
 3. The client calls `create_confirmed_draft` with the unchanged values and
    `user_confirmed: true`.
@@ -63,13 +64,22 @@ confirms that bare address.
    uvx --from proton-safe-mcp==1.2.0 proton-safe-mcp approve <draft_id>
    ```
 
-6. The CLI prints recipients, subject, attachment names and hashes, a body preview, and the proposal digest. It then requires the exact confirmation `APPROVE <last-eight-id-characters>`.
+6. The CLI prints the sender address, recipients, subject, attachment names and hashes, a body preview, and the proposal digest. It then requires the exact confirmation `APPROVE <last-eight-id-characters>`.
 7. Only after that confirmation may the MCP client call `commit_approved_draft(draft_id)`.
 8. Open Proton Mail, inspect the message in `Drafts`, and press Send yourself.
 
 !!! note
 
     `commit_approved_draft` appends a draft over IMAP. The server has no SMTP implementation and returns `sent: false`.
+
+## Choosing a sending alias
+
+A draft uses the primary `PROTON_BRIDGE_USER` address unless the client passes `from_address`.
+Configure the account's other addresses in `PROTON_BRIDGE_ALIASES`, ask the client which senders
+are available (`list_sender_addresses`), and state the one you want as part of the same
+confirmation that covers recipients, subject, body, and attachments. In enhanced mode the chosen
+sender is part of the digest, so approving a proposal approves that sender too, and swapping it
+invalidates the approval.
 
 ## Reject a proposal
 
@@ -84,6 +94,7 @@ Rejection is persistent for that proposal. A later commit attempt fails.
 The proposal digest covers:
 
 - draft ID;
+- the sender address the draft will use;
 - To, Cc, and Bcc recipients;
 - subject;
 - SHA-256 of the complete body;

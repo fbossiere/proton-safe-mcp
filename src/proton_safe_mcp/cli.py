@@ -27,6 +27,7 @@ def _load_request(settings: Settings, draft_id: str) -> dict[str, Any]:
 
 def _print_request(request: dict[str, Any]) -> None:
     print(f"Draft ID: {request['draft_id']}")
+    print(f"From: {request.get('from', '(primary address)')}")
     print(f"To: {', '.join(request['to'])}")
     if request.get("cc"):
         print(f"Cc: {', '.join(request['cc'])}")

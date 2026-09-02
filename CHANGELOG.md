@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added sending-alias support for drafts: `PROTON_BRIDGE_ALIASES` configures an allowlist of
+  additional From addresses, `list_sender_addresses` reports it, and `create_confirmed_draft` and
+  `prepare_draft` accept the chosen `from_address`. Unconfigured senders are rejected, the IMAP
+  write re-checks the allowlist, and the approval digest and CLI summary now bind the sender.
+
 - Added a dev container (`.devcontainer/devcontainer.json`) that mirrors the CI toolchain (Python
   3.12 + uv) and bundles the GitHub CLI for a zero-setup contributor environment, and documented
   its usage in `CONTRIBUTING.md`.

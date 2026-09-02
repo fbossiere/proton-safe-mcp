@@ -62,7 +62,7 @@ def _body_as_html(body_text: str) -> str:
     Bodies may quote attacker-controlled mail, so their content is HTML-escaped: the
     alternative can only ever carry markup generated here.
     """
-    normalized = body_text.replace("\r\n", "\n").replace("\r", "\n").strip("\n")
+    normalized = body_text.replace("\r\n", "\n").replace("\r", "\n")
     paragraphs = re.split(r"\n(?:[\t ]*\n)+", normalized)
     blocks = "".join(
         "<p>" + "<br>".join(html.escape(line) for line in paragraph.split("\n")) + "</p>"
@@ -305,6 +305,7 @@ class ProtonBridgeClient:
     def append_draft(
         self,
         *,
+        from_address: str,
         to: tuple[str, ...],
         cc: tuple[str, ...],
         bcc: tuple[str, ...],
@@ -312,8 +313,12 @@ class ProtonBridgeClient:
         body_text: str,
         attachments: tuple[Attachment, ...],
     ) -> dict[str, Any]:
+        # Re-check at the write boundary: only an address configured at startup may appear in
+        # the From header, whatever an earlier layer resolved.
+        if from_address not in self.settings.sender_addresses:
+            raise BridgeError("Sender address is not configured for this account")
         message = EmailMessage(policy=policy.SMTP)
-        message["From"] = self.settings.bridge_user
+        message["From"] = from_address
         message["To"] = ", ".join(to)
         if cc:
             message["Cc"] = ", ".join(cc)
@@ -344,6 +349,7 @@ class ProtonBridgeClient:
         return {
             "created": True,
             "folder": "Drafts",
+            "from": from_address,
             "to": list(to),
             "cc": list(cc),
             "bcc_count": len(bcc),

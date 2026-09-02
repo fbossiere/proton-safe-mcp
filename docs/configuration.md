@@ -6,7 +6,8 @@ Proton Safe MCP intentionally exposes a small configuration surface. The transpo
 
 | Variable | Default | Accepted range | Purpose |
 | --- | ---: | ---: | --- |
-| `PROTON_BRIDGE_USER` | required | non-empty, no line breaks | Proton address configured in Bridge |
+| `PROTON_BRIDGE_USER` | required | bare email address | Proton address configured in Bridge |
+| `PROTON_BRIDGE_ALIASES` | empty | up to 24 comma-separated bare addresses | Additional From addresses a draft may use |
 | `PROTON_IMAP_PORT` | `1143` | `1`–`65535` | Local Bridge IMAP port |
 | `PROTON_MCP_STATE_DIR` | `~/.local/state/proton-safe-mcp` | local directory | Private staging and approval state |
 | `PROTON_MCP_MAX_ATTACHMENT_BYTES` | `20971520` | `1`–`26214400` | Maximum for one file and for all files in one draft |
@@ -18,6 +19,25 @@ Proton Safe MCP intentionally exposes a small configuration surface. The transpo
 
 Every positive integer is validated at startup. Invalid values stop the server with a configuration error.
 
+## Sender addresses
+
+`PROTON_BRIDGE_USER` is the primary sender and the default From address. To draft as one of the
+account's other Proton addresses or aliases, list them in `PROTON_BRIDGE_ALIASES`:
+
+```bash
+export PROTON_BRIDGE_USER="your-address@proton.me"
+export PROTON_BRIDGE_ALIASES="billing@example.com,legal@example.com"
+```
+
+Each entry must be a bare address; display names, line breaks, and malformed addresses stop the
+server at startup. Duplicates, surrounding spaces, and case differences are folded into one entry,
+and the primary address always comes first.
+
+Clients read the resulting list with `list_sender_addresses` and select one per draft with
+`from_address`. Any other value is rejected, so the allowlist is fixed by local configuration and
+cannot be extended by an MCP client or by text found in an email. Only addresses that Proton Mail
+already accepts for your account will work when you press Send: Bridge does not create aliases.
+
 ## Fixed security settings
 
 The following behavior is not configurable:
@@ -25,6 +45,7 @@ The following behavior is not configurable:
 - Bridge host: `127.0.0.1`.
 - MCP transport: STDIO.
 - Draft destination: Proton Mail's `Drafts` folder.
+- Sender allowlist: fixed at startup from `PROTON_BRIDGE_USER` and `PROTON_BRIDGE_ALIASES`.
 - Direct draft confirmation: explicit client assertion of the exact user-confirmed content.
 - Enhanced draft approval: local, interactive, and outside the MCP tool surface.
 

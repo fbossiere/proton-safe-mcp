@@ -109,7 +109,7 @@ def test_doctor_rejects_unsupported_platform(settings, monkeypatch, capsys):
 
 def test_doctor_does_not_create_the_state_directory(tmp_path, monkeypatch, capsys):
     state_dir = tmp_path / "missing" / "state"
-    monkeypatch.setenv("PROTON_BRIDGE_USER", "bridge-user")
+    monkeypatch.setenv("PROTON_BRIDGE_USER", "bridge-user@example.com")
     monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(state_dir))
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
     monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
@@ -134,6 +134,7 @@ def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
 
     class DiagnosticSettings:
         bridge_user = "bridge-user"
+        sender_addresses = ("bridge-user",)
         state_dir = UnreadableStateDirectory()
 
     monkeypatch.setattr(

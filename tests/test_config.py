@@ -21,6 +21,22 @@ def test_from_env_rejects_header_injection_in_user(monkeypatch, tmp_path, user):
         Settings.from_env()
 
 
+@pytest.mark.parametrize(
+    "user",
+    [
+        "User <user@example.com>",
+        "not-an-address",
+        "user@exam..ple.com",
+    ],
+)
+def test_from_env_rejects_a_non_bare_or_malformed_primary_sender(monkeypatch, tmp_path, user):
+    monkeypatch.setenv("PROTON_BRIDGE_USER", user)
+    monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
+
+    with pytest.raises(ConfigurationError):
+        Settings.from_env()
+
+
 def test_bridge_host_is_loopback_and_not_configurable(monkeypatch, tmp_path):
     monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
     monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
@@ -65,3 +81,48 @@ def test_state_directories_are_private(monkeypatch, tmp_path):
     for directory in (settings.state_dir, settings.uploads_dir, settings.approvals_dir):
         assert directory.is_dir()
         assert directory.stat().st_mode & 0o777 == 0o700
+
+
+def test_sender_aliases_are_allowlisted_primary_first(monkeypatch, tmp_path):
+    monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
+    monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv(
+        "PROTON_BRIDGE_ALIASES",
+        " billing@example.com , USER@example.com ,, legal@example.com ",
+    )
+
+    settings = Settings.from_env()
+
+    # The primary address stays first and is never duplicated by a differently cased alias.
+    assert settings.sender_addresses == (
+        "user@example.com",
+        "billing@example.com",
+        "legal@example.com",
+    )
+    assert settings.default_sender == "user@example.com"
+
+
+def test_sender_addresses_default_to_the_primary_address_alone(monkeypatch, tmp_path):
+    monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
+    monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
+
+    assert Settings.from_env().sender_addresses == ("user@example.com",)
+
+
+@pytest.mark.parametrize(
+    "aliases",
+    [
+        "Billing <billing@example.com>",
+        "billing@example.com\r\nBcc: attacker@example.com",
+        "not-an-address",
+        "billing@example.com, attacker@exam..ple.com",
+        ",".join(f"alias{index}@example.com" for index in range(25)),
+    ],
+)
+def test_malformed_sender_aliases_stop_the_server(monkeypatch, tmp_path, aliases):
+    monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
+    monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("PROTON_BRIDGE_ALIASES", aliases)
+
+    with pytest.raises(ConfigurationError):
+        Settings.from_env()

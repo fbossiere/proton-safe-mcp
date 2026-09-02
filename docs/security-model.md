@@ -5,7 +5,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 ## Threats considered
 
 - Adversarial instructions embedded in email bodies or headers.
-- A model selecting recipients or outgoing attachments from untrusted mail or extracted attachment content.
+- A model selecting recipients, a sending identity, or outgoing attachments from untrusted mail or extracted attachment content.
 - Malformed, oversized, encrypted, active, or prompt-injected received attachments.
 - Header, folder, or IMAP search injection.
 - Client attempts to make the server read arbitrary local paths.
@@ -27,6 +27,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 | Outgoing attachments | No paths; type, size, order, lifetime, and SHA-256 validation |
 | Drafts | Exact conversational confirmation assertion by default; optional out-of-band approval with digest binding and expiry |
 | Draft bodies | Plain text plus a server-generated HTML alternative; client markup is escaped, never rendered |
+| Sender identity | From header restricted to the startup allowlist, re-checked at the IMAP write and bound into the approval digest |
 | Credentials | Bridge-generated IMAP password in the OS keyring |
 | State | `0700` directories, `0600` files, defensive no-follow behavior |
 | Inputs | Length, format, recipient, header, folder, and search validation |

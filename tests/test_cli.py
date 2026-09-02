@@ -13,9 +13,10 @@ def env(monkeypatch, settings):
     return settings
 
 
-def _prepare_draft(settings) -> str:
+def _prepare_draft(settings, from_address: str | None = None) -> str:
     store = DraftApprovalStore(settings)
     result = store.prepare(
+        from_address=from_address,
         to=["recipient@example.com"],
         cc=[],
         bcc=[],
@@ -66,3 +67,9 @@ def test_unknown_draft_id_is_reported_as_error(env, capsys):
 def test_show_rejects_path_like_draft_id(env, capsys):
     assert cli.main(["show", "../outside"]) == 1
     assert "Invalid draft_id" in capsys.readouterr().err
+
+
+def test_summary_shows_the_sender_the_draft_will_use(env, capsys):
+    draft_id = _prepare_draft(env, from_address="alias@example.com")
+    assert cli.main(["show", draft_id]) == 0
+    assert "From: alias@example.com" in capsys.readouterr().out

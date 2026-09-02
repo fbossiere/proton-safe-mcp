@@ -388,6 +388,7 @@ def test_append_draft_keeps_bcc_and_attachment_but_never_sends(settings):
         data=b"%PDF-1.7",
     )
     result = client.append_draft(
+        from_address="user@example.com",
         to=("recipient@example.com",),
         cc=(),
         bcc=("private@example.com",),
@@ -414,6 +415,7 @@ def _appended_draft(settings, **overrides):
             return "OK", [b"APPEND completed"]
 
     fields = {
+        "from_address": settings.default_sender,
         "to": ("recipient@example.com",),
         "cc": (),
         "bcc": (),
@@ -484,6 +486,13 @@ def test_html_alternative_treats_multiple_blank_lines_as_one_paragraph_break(set
     assert "<br>Second paragraph" not in html_part
 
 
+def test_html_alternative_preserves_leading_and_trailing_blank_lines(settings):
+    message = _appended_draft(settings, body_text="\n\nFirst paragraph\n\nLast paragraph\n\n")
+
+    html_part = message.get_body(("html",)).get_content()
+    assert "<p></p><p>First paragraph</p><p>Last paragraph</p><p></p>" in html_part
+
+
 def test_append_draft_failure_surfaces_the_bridge_response(settings):
     class FakeIMAP:
         def append(self, _folder, _flags, _date_time, _payload):
@@ -492,6 +501,7 @@ def test_append_draft_failure_surfaces_the_bridge_response(settings):
     client = _client_with(settings, FakeIMAP())
     with pytest.raises(BridgeError, match="Unable to append Proton draft: Over quota"):
         client.append_draft(
+            from_address="user@example.com",
             to=("recipient@example.com",),
             cc=(),
             bcc=(),
@@ -833,3 +843,46 @@ def test_attachment_metadata_reports_unnamed_parts_without_payloads(settings):
             "text_extractable": True,
         }
     ]
+
+
+def test_append_draft_uses_the_requested_configured_alias(settings):
+    captured = {}
+
+    class FakeIMAP:
+        def append(self, folder, flags, date_time, payload):
+            captured.update(folder=folder, payload=payload)
+            return "OK", [b"APPEND completed"]
+
+    client = _client_with(settings, FakeIMAP())
+    result = client.append_draft(
+        from_address="alias@example.com",
+        to=("recipient@example.com",),
+        cc=(),
+        bcc=(),
+        subject="Project brief",
+        body_text="Please review.",
+        attachments=(),
+    )
+
+    message = BytesParser(policy=policy.default).parsebytes(captured["payload"])
+    assert message["From"] == "alias@example.com"
+    assert result["from"] == "alias@example.com"
+    assert result["sent"] is False
+
+
+def test_append_draft_refuses_a_sender_outside_the_startup_allowlist(settings):
+    class RefusingIMAP:
+        def append(self, *_args):
+            raise AssertionError("append must not be reached")
+
+    client = _client_with(settings, RefusingIMAP())
+    with pytest.raises(BridgeError, match="Sender address is not configured"):
+        client.append_draft(
+            from_address="attacker@example.com",
+            to=("recipient@example.com",),
+            cc=(),
+            bcc=(),
+            subject="Project brief",
+            body_text="Please review.",
+            attachments=(),
+        )
