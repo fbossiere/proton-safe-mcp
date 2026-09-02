@@ -4,13 +4,11 @@ import asyncio
 import base64
 import hashlib
 import importlib
-import json
 
 import pytest
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
-from proton_safe_mcp.drafts import approve_request
 from proton_safe_mcp.errors import AttachmentError, BridgeError
 
 
@@ -78,8 +76,6 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
         "finish_attachment_upload",
         "discard_attachment",
         "create_confirmed_draft",
-        "prepare_draft",
-        "commit_approved_draft",
     }
     assert by_name["read_message"].annotations.readOnlyHint is True
     assert by_name["extract_attachment_text"].annotations.readOnlyHint is True
@@ -103,7 +99,6 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
     direct_schema = by_name["create_confirmed_draft"].inputSchema
     assert "from_address" in direct_schema["properties"]
     assert "from_address" not in direct_schema["required"]
-    assert "from_address" in by_name["prepare_draft"].inputSchema["properties"]
     assert "user_confirmed" in direct_schema["required"]
     confirmation_schema = direct_schema["properties"]["user_confirmed"]
     assert confirmation_schema.get("const") is True or confirmation_schema.get("enum") == [True]
@@ -214,24 +209,18 @@ def test_upload_rejects_a_filename_that_carries_a_path(server):
         server.begin_attachment_upload("../../etc/passwd.txt", "text/plain", 4, "0" * 64)
 
 
-def test_approval_workflow_creates_the_draft_and_destroys_the_tokens(server, monkeypatch):
+def test_confirmed_draft_carries_the_attachment_and_destroys_its_token(server, monkeypatch):
     _, token = _stage_attachment(server.attachments)
     captured: dict = {}
     monkeypatch.setattr(server.bridge, "append_draft", _recording_append_draft(captured))
 
-    proposal = server.prepare_draft(
+    result = server.create_confirmed_draft(
         to=["recipient@example.com"],
         subject="Quarterly numbers",
         body_text="See attached.",
+        user_confirmed=True,
         attachment_tokens=[token],
     )
-
-    assert proposal["approval_command"] == f"proton-safe-mcp approve {proposal['draft_id']}"
-    with pytest.raises(ToolError, match="Local approval required"):
-        server.commit_approved_draft(proposal["draft_id"])
-
-    approve_request(server.settings, proposal["draft_id"])
-    result = server.commit_approved_draft(proposal["draft_id"])
 
     assert result["sent"] is False
     assert result["attachment_names"] == ["brief.txt"]
@@ -239,53 +228,50 @@ def test_approval_workflow_creates_the_draft_and_destroys_the_tokens(server, mon
     assert captured["to"] == ("recipient@example.com",)
     assert captured["attachments"][0].data == b"quarterly numbers"
 
-    # A replay finds neither the proposal nor the staged bytes, so it cannot duplicate the draft.
+    # The token is single-use, so a replay finds neither the staged bytes nor a usable token.
     monkeypatch.setattr(server.bridge, "append_draft", _refusing_append_draft)
-    with pytest.raises(ToolError, match="Unknown draft proposal"):
-        server.commit_approved_draft(proposal["draft_id"])
     with pytest.raises(ToolError, match="Unknown attachment upload"):
-        server.discard_attachment(token)
+        server.create_confirmed_draft(
+            to=["recipient@example.com"],
+            subject="Quarterly numbers",
+            body_text="See attached.",
+            user_confirmed=True,
+            attachment_tokens=[token],
+        )
 
 
-def test_commit_rejects_an_attachment_swapped_after_approval(server, monkeypatch):
-    upload_id, token = _stage_attachment(server.attachments)
-    proposal = server.prepare_draft(
-        to=["recipient@example.com"],
-        subject="Quarterly numbers",
-        body_text="See attached.",
-        attachment_tokens=[token],
-    )
-    approve_request(server.settings, proposal["draft_id"])
-
-    # Simulate write access to the state directory: swap the staged bytes and the metadata that
-    # guards them, so the store itself hands back a file the user never approved.
-    swapped = b"attacker payload"
-    server.attachments._blob_path(upload_id, partial=False).write_bytes(swapped)
-    meta_path = server.attachments._meta_path(upload_id)
-    metadata = json.loads(meta_path.read_text(encoding="utf-8"))
-    metadata["expected_size"] = len(swapped)
-    metadata["sha256"] = hashlib.sha256(swapped).hexdigest()
-    meta_path.write_text(json.dumps(metadata), encoding="utf-8")
-
-    monkeypatch.setattr(server.bridge, "append_draft", _refusing_append_draft)
-    with pytest.raises(ToolError, match="Attachment set changed after approval"):
-        server.commit_approved_draft(proposal["draft_id"])
-
-
-def test_commit_rejects_a_token_revoked_after_approval(server, monkeypatch):
+def test_confirmed_draft_rejects_a_token_revoked_before_creation(server, monkeypatch):
     _, token = _stage_attachment(server.attachments)
-    proposal = server.prepare_draft(
-        to=["recipient@example.com"],
-        subject="Quarterly numbers",
-        body_text="See attached.",
-        attachment_tokens=[token],
-    )
-    approve_request(server.settings, proposal["draft_id"])
     server.discard_attachment(token)
 
     monkeypatch.setattr(server.bridge, "append_draft", _refusing_append_draft)
     with pytest.raises(ToolError, match="Unknown attachment upload"):
-        server.commit_approved_draft(proposal["draft_id"])
+        server.create_confirmed_draft(
+            to=["recipient@example.com"],
+            subject="Quarterly numbers",
+            body_text="See attached.",
+            user_confirmed=True,
+            attachment_tokens=[token],
+        )
+
+
+def test_confirmed_draft_rejects_staged_bytes_swapped_after_upload(server, monkeypatch):
+    upload_id, token = _stage_attachment(server.attachments)
+
+    # The staged blob is re-hashed against its recorded digest at load time, so bytes replaced
+    # after finish_attachment_upload never reach the draft.
+    swapped = b"attacker payload!"  # same length, so only the digest check can catch it
+    server.attachments._blob_path(upload_id, partial=False).write_bytes(swapped)
+
+    monkeypatch.setattr(server.bridge, "append_draft", _refusing_append_draft)
+    with pytest.raises(ToolError, match="Staged attachment content changed"):
+        server.create_confirmed_draft(
+            to=["recipient@example.com"],
+            subject="Quarterly numbers",
+            body_text="See attached.",
+            user_confirmed=True,
+            attachment_tokens=[token],
+        )
 
 
 def test_cleanup_failure_is_reported_without_hiding_the_created_draft(server, monkeypatch):
@@ -369,21 +355,3 @@ def test_confirmed_draft_rejects_an_unconfigured_sender(server, monkeypatch):
             user_confirmed=True,
             from_address="attacker@example.com",
         )
-
-
-def test_approved_draft_keeps_the_alias_it_was_approved_with(server, monkeypatch):
-    captured: dict = {}
-    monkeypatch.setattr(server.bridge, "append_draft", _recording_append_draft(captured))
-
-    proposal = server.prepare_draft(
-        to=["recipient@example.com"],
-        subject="Quarterly numbers",
-        body_text="See attached.",
-        from_address="alias@example.com",
-    )
-    assert proposal["summary"]["from"] == "alias@example.com"
-
-    approve_request(server.settings, proposal["draft_id"])
-    server.commit_approved_draft(proposal["draft_id"])
-
-    assert captured["from_address"] == "alias@example.com"

@@ -64,7 +64,6 @@ class Settings:
     max_received_attachment_bytes: int
     max_chunk_bytes: int
     upload_ttl_seconds: int
-    draft_ttl_seconds: int
     max_body_chars: int
 
     @property
@@ -75,10 +74,6 @@ class Settings:
     @property
     def uploads_dir(self) -> Path:
         return self.state_dir / "uploads"
-
-    @property
-    def approvals_dir(self) -> Path:
-        return self.state_dir / "approvals"
 
     @classmethod
     def from_env(cls, *, create_directories: bool = True) -> Settings:
@@ -105,7 +100,6 @@ class Settings:
             ),
             max_chunk_bytes=_positive_int("PROTON_MCP_MAX_CHUNK_BYTES", 384 * 1024, 1024 * 1024),
             upload_ttl_seconds=_positive_int("PROTON_MCP_UPLOAD_TTL_SECONDS", 1800, 86400),
-            draft_ttl_seconds=_positive_int("PROTON_MCP_DRAFT_TTL_SECONDS", 900, 3600),
             max_body_chars=_positive_int("PROTON_MCP_MAX_BODY_CHARS", 100_000, 500_000),
         )
         if create_directories:
@@ -113,6 +107,6 @@ class Settings:
         return settings
 
     def ensure_directories(self) -> None:
-        for directory in (self.state_dir, self.uploads_dir, self.approvals_dir):
+        for directory in (self.state_dir, self.uploads_dir):
             directory.mkdir(mode=0o700, parents=True, exist_ok=True)
             directory.chmod(0o700)

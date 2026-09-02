@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking.** Removed the optional terminal draft-approval workflow: the `prepare_draft` and
+  `commit_approved_draft` MCP tools, the `proton-safe-mcp show / approve / reject` CLI commands,
+  the on-disk approval state machine, and `PROTON_MCP_DRAFT_TTL_SECONDS`. `create_confirmed_draft`
+  is now the only way to create a draft, and it keeps `from_address` and every other input
+  unchanged.
+
+  It was never a security boundary. The choice between it and `create_confirmed_draft` was made by
+  the model — precisely the component the threat model does not trust — so a prompt injection
+  simply took the direct path. And the asset it guarded does not need guarding: the server has no
+  SMTP implementation, so a draft cannot leave the account until the user presses Send in Proton
+  Mail, where the full body, recipients, and sender are visible. The terminal step reviewed a
+  500-character truncated preview instead.
+
+  Its one genuine control, binding attachment digests and the sender across the approval window,
+  defended against an attacker with write access to the state directory — an attacker who could
+  equally well write the approval marker. Staged bytes are still re-hashed against their recorded
+  digest at load time, and `append_draft` still re-checks the sender allowlist, which is what
+  actually catches tampering.
+
+  The `~/.local/state/proton-safe-mcp/approvals` directory is no longer created and can be deleted.
+
+### Changed
+
+- `ApprovalError` is now `DraftError`, matching what it actually reports.
+- The architecture diagram now shows the manual send in Proton Mail as the human gate, in place
+  of the terminal approval box.
+
 ## [1.2.1] - 2026-09-02
 
 ### Added

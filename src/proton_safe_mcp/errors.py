@@ -13,8 +13,8 @@ class AttachmentError(ProtonMCPError):
     """An attachment upload is invalid or expired."""
 
 
-class ApprovalError(ProtonMCPError):
-    """Draft validation or optional out-of-band approval failed."""
+class DraftError(ProtonMCPError):
+    """Draft content failed validation."""
 
 
 class BridgeError(ProtonMCPError):

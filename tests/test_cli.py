@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from proton_safe_mcp import cli
-from proton_safe_mcp.drafts import DraftApprovalStore
 
 
 @pytest.fixture
@@ -13,63 +12,51 @@ def env(monkeypatch, settings):
     return settings
 
 
-def _prepare_draft(settings, from_address: str | None = None) -> str:
-    store = DraftApprovalStore(settings)
-    result = store.prepare(
-        from_address=from_address,
-        to=["recipient@example.com"],
-        cc=[],
-        bcc=[],
-        subject="CLI test",
-        body_text="Hello",
-        attachment_tokens=[],
-        attachments=[],
+@pytest.mark.parametrize("command", ["approve", "reject", "show"])
+def test_draft_approval_commands_are_gone(command, capsys):
+    """No draft approval state machine exists, so the CLI must not offer one."""
+    with pytest.raises(SystemExit) as excinfo:
+        cli.main([command, "0" * 32])
+    assert excinfo.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
+
+
+def test_a_command_is_required():
+    with pytest.raises(SystemExit) as excinfo:
+        cli.main([])
+    assert excinfo.value.code == 2
+
+
+def test_configuration_error_is_reported_without_a_traceback(monkeypatch, capsys):
+    monkeypatch.delenv("PROTON_BRIDGE_USER", raising=False)
+    assert cli.main(["setup"]) == 1
+    assert "PROTON_BRIDGE_USER is required" in capsys.readouterr().err
+
+
+def _answer_prompts(monkeypatch, *answers):
+    remaining = list(answers)
+    monkeypatch.setattr(cli.getpass, "getpass", lambda _prompt: remaining.pop(0))
+
+
+def test_setup_stores_the_bridge_password_in_the_keyring(env, monkeypatch, capsys):
+    stored: dict[str, str] = {}
+    _answer_prompts(monkeypatch, "bridge-password", "bridge-password")
+    monkeypatch.setattr(
+        cli,
+        "store_bridge_password",
+        lambda user, password: stored.update(user=user, secret=password),
     )
-    return result["draft_id"]
+
+    assert cli.main(["setup"]) == 0
+    assert stored == {"user": env.bridge_user, "secret": "bridge-password"}
+    assert "stored in the OS keyring" in capsys.readouterr().out
 
 
-def test_approve_requires_exact_interactive_confirmation(env, monkeypatch, capsys):
-    draft_id = _prepare_draft(env)
-    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
-    assert cli.main(["approve", draft_id]) == 1
-    assert "Approval cancelled" in capsys.readouterr().err
-    assert not (env.approvals_dir / f"{draft_id}.approved.json").exists()
+def test_setup_rejects_mismatched_passwords(env, monkeypatch, capsys):
+    _answer_prompts(monkeypatch, "one", "two")
+    monkeypatch.setattr(
+        cli, "store_bridge_password", lambda *_args: pytest.fail("must not store a credential")
+    )
 
-
-def test_approve_happy_path_writes_marker(env, monkeypatch, capsys):
-    draft_id = _prepare_draft(env)
-    monkeypatch.setattr("builtins.input", lambda _prompt: f"APPROVE {draft_id[-8:]}")
-    assert cli.main(["approve", draft_id]) == 0
-    assert "Approved" in capsys.readouterr().out
-    assert (env.approvals_dir / f"{draft_id}.approved.json").is_file()
-
-
-def test_reject_writes_rejection_marker(env, capsys):
-    draft_id = _prepare_draft(env)
-    assert cli.main(["reject", draft_id]) == 0
-    assert (env.approvals_dir / f"{draft_id}.rejected").is_file()
-
-
-def test_show_prints_summary_without_side_effects(env, capsys):
-    draft_id = _prepare_draft(env)
-    assert cli.main(["show", draft_id]) == 0
-    output = capsys.readouterr().out
-    assert "recipient@example.com" in output
-    assert "CLI test" in output
-    assert not (env.approvals_dir / f"{draft_id}.approved.json").exists()
-
-
-def test_unknown_draft_id_is_reported_as_error(env, capsys):
-    assert cli.main(["show", "0" * 32]) == 1
-    assert "Error:" in capsys.readouterr().err
-
-
-def test_show_rejects_path_like_draft_id(env, capsys):
-    assert cli.main(["show", "../outside"]) == 1
-    assert "Invalid draft_id" in capsys.readouterr().err
-
-
-def test_summary_shows_the_sender_the_draft_will_use(env, capsys):
-    draft_id = _prepare_draft(env, from_address="alias@example.com")
-    assert cli.main(["show", draft_id]) == 0
-    assert "From: alias@example.com" in capsys.readouterr().out
+    assert cli.main(["setup"]) == 1
+    assert "Passwords do not match" in capsys.readouterr().err

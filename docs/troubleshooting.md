@@ -311,23 +311,23 @@ See [Common attachment failures](attachments.md#common-failures) for filename, M
 
 Do not retry one chunk with the same index after the server has accepted it. Resume with the returned `next_chunk`, or discard and restart the upload if client state is uncertain.
 
-## Draft approval
+## Drafts
 
-### `Unknown draft proposal or server was restarted`
+### `Explicit user confirmation of the exact draft is required`
 
-The body is kept only in process memory. Prepare a new proposal after any server restart.
+`create_confirmed_draft` requires `user_confirmed: true`. Present the exact recipients, subject,
+complete body, and attachment list, obtain confirmation in the conversation, then call the tool
+again with the unchanged values.
 
-### `Draft proposal expired`
+### `Use a bare email address, without display name`
 
-Prepare and approve a new draft within `PROTON_MCP_DRAFT_TTL_SECONDS`.
+Recipients must be bare addresses such as `person@example.com`. Strip any `Display Name <…>`
+wrapper before calling the tool.
 
-### `Local approval required`
+### A draft was created but is not in `Drafts`
 
-Run the exact `approval_command` returned by `prepare_draft` in a separate local terminal.
-
-### Approval does not match
-
-The approval marker digest differs from the in-memory proposal. Reject it and prepare a new draft; do not modify approval state manually.
+Check the folder name Bridge exposes with `list_folders`. Some Proton locales expose a translated
+Drafts folder.
 
 ## Documentation build
 

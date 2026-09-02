@@ -120,13 +120,5 @@ All three clients can call `create_confirmed_draft` after you explicitly confirm
 recipients, subject, complete body, and attachments in the conversation. You still review and send
 the resulting draft yourself in Proton Mail.
 
-For optional enhanced security, have the client call `prepare_draft`, then inspect and approve the
-exact proposal in a separate terminal:
-
-```bash
-export PROTON_BRIDGE_USER="your-address@proton.me"
-proton-safe-mcp show <draft_id>
-proton-safe-mcp approve <draft_id>
-```
-
-The client may then call `commit_approved_draft`.
+No client can send, delete, or move mail: those tools do not exist. A draft therefore stays in
+your `Drafts` folder until you send it from Proton Mail yourself.

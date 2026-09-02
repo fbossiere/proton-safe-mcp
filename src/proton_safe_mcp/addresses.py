@@ -5,10 +5,10 @@ from __future__ import annotations
 import re
 from email.utils import parseaddr
 
-from .errors import ApprovalError, ProtonMCPError
+from .errors import DraftError, ProtonMCPError
 
 
-def validate_address(value: str, *, error: type[ProtonMCPError] = ApprovalError) -> str:
+def validate_address(value: str, *, error: type[ProtonMCPError] = DraftError) -> str:
     """Return a bare, header-safe address or raise ``error`` explaining the rejection."""
     if not isinstance(value, str) or not value or "\r" in value or "\n" in value:
         raise error("Invalid email address")

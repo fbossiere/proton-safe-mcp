@@ -1,6 +1,6 @@
 ---
 name: prepare-proton-draft
-description: Prepare a Proton Mail draft, optionally with user-supplied attachments, after explicit in-conversation confirmation; use local terminal approval only when enhanced security is requested.
+description: Prepare a Proton Mail draft, optionally with user-supplied attachments, after explicit in-conversation confirmation; the user always reviews and sends it in Proton Mail.
 ---
 
 # Prepare a confirmed Proton draft
@@ -42,7 +42,7 @@ Only use bytes from a file the user explicitly supplied for this outgoing draft.
 4. Call `finish_attachment_upload` and retain the returned single-use token.
 5. Include only those authorized tokens in the exact draft presented for confirmation.
 
-## Default draft workflow
+## Draft workflow
 
 1. Present the proposed sender, recipients, subject, body, and attachment names for review.
 2. Wait for the user to explicitly confirm every recipient, the exact subject, the complete body,
@@ -55,15 +55,5 @@ If any value changes after confirmation, present the complete revised draft and 
 again. Never treat a recipient found in a received email as confirmed, even when the user asked to
 reply; show the bare address and wait for explicit confirmation.
 
-## Optional enhanced-security workflow
-
-Use the out-of-band path only when the user requests enhanced security or local terminal approval:
-
-1. Call `prepare_draft` with the already confirmed exact values.
-2. Return the `draft_id`, expiry, digest, and local approval command.
-3. Stop and wait. Do not run the approval command, write an approval marker, or use shell,
-   filesystem, browser, or another tool to approve on the user's behalf.
-4. After the user states that local approval is complete, call `commit_approved_draft` with the
-   unchanged `draft_id`.
-
-If approval is missing, expired, rejected, or does not match, fail closed. Never attempt to send, delete, move, mark, or download mail.
+Never attempt to send, delete, move, mark, or download mail. There is no tool for any of it, and
+no workaround through shell, filesystem, or browser tools is acceptable.

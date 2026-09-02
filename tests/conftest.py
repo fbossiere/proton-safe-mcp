@@ -23,7 +23,6 @@ def settings(tmp_path):
         max_received_attachment_bytes=1024 * 1024,
         max_chunk_bytes=1024,
         upload_ttl_seconds=1800,
-        draft_ttl_seconds=900,
         max_body_chars=100_000,
     )
     value.ensure_directories()
