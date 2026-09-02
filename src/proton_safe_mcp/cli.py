@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import getpass
-import json
 import sys
 
 from .config import Settings
@@ -55,10 +54,9 @@ def main(argv: list[str] | None = None) -> int:
         settings = Settings.from_env()
         if args.command == "setup":
             return _cmd_setup(settings)
-        if args.command == "serve":
-            return _cmd_serve()
-        return 2
-    except (ProtonMCPError, OSError, json.JSONDecodeError) as exc:
+        # argparse restricts `command` to the three registered choices.
+        return _cmd_serve()
+    except (ProtonMCPError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
