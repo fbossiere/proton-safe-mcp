@@ -27,7 +27,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 | Outgoing attachments | No paths; type, size, order, lifetime, and SHA-256 validation |
 | Drafts | Exact conversational confirmation assertion; validated recipients, headers, sizes, and attachment tokens |
 | Draft bodies | Plain text plus a server-generated HTML alternative; client markup is escaped, never rendered |
-| Sender identity | From header restricted to the startup allowlist, re-checked at the IMAP write and bound into the approval digest |
+| Sender identity | From header restricted to the startup allowlist, re-checked at the IMAP write |
 | Credentials | Bridge-generated IMAP password in the OS keyring |
 | State | `0700` directories, `0600` files, defensive no-follow behavior |
 | Inputs | Length, format, recipient, header, folder, and search validation |
