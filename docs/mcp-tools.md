@@ -1,6 +1,6 @@
 # MCP tools
 
-The server exposes fourteen tools. Tool annotations help clients present them correctly, while the
+The server exposes twelve tools. Tool annotations help clients present them correctly, while the
 server enforces input validation and the absence of any send, delete, or move capability.
 
 ## Read-only mail
