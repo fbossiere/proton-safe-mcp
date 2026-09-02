@@ -60,8 +60,8 @@ confirms that bare address.
    If the command is not installed globally, run the pinned release with `uvx` instead:
 
    ```bash
-   uvx --from proton-safe-mcp==1.2.0 proton-safe-mcp show <draft_id>
-   uvx --from proton-safe-mcp==1.2.0 proton-safe-mcp approve <draft_id>
+   uvx --from proton-safe-mcp==1.2.1 proton-safe-mcp show <draft_id>
+   uvx --from proton-safe-mcp==1.2.1 proton-safe-mcp approve <draft_id>
    ```
 
 6. The CLI prints the sender address, recipients, subject, attachment names and hashes, a body preview, and the proposal digest. It then requires the exact confirmation `APPROVE <last-eight-id-characters>`.
