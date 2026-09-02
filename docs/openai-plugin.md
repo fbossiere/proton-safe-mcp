@@ -223,7 +223,7 @@ ChatGPT with an older environment. Quit ChatGPT again and wait until this comman
 pgrep -a -x ChatGPT
 ```
 
-Then launch it once from a terminal after loading the two non-secret settings:
+Then launch it once from a terminal after loading the supported non-secret settings:
 
 ```bash
 set -a
@@ -239,7 +239,7 @@ that process and preserve its stale environment. Start a new task after the app 
 This terminal launch is a one-time proof, not the intended everyday startup method. If it fixes
 the plugin, install the
 [persistent per-user menu launcher](troubleshooting.md#make-the-menu-launch-permanent) so the
-normal ChatGPT icon loads the two settings automatically on later starts.
+normal ChatGPT icon loads the supported settings automatically on later starts.
 
 Also verify the plugin installation from the same Codex command:
 

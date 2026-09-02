@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The bundled Codex plugin now forwards `PROTON_BRIDGE_ALIASES` from the desktop environment, so
-  sending aliases introduced in 1.2.1 are available through `list_sender_addresses`.
+  sending aliases introduced in 1.2.1 are available through `list_sender_addresses`. Troubleshooting
+  documents how to tell that packaging defect apart from a stale ChatGPT process environment, since
+  both leave `list_sender_addresses` reporting the primary address with no startup error.
 - The installation path now documents `PROTON_BRIDGE_ALIASES` where it is actually set. The README
   and Getting started only described the primary address, and the client `env` examples omitted the
   variable, so the sending-alias allowlist was discoverable only in the configuration reference.

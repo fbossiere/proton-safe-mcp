@@ -16,6 +16,7 @@ counts, or message content.
 | --- | --- | --- |
 | Plugin is installed but `/mcp` shows no Proton tools | MCP server exited before tool discovery | Check the user-manager variables below |
 | `PROTON_BRIDGE_USER is required` | Codex did not inherit the account variable | Reload `environment.d` and verify names |
+| `list_sender_addresses` returns only the primary address | Alias forwarding is missing from the installed plugin or Codex started without the alias variable | Run the alias-specific checks below |
 | `echo "$PROTON_BRIDGE_USER"` is empty after a reload | Current shell kept its old environment | Check `systemctl --user show-environment`; source the file only for a CLI test |
 | `doctor` passes through `systemd-run` but the plugin has no tools | GNOME or ChatGPT kept an older environment | Fully quit, then launch ChatGPT once from the prepared terminal |
 | `NoKeyringError` appears only inside a sandbox | That process cannot reach the desktop keyring | Run `doctor` from the normal user session; do not copy the password into plugin JSON |
@@ -104,7 +105,7 @@ Use this sequence on Ubuntu:
 
 The terminal launch above is only a diagnostic. You do **not** need to type it every time. If it
 restores the plugin, create a per-user launcher that keeps the normal `ChatGPT` desktop ID and
-loads only the two allowed settings.
+loads only the supported non-secret settings.
 
 Create the private executable directory if needed:
 
@@ -195,6 +196,55 @@ reinstall the Bridge or plugin unless the commands above identify an installatio
 
 See the [FAQ](faq.md) for why the current terminal may still show an empty variable and how to
 collect privacy-safe evidence.
+
+### `list_sender_addresses` returns only the primary address
+
+This symptom is different from a missing Proton tool list. Sender aliases are optional, so the MCP
+server can start normally and silently fall back to the primary address when
+`PROTON_BRIDGE_ALIASES` does not reach it. Two independent conditions must both be true:
+
+1. the installed plugin's `.mcp.json` must include `PROTON_BRIDGE_ALIASES` in `env_vars`; and
+2. the Codex process must already contain `PROTON_BRIDGE_ALIASES` when it starts the MCP server.
+
+Codex's `env_vars` setting is an allowlist and pass-through, not a settings-file loader. Reinstalling
+the plugin can repair the first condition, but it does not update the environment of an already
+running ChatGPT process. Restarting ChatGPT can repair the second condition, but it cannot repair an
+older installed plugin manifest that never forwarded the variable.
+
+Use this privacy-safe sequence on Ubuntu:
+
+1. Confirm that the user manager knows the alias variable without printing its value:
+
+   ```bash
+   systemctl --user show-environment |
+     awk -F= '$1 == "PROTON_BRIDGE_ALIASES" { print $1 "=<set>" }'
+   ```
+
+2. Check what the server receives outside ChatGPT:
+
+   ```bash
+   systemd-run --user --wait --pipe \
+     uvx --from proton-safe-mcp==2.0.1 proton-safe-mcp doctor
+   ```
+
+   `doctor` should report a primary address plus the configured alias count. If it reports the
+   primary address only, fix `~/.config/environment.d/90-proton-safe.conf`, run
+   `systemctl --user daemon-reload`, and repeat the check.
+
+3. If `doctor` sees the aliases but `list_sender_addresses` still returns only the primary address,
+   reinstall the current plugin build so its cached `.mcp.json` includes the alias pass-through:
+
+   ```bash
+   /usr/lib/chatgpt/resources/codex plugin add proton-safe@personal
+   ```
+
+4. Fully quit ChatGPT, wait until `pgrep -a -x ChatGPT` prints nothing, reopen it, and start a new
+   task. If the normal menu launch still loses the aliases, use the terminal-launch diagnostic and
+   the persistent menu launcher documented above.
+
+This sequence distinguishes the v2.0.1 plugin-packaging defect from a stale desktop-process
+environment. It also explains why the failure displayed no startup error: the primary sender
+remained valid throughout.
 
 ### ChatGPT desktop on Ubuntu cannot find `codex`
 

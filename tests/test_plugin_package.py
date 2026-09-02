@@ -105,6 +105,8 @@ def test_plugin_docs_are_local_first_and_tunnel_optional():
     assert "systemctl --user daemon-reload" in guide
     assert "systemd-run --user --wait --pipe" in guide
     assert "proton_bridge_aliases" in guide
+    assert "loading the supported non-secret settings" in guide
+    assert "loads the supported settings automatically" in guide
     assert "do not install an unrelated" in guide
 
 
@@ -130,6 +132,10 @@ def test_ubuntu_plugin_install_failures_are_documented():
     assert "environment.d accepts quoted values" in troubleshooting
     assert "never evaluate the file as shell code" in troubleshooting
     assert "proton_bridge_aliases" in troubleshooting
+    assert "loads only the supported non-secret settings" in troubleshooting
+    assert "`list_sender_addresses` returns only the primary address" in troubleshooting
+    assert "two independent conditions must both be true" in troubleshooting
+    assert "v2.0.1 plugin-packaging defect" in troubleshooting
     assert "do not add `proton_bridge_password`" in troubleshooting
 
 
