@@ -56,6 +56,21 @@ class _HTMLTextExtractor(HTMLParser):
         return value.strip()
 
 
+def _body_as_html(body_text: str) -> str:
+    """Render a confirmed plain-text body as the minimal escaped HTML Proton needs.
+
+    Bodies may quote attacker-controlled mail, so their content is HTML-escaped: the
+    alternative can only ever carry markup generated here.
+    """
+    normalized = body_text.replace("\r\n", "\n").replace("\r", "\n").strip("\n")
+    paragraphs = re.split(r"\n(?:[\t ]*\n)+", normalized)
+    blocks = "".join(
+        "<p>" + "<br>".join(html.escape(line) for line in paragraph.split("\n")) + "</p>"
+        for paragraph in paragraphs
+    )
+    return f"<html><body>{blocks}</body></html>"
+
+
 def _decode_header(value: str | None) -> str:
     if not value:
         return ""
@@ -308,6 +323,10 @@ class ProtonBridgeClient:
             message["Bcc"] = ", ".join(bcc)
         message["Subject"] = subject
         message.set_content(body_text)
+        # Proton opens a text/plain-only draft in the composer's "Plain text" mode. Adding the
+        # escaped HTML alternative keeps the draft in the default "Normal" rich-text mode while
+        # the plain-text part stays authoritative for clients that prefer it.
+        message.add_alternative(_body_as_html(body_text), subtype="html")
         for attachment in attachments:
             maintype, subtype = attachment.content_type.split("/", 1)
             message.add_attachment(

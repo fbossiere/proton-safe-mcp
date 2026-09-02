@@ -46,6 +46,8 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 - Direct draft creation requires an explicit client assertion that the user confirmed the exact recipients, subject, body, and attachments in the conversation.
 - Optional enhanced-security mode binds the exact draft to a separate local terminal approval that is not exposed as an MCP tool.
 - The Bridge-generated IMAP password is stored in the operating-system keyring.
+- Draft bodies are stored as plain text plus a server-generated HTML alternative that
+  HTML-escapes the confirmed body, so quoted markup can never be rendered.
 - Recipient, subject, and folder inputs are validated against header/criteria injection.
 - State files are private to the Unix account (`0700` directories, `0600` files, `O_NOFOLLOW`).
 

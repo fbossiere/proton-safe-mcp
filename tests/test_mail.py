@@ -404,6 +404,86 @@ def test_append_draft_keeps_bcc_and_attachment_but_never_sends(settings):
     assert result["sent"] is False
 
 
+def _appended_draft(settings, **overrides):
+    """Append a draft through a fake Bridge and return the parsed outgoing message."""
+    captured = {}
+
+    class FakeIMAP:
+        def append(self, folder, flags, date_time, payload):
+            captured["payload"] = payload
+            return "OK", [b"APPEND completed"]
+
+    fields = {
+        "to": ("recipient@example.com",),
+        "cc": (),
+        "bcc": (),
+        "subject": "Project brief",
+        "body_text": "Please review.",
+        "attachments": (),
+    }
+    fields.update(overrides)
+    _client_with(settings, FakeIMAP()).append_draft(**fields)
+    return BytesParser(policy=policy.default).parsebytes(captured["payload"])
+
+
+def test_append_draft_offers_both_plain_text_and_html_for_protons_normal_mode(settings):
+    # A text/plain-only draft opens in Proton's "Plain text" composer mode.
+    message = _appended_draft(settings, body_text="Please review.")
+
+    assert message.get_content_type() == "multipart/alternative"
+    subtypes = [part.get_content_subtype() for part in message.iter_parts()]
+    assert subtypes == ["plain", "html"]
+    assert message.get_body(("plain",)).get_content().strip() == "Please review."
+    assert "<p>Please review.</p>" in message.get_body(("html",)).get_content()
+
+
+def test_append_draft_keeps_the_html_alternative_alongside_attachments(settings):
+    attachment = Attachment(
+        upload_id="a" * 32,
+        filename="brief.pdf",
+        content_type="application/pdf",
+        size_bytes=8,
+        sha256="b" * 64,
+        data=b"%PDF-1.7",
+    )
+
+    message = _appended_draft(settings, attachments=(attachment,))
+
+    assert message.get_content_type() == "multipart/mixed"
+    assert message.get_body(("plain",)) is not None
+    assert message.get_body(("html",)) is not None
+    assert [item.get_filename() for item in message.iter_attachments()] == ["brief.pdf"]
+
+
+def test_html_alternative_escapes_a_body_that_quotes_untrusted_mail(settings):
+    body = '<script>alert("x")</script> Ben & Co <b>bold</b>'
+
+    message = _appended_draft(settings, body_text=body)
+
+    html_part = message.get_body(("html",)).get_content()
+    assert "<script>" not in html_part
+    assert "<b>" not in html_part
+    assert "&lt;script&gt;" in html_part
+    assert "Ben &amp; Co" in html_part
+    # The plain-text part still carries the exact confirmed body.
+    assert message.get_body(("plain",)).get_content().strip() == body
+
+
+def test_html_alternative_preserves_line_and_paragraph_breaks(settings):
+    message = _appended_draft(settings, body_text="Line one\nLine two\n\nSecond paragraph")
+
+    html_part = message.get_body(("html",)).get_content()
+    assert "<p>Line one<br>Line two</p><p>Second paragraph</p>" in html_part
+
+
+def test_html_alternative_treats_multiple_blank_lines_as_one_paragraph_break(settings):
+    message = _appended_draft(settings, body_text="First paragraph\n\n\n \nSecond paragraph")
+
+    html_part = message.get_body(("html",)).get_content()
+    assert "<p>First paragraph</p><p>Second paragraph</p>" in html_part
+    assert "<br>Second paragraph" not in html_part
+
+
 def test_append_draft_failure_surfaces_the_bridge_response(settings):
     class FakeIMAP:
         def append(self, _folder, _flags, _date_time, _payload):

@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Drafts now carry a `text/html` alternative next to the confirmed plain-text body, so Proton
+  opens them in the composer's default **Normal** mode instead of **Plain text** mode. The HTML is
+  generated from `body_text` with HTML-special characters escaped, so quoted markup stays inert.
+- Documented that a public key is attached by Proton at send time (**Encryption and keys →
+  External PGP settings → Attach public key**), not by this server.
 - Clarified that terminal approval is selected per draft in the conversation, is unrelated to
   `proton-safe-mcp setup`, and can use the pinned `uvx` command when the CLI is not installed
   globally.
