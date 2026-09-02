@@ -12,7 +12,7 @@ The bundled MCP configuration launches the reviewed `proton-safe-mcp==1.2.0` rel
 It deliberately passes no Proton or Bridge password through plugin configuration. Complete the
 normal `proton-safe-mcp setup` keyring step before enabling the plugin. That command only stores
 the Bridge credential; it does not select an approval mode. Conversational confirmation is the
-default. For one draft, ask: “Use enhanced-security mode with terminal approval for this draft.”
+default. For one draft, ask: `Use enhanced-security mode with terminal approval for this draft.`
 
 The primary deployment runs locally in ChatGPT desktop or Codex on the same machine as Proton Mail
 Bridge. It uses STDIO directly and requires no tunnel or dedicated server. A direct MCP
