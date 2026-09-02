@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a dev container (`.devcontainer/devcontainer.json`) that mirrors the CI toolchain (Python
+  3.12 + uv) and bundles the GitHub CLI for a zero-setup contributor environment, and documented
+  its usage in `CONTRIBUTING.md`.
+
 ## [1.2.0] - 2026-09-02
 
 ### Added

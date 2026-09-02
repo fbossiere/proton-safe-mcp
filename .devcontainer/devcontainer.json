@@ -1,0 +1,63 @@
+{
+  // Dev container for proton-safe-mcp.
+  // Mirrors the CI toolchain: Python 3.12 + uv (see .github/workflows/ci.yml).
+  // You do NOT need Proton Bridge to develop — the test suite fakes the IMAP layer.
+  "name": "proton-safe-mcp",
+
+  // Microsoft's Python base image gives a non-root `vscode` user, git, and
+  // common CLI utilities out of the box. 3.12 matches the CI primary version;
+  // tests still run across 3.11/3.12/3.13 in CI.
+  "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+
+  // uv is the project's package/venv manager (uv.lock is committed).
+  "features": {
+    "ghcr.io/va-h/devcontainers-features/uv:1": {
+      "version": "latest"
+    },
+    // The contributor workflow ends at "open a PR", so ship the GitHub CLI too.
+    // It reuses the credentials the Dev Containers extension forwards from the host.
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    }
+  },
+
+  // Copy instead of hardlink so uv never warns when its cache and the project
+  // live on different overlay layers inside the container.
+  "remoteEnv": {
+    "UV_LINK_MODE": "copy"
+  },
+
+  // Reproduce the frozen dependency set from uv.lock, including dev + docs
+  // extras so ruff, mypy, pytest, pip-audit and mkdocs are all available.
+  "postCreateCommand": "uv sync --frozen --extra dev --extra docs",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": ".venv/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        }
+      }
+    }
+  },
+
+  "remoteUser": "vscode"
+
+  // Note: to run against a REAL Proton Bridge (not needed for tests), the
+  // Bridge listens on 127.0.0.1 on the *host*. From inside the container that
+  // is not reachable directly — you'd run the container with host networking
+  // or point the client at host.docker.internal. Dev/test needs neither.
+}

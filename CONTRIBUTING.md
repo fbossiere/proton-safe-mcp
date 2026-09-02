@@ -30,6 +30,24 @@ uv sync --extra dev
 
 You do not need Proton Bridge to develop: the test suite fakes the IMAP layer.
 
+### Dev container (optional)
+
+A [dev container](.devcontainer/devcontainer.json) is provided for a zero-setup,
+CI-matching environment (Python 3.12 + [uv](https://docs.astral.sh/uv/)). It runs
+`uv sync --frozen --extra dev --extra docs` on create, so ruff, mypy, pytest,
+pip-audit and mkdocs are all ready. The GitHub CLI (`gh`) is included so you can
+open a pull request without leaving the container.
+
+- **VS Code**: install the *Dev Containers* extension, open the repo, then run
+  **Dev Containers: Reopen in Container** from the command palette.
+- **GitHub Codespaces**: **Code → Create codespace on `main`**.
+- **CLI**: `devcontainer up --workspace-folder .` (from `@devcontainers/cli`).
+
+The container is enough for the full local gate below — the test suite fakes the
+IMAP layer, so no Proton Bridge is required. To run against a *real* Bridge (not
+needed for tests), note it listens on `127.0.0.1` on the **host**, which the
+container cannot reach directly; use host networking or `host.docker.internal`.
+
 ## Before opening a PR
 
 Run the full local gate — it matches CI exactly:
