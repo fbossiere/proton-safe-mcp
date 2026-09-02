@@ -21,7 +21,7 @@ from .config import Settings
 from .errors import AttachmentError
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-TOKEN_RE = re.compile(r"^([0-9a-f]{32})\.([A-Za-z0-9_-]{32,})$")
+TOKEN_RE = re.compile(r"^([0-9a-f]{32})\.([A-Za-z0-9_-]{32,64})$")
 
 ALLOWED_TYPES: dict[str, str] = {
     ".pdf": "application/pdf",
@@ -65,7 +65,7 @@ class AttachmentStore:
         self, filename: str, content_type: str, size_bytes: int, sha256_hex: str
     ) -> dict[str, Any]:
         self.cleanup_expired()
-        clean_name, canonical_type = self._validate_file_metadata(
+        canonical_type = self._validate_file_metadata(
             filename, content_type, size_bytes, sha256_hex
         )
         upload_id = uuid.uuid4().hex
@@ -73,7 +73,7 @@ class AttachmentStore:
         metadata = {
             "version": 1,
             "upload_id": upload_id,
-            "filename": clean_name,
+            "filename": filename,
             "content_type": canonical_type,
             "expected_size": size_bytes,
             "expected_sha256": sha256_hex.lower(),
@@ -197,6 +197,7 @@ class AttachmentStore:
             )
 
     def consume(self, token: str) -> None:
+        """Destroy one staged upload, whether it was used by a draft or discarded."""
         upload_id, secret = self._parse_token(token)
         with self._lock:
             metadata = self._read_meta(upload_id)
@@ -205,11 +206,7 @@ class AttachmentStore:
                 raise AttachmentError("Invalid attachment token")
             self._destroy_upload(upload_id)
 
-    def discard(self, token: str) -> None:
-        self.consume(token)
-
-    def cleanup_expired(self) -> int:
-        removed = 0
+    def cleanup_expired(self) -> None:
         now = int(time.time())
         with self._lock:
             for meta_path in self.settings.uploads_dir.glob("*.json"):
@@ -219,15 +216,14 @@ class AttachmentStore:
                     self._validate_upload_id(upload_id)
                     if metadata.get("expires_at", 0) < now:
                         self._destroy_upload(upload_id)
-                        removed += 1
                 except (OSError, ValueError, KeyError, json.JSONDecodeError):
                     # Do not follow or delete unknown files from a compromised directory.
                     continue
-        return removed
 
     def _validate_file_metadata(
         self, filename: str, content_type: str, size_bytes: int, sha256_hex: str
-    ) -> tuple[str, str]:
+    ) -> str:
+        """Return the canonical content type for an accepted filename, or raise."""
         if not filename or filename in {".", ".."}:
             raise AttachmentError("filename is required")
         if Path(filename).name != filename or "/" in filename or "\\" in filename:
@@ -246,7 +242,7 @@ class AttachmentStore:
             )
         if not SHA256_RE.fullmatch(sha256_hex.lower()):
             raise AttachmentError("sha256_hex must contain exactly 64 hexadecimal characters")
-        return filename, canonical_type
+        return canonical_type
 
     def _assert_active(self, metadata: dict[str, Any], status: str) -> None:
         if metadata.get("expires_at", 0) < int(time.time()):
