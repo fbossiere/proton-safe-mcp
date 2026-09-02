@@ -67,7 +67,7 @@ Use this sequence on Ubuntu:
 
    ```bash
    systemd-run --user --wait --pipe \
-     uvx --from proton-safe-mcp==1.2.1 proton-safe-mcp doctor
+     uvx --from proton-safe-mcp==2.0.0 proton-safe-mcp doctor
    ```
 
    This privacy-safe command separates environment, keyring, and Bridge failures before ChatGPT is
