@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a dev container (`.devcontainer/devcontainer.json`) that mirrors the CI toolchain (Python
   3.12 + uv) and bundles the GitHub CLI for a zero-setup contributor environment, and documented
   its usage in `CONTRIBUTING.md`.
+- Documented how to open a pull request from the dev container in `CONTRIBUTING.md`, including the
+  one-time `gh` authentication and why the protocol must be HTTPS without a mounted SSH key.
 
 ## [1.2.0] - 2026-09-02
 
