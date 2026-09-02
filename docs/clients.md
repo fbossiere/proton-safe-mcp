@@ -114,10 +114,14 @@ errors. In an agent chat, ask it to call `mailbox_status` and confirm that `conn
 
 Reference: [VS Code MCP configuration](https://code.visualstudio.com/docs/agents/reference/mcp-configuration).
 
-## Approval still happens outside the client
+## Draft confirmation
 
-All three clients can prepare a pending draft, but none can approve it through MCP. Inspect and
-approve the exact proposal in a separate terminal:
+All three clients can call `create_confirmed_draft` after you explicitly confirm the exact
+recipients, subject, complete body, and attachments in the conversation. You still review and send
+the resulting draft yourself in Proton Mail.
+
+For optional enhanced security, have the client call `prepare_draft`, then inspect and approve the
+exact proposal in a separate terminal:
 
 ```bash
 export PROTON_BRIDGE_USER="your-address@proton.me"
@@ -125,5 +129,4 @@ proton-safe-mcp show <draft_id>
 proton-safe-mcp approve <draft_id>
 ```
 
-The client may then call `commit_approved_draft`. You still review and send the resulting draft in
-Proton Mail yourself.
+The client may then call `commit_approved_draft`.

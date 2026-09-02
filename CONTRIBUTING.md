@@ -12,9 +12,11 @@ Pull requests that violate these will be declined regardless of code quality:
 4. **No raw received-attachment download tool.** Received files may expose bounded extracted text,
    metadata, and a digest, but never bytes, filesystem paths, or persisted files.
 5. **The Bridge host stays `127.0.0.1`.** TLS verification is disabled only because the host is unchangeable; making the host configurable would silently break that safety argument.
-6. **Draft approval stays out-of-band.** The approval step must not be reachable through any MCP tool.
+6. **Draft confirmation is explicit.** Direct creation requires the client to assert that the user
+   confirmed the exact recipients, subject, body, and attachments. The optional local approval
+   marker stays out-of-band and must not be reachable through any MCP tool.
 7. **Plugin instructions are not authorization.** Skills may guide safe workflows but cannot weaken
-   tool validation, infer recipients from mail content, or approve a draft.
+   tool validation, treat recipients from mail as confirmed, or create a local approval marker.
 8. **Private connection material stays private.** Never commit a Bridge credential, tunnel runtime
    API key, or account-specific `.app.json` mapping.
 

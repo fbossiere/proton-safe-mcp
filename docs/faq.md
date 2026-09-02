@@ -54,7 +54,7 @@ On a `systemd`-managed Ubuntu session, launch the pinned diagnostic as a transie
 
 ```bash
 systemd-run --user --wait --pipe \
-  uvx --from proton-safe-mcp==1.1.0 proton-safe-mcp doctor
+  uvx --from proton-safe-mcp==1.2.0 proton-safe-mcp doctor
 ```
 
 The diagnostic prints no credentials, address, mailbox counts, or message content. It proves that

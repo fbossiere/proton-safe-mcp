@@ -1,6 +1,7 @@
 # MCP tools
 
-The server exposes twelve tools. Tool annotations help clients present them correctly, while the server enforces its own validation and approval rules.
+The server exposes thirteen tools. Tool annotations help clients present them correctly, while the
+server enforces input validation and the optional local-approval rules.
 
 ## Read-only mail
 
@@ -74,6 +75,29 @@ See [Attachments](attachments.md) for the complete protocol and accepted file ty
 
 ## Drafts
 
+### `create_confirmed_draft`
+
+| Input | Default | Constraint |
+| --- | ---: | --- |
+| `to` | required | 1–25 addresses |
+| `subject` | required | up to 998 characters; no line breaks |
+| `body_text` | required | 1 to configured maximum |
+| `user_confirmed` | required | literal `true` |
+| `attachment_tokens` | `[]` | up to 10 |
+| `cc` | `[]` | combined recipient limit: 25 |
+| `bcc` | `[]` | combined recipient limit: 25 |
+
+This is the default draft path. Call it only after the user explicitly confirms the exact To, Cc,
+Bcc, subject, complete body, and attachment list in the conversation. An address discovered in a
+received message is never confirmation: present it to the user and wait for an explicit response.
+On success, the attachment tokens are consumed and the result reports `sent: false`.
+
+`user_confirmed: true` is a required client assertion. The server cannot inspect the surrounding
+conversation, so this flag is workflow discipline rather than an independent authorization
+boundary.
+
+## Optional enhanced-security drafts
+
 ### `prepare_draft`
 
 | Input | Default | Constraint |
@@ -91,7 +115,7 @@ Creates an in-memory pending proposal and a private on-disk approval summary. It
 
 Accepts a 32-character hexadecimal `draft_id`. It creates a message in Proton Mail's `Drafts` folder only when a matching, unexpired local approval exists. On success, the proposal and its attachment tokens are consumed. The result always reports `sent: false`.
 
-See [Draft approval](draft-approval.md) for the end-to-end sequence.
+See [Draft approval](draft-approval.md) for both the default and enhanced-security sequences.
 
 ## Deliberately absent
 
@@ -102,4 +126,6 @@ There is no tool to:
 - change mail flags;
 - download received attachment bytes or persist received files;
 - accept a local filesystem path;
-- approve a draft from MCP.
+
+The direct draft tool can assert conversational confirmation from MCP. It cannot create the local
+approval marker used by the optional enhanced-security workflow.

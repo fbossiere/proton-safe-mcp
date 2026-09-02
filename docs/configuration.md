@@ -25,7 +25,8 @@ The following behavior is not configurable:
 - Bridge host: `127.0.0.1`.
 - MCP transport: STDIO.
 - Draft destination: Proton Mail's `Drafts` folder.
-- Draft approval: local, interactive, and outside the MCP tool surface.
+- Direct draft confirmation: explicit client assertion of the exact user-confirmed content.
+- Enhanced draft approval: local, interactive, and outside the MCP tool surface.
 
 `PROTON_BRIDGE_HOST` is intentionally ignored. TLS certificate verification is disabled only because the connection target is fixed to loopback; making the host configurable would invalidate that safety argument.
 

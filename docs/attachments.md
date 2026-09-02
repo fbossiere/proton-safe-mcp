@@ -29,7 +29,9 @@ Given the raw file bytes:
 4. Base64-encode each raw chunk independently.
 5. Call `upload_attachment_chunk(upload_id, chunk_index, data_base64)` for indexes `0`, `1`, `2`, and so on.
 6. Call `finish_attachment_upload(upload_id)`.
-7. Retain the returned opaque `attachment_token` and pass it to `prepare_draft`.
+7. Retain the returned opaque `attachment_token` and include it in the exact attachment list shown
+   to the user before calling `create_confirmed_draft`. Use `prepare_draft` instead only for the
+   optional enhanced-security workflow.
 
 Example calculation:
 
@@ -56,7 +58,7 @@ The example only demonstrates byte preparation. The MCP client is responsible fo
 - `finish_attachment_upload` requires an exact size match and re-computes SHA-256.
 - A hash mismatch destroys the upload.
 - Ready tokens are random, short-lived, and revalidated before draft creation.
-- Tokens are single-use and are destroyed after a successful draft commit.
+- Tokens are single-use and are destroyed after successful direct creation or enhanced-mode commit.
 - `discard_attachment` destroys a staged attachment before use.
 
 One draft can contain at most ten attachments. The combined attachment size cannot exceed `PROTON_MCP_MAX_ATTACHMENT_BYTES`.

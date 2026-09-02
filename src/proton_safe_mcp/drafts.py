@@ -1,4 +1,4 @@
-"""Ephemeral draft proposals and out-of-band local approval."""
+"""Draft validation plus optional out-of-band local approval."""
 
 from __future__ import annotations
 
@@ -50,8 +50,7 @@ def validate_address(value: str) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class DraftProposal:
-    draft_id: str
+class DraftContent:
     to: tuple[str, ...]
     cc: tuple[str, ...]
     bcc: tuple[str, ...]
@@ -59,9 +58,56 @@ class DraftProposal:
     body_text: str
     attachment_tokens: tuple[str, ...]
     attachments: tuple[Attachment, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DraftProposal(DraftContent):
+    draft_id: str
     digest: str
     created_at: int
     expires_at: int
+
+
+def validate_draft(
+    settings: Settings,
+    *,
+    to: list[str],
+    cc: list[str],
+    bcc: list[str],
+    subject: str,
+    body_text: str,
+    attachment_tokens: list[str],
+    attachments: list[Attachment],
+) -> DraftContent:
+    """Validate and freeze the exact content of a draft before any IMAP write."""
+    recipients = tuple(validate_address(item) for item in to)
+    cc_values = tuple(validate_address(item) for item in cc)
+    bcc_values = tuple(validate_address(item) for item in bcc)
+    if not recipients:
+        raise ApprovalError("At least one To recipient is required")
+    if len(recipients) + len(cc_values) + len(bcc_values) > 25:
+        raise ApprovalError("A draft may contain at most 25 recipients")
+    if "\r" in subject or "\n" in subject or len(subject) > 998:
+        raise ApprovalError("Subject contains a line break or is too long")
+    if not body_text or len(body_text) > settings.max_body_chars:
+        raise ApprovalError(f"body_text must contain 1 to {settings.max_body_chars} characters")
+    if len(attachment_tokens) != len(attachments):
+        raise ApprovalError("Attachment token resolution mismatch")
+    if len(attachments) > 10:
+        raise ApprovalError("A draft may contain at most 10 attachments")
+    if sum(item.size_bytes for item in attachments) > settings.max_attachment_bytes:
+        raise ApprovalError("Combined attachment size exceeds the configured per-draft maximum")
+    if len({item.upload_id for item in attachments}) != len(attachments):
+        raise ApprovalError("Duplicate attachments are not allowed")
+    return DraftContent(
+        to=recipients,
+        cc=cc_values,
+        bcc=bcc_values,
+        subject=subject,
+        body_text=body_text,
+        attachment_tokens=tuple(attachment_tokens),
+        attachments=tuple(attachments),
+    )
 
 
 class DraftApprovalStore:
@@ -81,36 +127,25 @@ class DraftApprovalStore:
         attachment_tokens: list[str],
         attachments: list[Attachment],
     ) -> dict[str, Any]:
-        recipients = tuple(validate_address(item) for item in to)
-        cc_values = tuple(validate_address(item) for item in cc)
-        bcc_values = tuple(validate_address(item) for item in bcc)
-        if not recipients:
-            raise ApprovalError("At least one To recipient is required")
-        if len(recipients) + len(cc_values) + len(bcc_values) > 25:
-            raise ApprovalError("A draft may contain at most 25 recipients")
-        if "\r" in subject or "\n" in subject or len(subject) > 998:
-            raise ApprovalError("Subject contains a line break or is too long")
-        if not body_text or len(body_text) > self.settings.max_body_chars:
-            raise ApprovalError(
-                f"body_text must contain 1 to {self.settings.max_body_chars} characters"
-            )
-        if len(attachment_tokens) != len(attachments):
-            raise ApprovalError("Attachment token resolution mismatch")
-        if len(attachments) > 10:
-            raise ApprovalError("A draft may contain at most 10 attachments")
-        if sum(item.size_bytes for item in attachments) > self.settings.max_attachment_bytes:
-            raise ApprovalError("Combined attachment size exceeds the configured per-draft maximum")
-        if len({item.upload_id for item in attachments}) != len(attachments):
-            raise ApprovalError("Duplicate attachments are not allowed")
+        content = validate_draft(
+            self.settings,
+            to=to,
+            cc=cc,
+            bcc=bcc,
+            subject=subject,
+            body_text=body_text,
+            attachment_tokens=attachment_tokens,
+            attachments=attachments,
+        )
 
         now = int(time.time())
         expires_at = now + self.settings.draft_ttl_seconds
         draft_id = uuid.uuid4().hex
         canonical = {
             "draft_id": draft_id,
-            "to": recipients,
-            "cc": cc_values,
-            "bcc": bcc_values,
+            "to": content.to,
+            "cc": content.cc,
+            "bcc": content.bcc,
             "subject": subject,
             "body_sha256": hashlib.sha256(body_text.encode("utf-8")).hexdigest(),
             "attachments": [
@@ -125,13 +160,13 @@ class DraftApprovalStore:
         ).hexdigest()
         proposal = DraftProposal(
             draft_id=draft_id,
-            to=recipients,
-            cc=cc_values,
-            bcc=bcc_values,
-            subject=subject,
-            body_text=body_text,
-            attachment_tokens=tuple(attachment_tokens),
-            attachments=tuple(attachments),
+            to=content.to,
+            cc=content.cc,
+            bcc=content.bcc,
+            subject=content.subject,
+            body_text=content.body_text,
+            attachment_tokens=content.attachment_tokens,
+            attachments=content.attachments,
             digest=digest,
             created_at=now,
             expires_at=expires_at,
