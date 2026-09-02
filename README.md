@@ -63,7 +63,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==2.0.0
+uv tool install proton-safe-mcp==2.0.1
 ```
 
 For development from source instead:

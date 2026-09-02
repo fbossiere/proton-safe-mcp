@@ -8,7 +8,7 @@ server:
 - prepare drafts after explicit conversational confirmation, with manual review and sending in
   Proton Mail.
 
-The bundled MCP configuration launches the reviewed `proton-safe-mcp==2.0.0` release with `uvx`.
+The bundled MCP configuration launches the reviewed `proton-safe-mcp==2.0.1` release with `uvx`.
 It deliberately passes no Proton or Bridge password through plugin configuration. Complete the
 normal `proton-safe-mcp setup` keyring step before enabling the plugin. That command only stores
 the Bridge credential.
@@ -26,7 +26,7 @@ For optional ChatGPT web access or a Bridge on another machine, run OpenAI Secur
 `tunnel-client` on the same machine as Proton Mail Bridge and configure its MCP command as:
 
 ```text
-uvx --from proton-safe-mcp==2.0.0 proton-safe-mcp serve
+uvx --from proton-safe-mcp==2.0.1 proton-safe-mcp serve
 ```
 
 The registered ChatGPT connection ID is account-specific and is intentionally not committed here.
