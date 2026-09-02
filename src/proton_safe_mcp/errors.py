@@ -14,7 +14,7 @@ class AttachmentError(ProtonMCPError):
 
 
 class ApprovalError(ProtonMCPError):
-    """A draft has not received valid out-of-band approval."""
+    """Draft validation or optional out-of-band approval failed."""
 
 
 class BridgeError(ProtonMCPError):

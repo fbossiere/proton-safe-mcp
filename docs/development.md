@@ -52,7 +52,7 @@ Contributions must preserve the restricted capability surface:
 4. No raw received-attachment download tool or received-file persistence; extraction returns only
    bounded text and metadata.
 5. Bridge host fixed to `127.0.0.1`.
-6. Draft approval outside MCP.
+6. Explicit confirmation for direct drafts; optional enhanced approval outside MCP.
 
 Plugin skills may explain or orchestrate these controls, but they must not claim to authorize an
 action. Account-specific `.app.json` mappings, Bridge credentials, and tunnel API keys must never be

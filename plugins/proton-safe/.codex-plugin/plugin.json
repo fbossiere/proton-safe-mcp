@@ -1,7 +1,7 @@
 {
   "name": "proton-safe",
-  "version": "0.1.0+codex.20260901072229",
-  "description": "Read Proton Mail safely and prepare drafts that require local human approval.",
+  "version": "0.1.0+codex.20260902034156",
+  "description": "Read Proton Mail safely and prepare explicitly confirmed drafts without sending.",
   "author": {
     "name": "Francois Bossiere",
     "url": "https://github.com/fbossiere"
@@ -20,8 +20,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Proton Safe",
-    "shortDescription": "Read Proton Mail and prepare human-approved drafts.",
-    "longDescription": "Use the local Proton Safe MCP server to review Proton Mail, extract bounded text from selected PDF, TXT, and CSV attachments, and prepare draft-only replies. Sending, deleting, moving, downloading raw received attachments, and approving drafts through MCP remain unavailable by design.",
+    "shortDescription": "Read Proton Mail and prepare confirmed drafts.",
+    "longDescription": "Use the local Proton Safe MCP server to review Proton Mail, extract bounded text from selected PDF, TXT, and CSV attachments, and prepare draft-only replies after exact conversational confirmation. Optional local approval provides enhanced security. Sending, deleting, moving, and downloading raw received attachments remain unavailable by design.",
     "developerName": "Francois Bossiere",
     "category": "Communication",
     "capabilities": [

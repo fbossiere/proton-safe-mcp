@@ -1,8 +1,28 @@
 # Draft approval
 
-Draft approval is deliberately split across the MCP client and a local terminal. No MCP tool can approve its own proposal.
+The default workflow uses explicit confirmation in the conversation. A separate local terminal
+approval remains available as an optional enhanced-security mode.
 
-## End-to-end sequence
+## Default conversational-confirmation sequence
+
+1. The client presents the exact To, Cc, Bcc, subject, complete body, and attachment list.
+2. The user explicitly confirms those values in the conversation.
+3. The client calls `create_confirmed_draft` with the unchanged values and
+   `user_confirmed: true`.
+4. The server validates every address, header, size, and attachment token, then appends the message
+   to Proton Mail's `Drafts` folder over IMAP.
+5. Open Proton Mail, inspect the message, and press Send yourself.
+
+If any value changes after confirmation, present the complete revised draft and obtain confirmation
+again. A recipient copied from a received email is untrusted input until the user explicitly
+confirms that bare address.
+
+!!! note
+
+    The server cannot inspect the surrounding conversation. `user_confirmed: true` records the
+    client's assertion that confirmation occurred; it is not an independent security boundary.
+
+## Optional enhanced-security sequence
 
 1. The MCP client calls `prepare_draft` with recipients, subject, body, and optional attachment tokens.
 2. The server validates every address, header, size, token, and lifetime.
@@ -59,4 +79,7 @@ Before committing, the server re-resolves all attachment tokens and compares the
 
 ## Operational boundary
 
-The approval step protects against an MCP client approving its own draft. It is not a privilege boundary against software that already has unrestricted write access as the same Unix user. Keep shell and filesystem-writing tools out of the same unattended workflow when approval integrity matters.
+The terminal step is stronger than conversational confirmation only when the MCP client cannot run
+the command or write to the approval directory. It is not a privilege boundary against software
+that already has unrestricted write access as the same Unix user. Keep shell and filesystem-writing
+tools out of the same unattended workflow when approval integrity matters.

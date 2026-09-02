@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-02
+
+### Added
+
+- Added `create_confirmed_draft` as the default draft path. It requires the client to assert exact
+  in-conversation confirmation of every recipient, the subject, complete body, and attachments.
+
+### Changed
+
+- Kept `prepare_draft` and `commit_approved_draft` as an optional enhanced-security workflow rather
+  than a requirement for every draft.
+- Documented that conversational confirmation is a client workflow assertion, while local approval
+  is not a strong isolation boundary when the same agent can write to the approval directory.
+
 ### Fixed
 
 - Shortened the official MCP Registry description to satisfy its 100-character limit and added a
@@ -73,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v1.0.0...v1.0.1
