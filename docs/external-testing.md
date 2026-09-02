@@ -28,7 +28,7 @@ email address, message content, or hardware-key material in public feedback.
 Install the reviewed release:
 
 ```bash
-uv tool install proton-safe-mcp==2.0.1
+uv tool install proton-safe-mcp==2.0.2
 ```
 
 Follow [Getting started](getting-started.md) to set `PROTON_BRIDGE_USER` and

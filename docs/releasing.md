@@ -29,7 +29,7 @@ manually upload the same version first.
 2. Run the complete quality gate from [Development](development.md).
 3. Merge the release changes to `main`.
 4. Create a GitHub release whose tag is exactly `v` followed by the package version, for example
-   `v2.0.1`.
+   `v2.0.2`.
 
 Publishing the GitHub release starts `.github/workflows/release.yml`. The workflow verifies version
 consistency, rebuilds and tests the distributions, publishes them to PyPI, and only then publishes
@@ -49,5 +49,5 @@ distribution.
 - Clean installation:
 
   ```bash
-  uvx --from proton-safe-mcp==2.0.1 proton-safe-mcp --help
+  uvx --from proton-safe-mcp==2.0.2 proton-safe-mcp --help
   ```
