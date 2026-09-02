@@ -3,7 +3,7 @@
   "name": "io.github.fbossiere/proton-safe-mcp",
   "title": "Proton Safe MCP",
   "description": "Read Proton Mail, extract bounded attachment text, and create explicitly confirmed drafts.",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "websiteUrl": "https://fbossiere.github.io/proton-safe-mcp/",
   "repository": {
     "url": "https://github.com/fbossiere/proton-safe-mcp",
@@ -13,7 +13,7 @@
     {
       "registryType": "pypi",
       "identifier": "proton-safe-mcp",
-      "version": "1.2.1",
+      "version": "2.0.0",
       "runtimeHint": "uvx",
       "packageArguments": [
         {

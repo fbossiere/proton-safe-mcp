@@ -1,7 +1,7 @@
 # MCP tools
 
-The server exposes fourteen tools. Tool annotations help clients present them correctly, while the
-server enforces input validation and the optional local-approval rules.
+The server exposes twelve tools. Tool annotations help clients present them correctly, while the
+server enforces input validation and the absence of any send, delete, or move capability.
 
 ## Read-only mail
 
@@ -129,28 +129,6 @@ copy of them. Because you always press Send in Proton Mail, Proton is what attac
 
 Either way the key is attached at send time, after the draft this server created.
 
-## Optional enhanced-security drafts
-
-### `prepare_draft`
-
-| Input | Default | Constraint |
-| --- | ---: | --- |
-| `to` | required | 1–25 addresses |
-| `subject` | required | up to 998 characters; no line breaks |
-| `body_text` | required | 1 to configured maximum |
-| `from_address` | primary address | one of `list_sender_addresses`; bare address |
-| `attachment_tokens` | `[]` | up to 10 |
-| `cc` | `[]` | combined recipient limit: 25 |
-| `bcc` | `[]` | combined recipient limit: 25 |
-
-Creates an in-memory pending proposal and a private on-disk approval summary. It does not create a Proton draft.
-
-### `commit_approved_draft`
-
-Accepts a 32-character hexadecimal `draft_id`. It creates a message in Proton Mail's `Drafts` folder only when a matching, unexpired local approval exists. On success, the proposal and its attachment tokens are consumed. The result always reports `sent: false`.
-
-See [Draft approval](draft-approval.md) for both the default and enhanced-security sequences.
-
 ## Deliberately absent
 
 There is no tool to:
@@ -161,5 +139,7 @@ There is no tool to:
 - download received attachment bytes or persist received files;
 - accept a local filesystem path;
 
-The direct draft tool can assert conversational confirmation from MCP. It cannot create the local
-approval marker used by the optional enhanced-security workflow.
+The draft tool's `user_confirmed` flag records the client's assertion that you confirmed the exact
+content in the conversation. It is a prompt-level nudge, not an authorization channel: the server
+cannot see the conversation. The capability boundary is that no tool sends, deletes, or moves
+anything — every draft waits in Proton Mail for you to review and send.

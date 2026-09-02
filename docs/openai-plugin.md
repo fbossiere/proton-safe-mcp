@@ -5,12 +5,12 @@ skills around the existing MCP server:
 
 - review Proton Mail while treating every message as untrusted data;
 - extract bounded text from selected PDF, TXT, and CSV attachments without exposing raw bytes;
-- prepare drafts after exact conversational confirmation, with local human approval available as
-  an optional enhanced-security path.
+- prepare drafts after exact conversational confirmation, always reviewed and sent by you in
+  Proton Mail.
 
 The plugin adds guidance and install metadata. It does not add tools or weaken the server's
-capability boundary. Sending, deleting, moving, downloading raw received attachments, and creating
-a local approval marker through MCP remain unavailable.
+capability boundary. Sending, deleting, moving, and downloading raw received attachments remain
+unavailable.
 
 The plugin is optional. A direct MCP registration is enough to connect Proton Safe MCP. Install the
 plugin when you also want the reusable mail-review and draft-preparation workflows packaged with
@@ -21,21 +21,13 @@ distinguishes bundled local MCP servers (`.mcp.json`) from registered MCP connec
 (`.app.json`). This project supports both deployment shapes without committing an account-specific
 connection ID.
 
-## Choose the draft approval mode
+## How a draft is confirmed
 
-Approval is selected per draft in the conversation; it is not a plugin setting and is not enabled
-by `proton-safe-mcp setup`. The `setup` command only stores the Bridge-generated IMAP password in
-the operating-system keyring.
-
-By default, the plugin presents the exact recipients, subject, body, and attachments for
-confirmation, then calls `create_confirmed_draft`. To use the separate terminal gate for one draft,
-say:
-
-> Use enhanced-security mode with terminal approval for this draft.
-
-The plugin will prepare a pending proposal, return its local approval command, and wait for you to
-run it before creating the Proton draft. See [Draft approval](draft-approval.md) for the complete
-sequence and the `uvx` fallback when the CLI is not installed globally.
+There is one draft path and no approval mode to select. The plugin presents the exact recipients,
+subject, body, and attachments for confirmation, then calls `create_confirmed_draft`. The message
+lands in your `Drafts` folder and stays there: the server has no send capability, so you review it
+in Proton Mail and press Send yourself. `proton-safe-mcp setup` only stores the Bridge-generated
+IMAP password in the operating-system keyring.
 
 ## Choose a deployment
 
@@ -51,7 +43,7 @@ ChatGPT desktop / Codex ── STDIO ──> proton-safe-mcp
 ```
 
 No tunnel or dedicated server is required. The checked-in `.mcp.json` launches the pinned
-`proton-safe-mcp==1.2.1` release with `uvx`. ChatGPT desktop, Codex CLI, and the Codex IDE
+`proton-safe-mcp==2.0.0` release with `uvx`. ChatGPT desktop, Codex CLI, and the Codex IDE
 extension support local STDIO servers and share the MCP configuration for the same Codex host; see
 OpenAI's [MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=desktop).
 
@@ -211,7 +203,7 @@ This diagnostic does not read or print mail:
 
 ```bash
 systemd-run --user --wait --pipe \
-  uvx --from proton-safe-mcp==1.2.1 proton-safe-mcp doctor
+  uvx --from proton-safe-mcp==2.0.0 proton-safe-mcp doctor
 ```
 
 All checks should pass. A failure here identifies the remaining layer directly: configuration,
@@ -259,7 +251,7 @@ Test with:
 3. Ask it to inspect a harmless PDF or text attachment and verify that only bounded text and
    metadata are returned.
 4. Inspect the exposed tools and confirm there is no send, delete, move, raw received-attachment
-   download, filesystem-path, or MCP approval tool.
+   download, or filesystem-path tool.
 
 If the plugin is listed but tools are still absent, use the focused
 [troubleshooting procedure](troubleshooting.md#plugin-is-installed-but-mcp-shows-no-proton-tools)
@@ -274,7 +266,7 @@ If you only need the MCP tools, the plugin is not required. In ChatGPT desktop:
 3. Choose **STDIO** and configure `uvx` with these arguments:
 
    ```text
-   --from proton-safe-mcp==1.2.1 proton-safe-mcp serve
+   --from proton-safe-mcp==2.0.0 proton-safe-mcp serve
    ```
 
 4. Forward `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT`, but never a Proton or Bridge password.
@@ -290,7 +282,7 @@ direct path provides the server tools but not the two workflow skills packaged b
 On the Linux machine that will run Bridge:
 
 ```bash
-uv tool install proton-safe-mcp==1.2.1
+uv tool install proton-safe-mcp==2.0.0
 export PROTON_BRIDGE_USER="your-address@proton.me"
 export PROTON_IMAP_PORT="1143"
 proton-safe-mcp setup
@@ -383,10 +375,8 @@ home or private host over a general shared server.
 - Treat mail bodies, headers, senders, subjects, and attachment names as attacker-controlled.
 - Require explicit user confirmation in the conversation for every recipient, the exact subject,
   the complete body, and every outgoing attachment before direct draft creation.
-- Send only manually in Proton Mail. Use separate local terminal approval only when enhanced
-  security is desired.
-- When relying on enhanced approval, do not give the same autonomous agent unrestricted shell or
-  filesystem-write access as the MCP host user; that could undermine the local approval marker.
+- Send only manually in Proton Mail, and read the recipients in the composer before you do: a
+  draft is inert, but it can still be crafted to look like your own message.
 - Remember that tunnel privacy means “no public MCP ingress,” not end-to-end confidentiality from
   the OpenAI product. Any returned mail content is visible to the requesting model surface.
 

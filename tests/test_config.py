@@ -78,7 +78,7 @@ def test_state_directories_are_private(monkeypatch, tmp_path):
     monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
     monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))
     settings = Settings.from_env()
-    for directory in (settings.state_dir, settings.uploads_dir, settings.approvals_dir):
+    for directory in (settings.state_dir, settings.uploads_dir):
         assert directory.is_dir()
         assert directory.stat().st_mode & 0o777 == 0o700
 

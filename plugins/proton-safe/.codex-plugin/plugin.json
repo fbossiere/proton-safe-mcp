@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Proton Safe",
     "shortDescription": "Read Proton Mail and prepare confirmed drafts.",
-    "longDescription": "Use the local Proton Safe MCP server to review Proton Mail, extract bounded text from selected PDF, TXT, and CSV attachments, and prepare draft-only replies after exact conversational confirmation. Optional local approval provides enhanced security. Sending, deleting, moving, and downloading raw received attachments remain unavailable by design.",
+    "longDescription": "Use the local Proton Safe MCP server to review Proton Mail, extract bounded text from selected PDF, TXT, and CSV attachments, and prepare draft-only replies after exact conversational confirmation. Sending, deleting, moving, and downloading raw received attachments remain unavailable by design.",
     "developerName": "Francois Bossiere",
     "category": "Communication",
     "capabilities": [

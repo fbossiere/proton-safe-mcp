@@ -23,7 +23,7 @@ Email is attacker-controlled input. Any sender can put adversarial instructions 
 
 - **No send.** There is no SMTP client and no `send_message` tool in the codebase — a test asserts it.
 - **No delete, no move,** and no raw received-attachment download tool.
-- **Human in the loop.** Direct draft creation requires explicit confirmation of the exact content in the conversation, and Proton Mail still requires manual review and sending. A separate terminal approval remains available for enhanced security.
+- **Human in the loop.** Draft creation requires explicit confirmation of the exact content in the conversation, and Proton Mail still requires manual review and sending.
 - **No filesystem access for clients.** Attachment bytes are streamed in chunks with declared size and SHA-256 verification; paths are rejected.
 - **Loopback only.** STDIO transport, no listening socket, and the Bridge host is hard-coded to `127.0.0.1`.
 
@@ -31,7 +31,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 ## Architecture
 
-![Architecture diagram showing an MCP client connected over STDIO to proton-safe-mcp, which uses loopback-only IMAP to create confirmed Proton Mail drafts; optional enhanced approval happens separately in a local terminal](https://raw.githubusercontent.com/fbossiere/proton-safe-mcp/main/docs/assets/architecture.png)
+![Architecture diagram showing an MCP client connected over STDIO to proton-safe-mcp, which uses loopback-only IMAP to create confirmed drafts in Proton Mail, where the user reviews each draft and presses Send](https://raw.githubusercontent.com/fbossiere/proton-safe-mcp/main/docs/assets/architecture.png)
 
 ## Security properties
 
@@ -43,8 +43,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 - Attachment input is chunked base64 with declared size and SHA-256 verification.
 - Only PDF, DOCX, XLSX, PPTX, TXT, CSV, PNG, and JPEG uploads are accepted.
 - Attachment tokens are random, short-lived, single-use, and reverified before draft creation.
-- Direct draft creation requires an explicit client assertion that the user confirmed the exact recipients, subject, body, and attachments in the conversation.
-- Optional enhanced-security mode binds the exact draft to a separate local terminal approval that is not exposed as an MCP tool.
+- Draft creation requires an explicit client assertion that the user confirmed the exact recipients, subject, body, and attachments in the conversation.
 - The Bridge-generated IMAP password is stored in the operating-system keyring.
 - Draft bodies are stored as plain text plus a server-generated HTML alternative that
   HTML-escapes the confirmed body, so quoted markup can never be rendered.
@@ -64,7 +63,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==1.2.1
+uv tool install proton-safe-mcp==2.0.0
 ```
 
 For development from source instead:
@@ -163,9 +162,7 @@ ChatGPT desktop/Codex installation, direct MCP registration, and the optional re
 | | `upload_attachment_chunk` | Ordered base64 chunks |
 | | `finish_attachment_upload` | Verifies hash, returns single-use token |
 | | `discard_attachment` | |
-| Drafts | `create_confirmed_draft` | Default; requires exact conversational confirmation |
-| | `prepare_draft` | Enhanced mode; creates a pending proposal only |
-| | `commit_approved_draft` | Enhanced mode; requires prior local approval |
+| Drafts | `create_confirmed_draft` | Requires exact conversational confirmation |
 
 There is deliberately no `send_message` tool.
 
@@ -183,32 +180,16 @@ The MCP client only needs the ability to obtain the bytes of a file and call too
    `create_confirmed_draft(..., user_confirmed=true, attachment_tokens=[token])`.
 8. Open Proton Mail, review the draft, and send it manually.
 
-For enhanced security, replace steps 7–8 with the optional local approval path:
-
-Approval is selected per draft, not during `proton-safe-mcp setup`. In ChatGPT or Codex, ask:
-`Use enhanced-security mode with terminal approval for this draft.`
-
-1. Call `prepare_draft(..., attachment_tokens=[token])`.
-2. Inspect and approve the exact proposal in a local terminal:
-
-   ```bash
-   export PROTON_BRIDGE_USER="your-address@proton.me"
-   proton-safe-mcp approve <draft_id>
-   ```
-
-3. Allow the MCP client to call `commit_approved_draft(draft_id)`.
-4. Open Proton Mail, review the draft, and send it manually.
-
-In enhanced mode, the proposal expires after 15 minutes by default. Uploaded attachments expire
-after 30 minutes. The server intentionally keeps pending proposal bodies in memory only; restarting
-it invalidates them.
+Step 8 is the human gate, and it is the only one that matters: the server has no SMTP
+implementation, so a draft it creates cannot leave your account until you press Send in Proton
+Mail. Uploaded attachments expire after 30 minutes if no draft consumes them.
 
 ## Local administration
 
 ```bash
-proton-safe-mcp show <draft_id>      # inspect a pending draft
-proton-safe-mcp approve <draft_id>   # interactive; no --yes bypass exists
-proton-safe-mcp reject <draft_id>
+proton-safe-mcp doctor   # check the local setup without printing private data
+proton-safe-mcp setup    # store the Bridge-generated IMAP password in the OS keyring
+proton-safe-mcp serve    # run the MCP server over STDIO
 ```
 
 ## Configuration reference
@@ -218,12 +199,11 @@ proton-safe-mcp reject <draft_id>
 | `PROTON_BRIDGE_USER` | required | Proton address configured in Bridge |
 | `PROTON_BRIDGE_ALIASES` | empty | Comma-separated additional From addresses a draft may use |
 | `PROTON_IMAP_PORT` | `1143` | Local Bridge IMAP port |
-| `PROTON_MCP_STATE_DIR` | `~/.local/state/proton-safe-mcp` | Private staging and approval state |
+| `PROTON_MCP_STATE_DIR` | `~/.local/state/proton-safe-mcp` | Private attachment staging state |
 | `PROTON_MCP_MAX_ATTACHMENT_BYTES` | `20971520` | Per-file maximum, capped at 25 MiB |
 | `PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES` | `10485760` | Received-file extraction maximum, capped at 25 MiB |
 | `PROTON_MCP_MAX_CHUNK_BYTES` | `393216` | Decoded chunk maximum, capped at 1 MiB |
 | `PROTON_MCP_UPLOAD_TTL_SECONDS` | `1800` | Attachment staging lifetime |
-| `PROTON_MCP_DRAFT_TTL_SECONDS` | `900` | Pending draft lifetime |
 | `PROTON_MCP_MAX_BODY_CHARS` | `100000` | Maximum outgoing draft body length |
 
 `PROTON_BRIDGE_HOST` is intentionally unsupported.
@@ -242,7 +222,7 @@ uv run ruff format .     # format
 uv run mypy              # strict type checking
 ```
 
-Proton Bridge is not needed for development: the test suite fakes the IMAP layer. Tests cover path rejection, MIME restrictions, received-attachment size and format rejection, bounded PDF/text extraction, ordered chunks, size/hash verification, token consumption, header injection, direct confirmation, approval digest integrity, CLI approval flow, and HTML-to-text sanitization.
+Proton Bridge is not needed for development: the test suite fakes the IMAP layer. Tests cover path rejection, MIME restrictions, received-attachment size and format rejection, bounded PDF/text extraction, ordered chunks, size/hash verification, token consumption, header injection, draft confirmation, recipient and attachment bounds, and HTML-to-text sanitization.
 
 See [CONTRIBUTING.md](https://github.com/fbossiere/proton-safe-mcp/blob/main/CONTRIBUTING.md) for the design rules that reviews enforce.
 
@@ -254,11 +234,11 @@ Read this before relying on the server in an autonomous workflow:
 - Extracted attachment text is attacker-controlled and may contain prompt injection. The server
   bounds the returned text but does not make it trustworthy or perform OCR or malware scanning.
 - Uploaded attachment bytes are stored temporarily in files readable only by the Unix account. Use full-disk encryption.
-- The server cannot inspect the surrounding conversation. `user_confirmed: true` is a client assertion, so the direct workflow depends on the client honoring the confirmation rule.
-- If the MCP client also has unrestricted shell access as the same Unix user, it can potentially write an approval marker itself. Keep shell/file-writing tools out of the same autonomous agent session when approval integrity matters.
+- The server cannot inspect the surrounding conversation. `user_confirmed: true` is a client assertion, so the confirmation step depends on the client honoring the rule. It reduces accidents; it is not a boundary against a client under an attacker's influence.
+- A draft this server creates is inert until you send it, but it can still be crafted to look like something you wrote. Read drafts in Proton Mail before sending, especially recipients.
 - Secure MCP Tunnel keeps the server off the public internet, but mail content returned to an
   OpenAI product still crosses the local Bridge boundary and is processed by that product.
-- Tool annotations and conversational-confirmation instructions are client guidance, not authorization controls. The server still enforces input validation; enhanced mode additionally checks local approval state.
+- Tool annotations and conversational-confirmation instructions are client guidance, not authorization controls. What the server enforces is input validation and the absence of any send, delete, or move capability.
 - Proton Bridge's self-signed TLS certificate is not verified. This is acceptable here only because the target host is unchangeably `127.0.0.1`.
 
 ## Security

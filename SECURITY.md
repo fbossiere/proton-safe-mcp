@@ -21,7 +21,7 @@ Pin deployments to a reviewed release tag and update dependencies deliberately.
 
 This server is not an antivirus, phishing detector, spam filter, or sender-authentication product. Email contents remain attacker-controlled input, and this project makes no claim to neutralize prompt injection — it only limits what an injected instruction can accomplish (no send, no delete, no path access, explicit confirmation before draft creation, and manual review before sending).
 
-Reports about the *documented* threat-model limitations in the README (for example, "an MCP client with unrestricted shell access as the same Unix user can defeat the approval marker") are appreciated as discussions but are not vulnerabilities: they are explicitly out of scope by design.
+Reports about the *documented* threat-model limitations in the README (for example, "`user_confirmed: true` is a client assertion the server cannot verify") are appreciated as discussions but are not vulnerabilities: they are explicitly out of scope by design.
 
 ## Credential boundary
 

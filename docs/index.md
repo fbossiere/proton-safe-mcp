@@ -2,7 +2,7 @@
 
 **Read and search Proton Mail, then create drafts that only you can send.**
 
-Proton Safe MCP is a local, client-agnostic [Model Context Protocol](https://modelcontextprotocol.io/) server for Proton Mail through the official [Proton Mail Bridge](https://proton.me/mail/bridge). It exposes bounded mail-reading tools and creates drafts after exact conversational confirmation, with optional out-of-band approval for enhanced security.
+Proton Safe MCP is a local, client-agnostic [Model Context Protocol](https://modelcontextprotocol.io/) server for Proton Mail through the official [Proton Mail Bridge](https://proton.me/mail/bridge). It exposes bounded mail-reading tools and creates drafts after exact conversational confirmation. It has no send, delete, or move capability, so every draft waits in Proton Mail for you to review and send.
 
 ![Proton Safe MCP — draft-only email tools, human-approved](assets/proton-mcp-safe.png)
 
@@ -19,8 +19,8 @@ The capability restrictions are part of the product, not optional settings:
 - **Bounded received-attachment text.** PDF, TXT, and CSV inspection returns text and metadata,
   never attachment bytes or files.
 - **No client-supplied filesystem paths.** Attachments arrive as bounded base64 chunks.
-- **Explicit confirmation.** The default draft path requires confirmation of the exact content in
-  the conversation; a local terminal can additionally bind approval to the exact proposal.
+- **Explicit confirmation.** Creating a draft requires confirmation of the exact content in the
+  conversation, and the draft still waits in Proton Mail for you to send it.
 - **Loopback only.** The server uses STDIO and the Bridge host is fixed to `127.0.0.1`.
 
 ## How it fits together
@@ -30,10 +30,9 @@ MCP client ──STDIO──> proton-safe-mcp ──IMAP on 127.0.0.1──> Pro
                             │
                             ├── read/search + bounded extraction tools
                             ├── bounded attachment staging
-                            ├── confirmed draft ──> Proton Mail Drafts (never Sent)
-                            └── optional pending proposal
-                                      │
-Local terminal ──show / approve / reject──┘
+                            └── confirmed draft ──> Proton Mail Drafts (never Sent)
+                                                              │
+                                              you review and press Send
 ```
 
 The optional [Proton Safe OpenAI plugin](openai-plugin.md) packages guarded workflows around this
@@ -48,7 +47,7 @@ on another machine; it does not change the loopback-only Bridge boundary.
 3. Review the [security model](security-model.md) before combining the server with other tools.
 4. Use the [MCP tool reference](mcp-tools.md) for exact inputs and limits.
 5. Read [received attachment extraction](received-attachments.md), [outgoing attachment
-   staging](attachments.md), and [draft confirmation and approval](draft-approval.md) before
+   staging](attachments.md), and the [MCP tool reference](mcp-tools.md) before
    handling files or creating drafts.
 6. Use the [OpenAI plugin guide](openai-plugin.md) for local ChatGPT desktop/Codex installation,
    direct MCP registration, or optional remote tunnel access.
@@ -59,4 +58,4 @@ Linux and Proton Mail Bridge users can also run the
 [10-minute external test](external-testing.md) and report installation friction without sharing
 private mail content.
 
-The current stable version is [v1.2.1](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v1.2.1).
+The current stable version is [v2.0.0](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.0.0).

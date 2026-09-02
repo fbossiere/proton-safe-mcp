@@ -28,7 +28,7 @@ email address, message content, or hardware-key material in public feedback.
 Install the reviewed release:
 
 ```bash
-uv tool install proton-safe-mcp==1.2.1
+uv tool install proton-safe-mcp==2.0.0
 ```
 
 Follow [Getting started](getting-started.md) to set `PROTON_BRIDGE_USER` and
@@ -71,25 +71,14 @@ The client should call `create_confirmed_draft` with `user_confirmed: true`. Con
 Review the draft manually and delete it in Proton Mail if you do not want to keep it. Do not send
 it merely for this test.
 
-### 5. Optionally exercise enhanced approval
+### 5. Confirm the draft tool refuses an unconfirmed call
 
-Ask the client to create a second harmless proposal using `prepare_draft`. Before approving, ask it
-to call `commit_approved_draft` with the returned `draft_id`. The call must fail with a
-local-approval-required result.
-
-In a separate terminal, inspect the exact proposal:
-
-```bash
-proton-safe-mcp show <draft_id>
-proton-safe-mcp approve <draft_id>
-```
-
-After interactive approval, ask the client to call `commit_approved_draft` again and confirm that
-the second draft matches the locally approved proposal and still reports `sent: false`.
+Ask the client to call `create_confirmed_draft` with `user_confirmed: false`. The call must fail
+and no draft may appear in Proton Mail.
 
 ## Optional attachment check
 
-If the core test succeeds, repeat the default draft flow with a newly created, non-confidential TXT or PDF
+If the core test succeeds, repeat the draft flow with a newly created, non-confidential TXT or PDF
 file. Follow the [attachment workflow](attachments.md) and confirm that the file name, type, size,
 and SHA-256 digest are checked before the draft is created.
 
@@ -105,7 +94,7 @@ The core path is successful when:
 3. direct draft creation occurs only after exact conversational confirmation;
 4. the confirmed draft appears in Proton Mail and is never sent;
 5. bounded PDF/TXT/CSV text extraction returns no raw bytes or filesystem path;
-6. no send, delete, move, raw received-attachment-download, or MCP approval tool is exposed.
+6. no send, delete, move, or raw received-attachment-download tool is exposed.
 
 Partial and failed tests are equally useful. Report the first point of friction rather than
 working around it silently.

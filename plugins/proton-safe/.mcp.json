@@ -4,7 +4,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "proton-safe-mcp==1.2.1",
+        "proton-safe-mcp==2.0.0",
         "proton-safe-mcp",
         "serve"
       ],
@@ -14,7 +14,6 @@
         "PATH",
         "PROTON_BRIDGE_USER",
         "PROTON_IMAP_PORT",
-        "PROTON_MCP_DRAFT_TTL_SECONDS",
         "PROTON_MCP_MAX_ATTACHMENT_BYTES",
         "PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES",
         "PROTON_MCP_MAX_BODY_CHARS",

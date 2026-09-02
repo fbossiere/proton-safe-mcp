@@ -26,16 +26,16 @@ flowchart LR
     server["<strong>proton-safe-mcp</strong><br/><br/>Read tools<br/>Chunked attachment staging<br/>Confirmed drafts"]
     bridge["Proton Mail Bridge<br/>(local)"]
     mail["Proton Mail<br/>(Drafts)"]
-    approval["<strong>Optional enhanced security</strong><br/><br/><code>proton-safe-mcp approve &lt;draft_id&gt;</code>"]
+    human["<strong>You</strong><br/><br/>Review the draft<br/>and press Send"]
 
     client -->|"STDIO / MCP<br/>tools only"| server
     server -->|"IMAP · loopback only<br/><code>127.0.0.1</code>"| bridge
     bridge -->|"E2E-encrypted"| mail
-    approval -.->|"Exact out-of-band approval<br/>not an MCP tool"| server
+    human -.->|"Manual send<br/>no SMTP in the server"| mail
 
     classDef component fill:#eef2ff,stroke:#4f46e5,stroke-width:2px,color:#111827;
     classDef boundary fill:#ecfeff,stroke:#0891b2,stroke-width:2px,color:#111827;
     classDef human fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#111827;
     class client,server component;
     class bridge,mail boundary;
-    class approval human;
+    class human human;

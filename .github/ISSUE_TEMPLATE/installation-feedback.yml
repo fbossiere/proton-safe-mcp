@@ -87,9 +87,8 @@ body:
         - label: Stored the Bridge-generated password with `proton-safe-mcp setup`.
         - label: "Received `connected: true` from `mailbox_status`."
         - label: Confirmed that `read_message` did not mark the test message as read.
-        - label: Confirmed that draft creation failed before local approval.
-        - label: Approved the exact proposal in a separate terminal.
-        - label: "Confirmed that the approved draft appeared in Proton Mail with `sent: false`."
+        - label: Confirmed that `create_confirmed_draft` refused a call with `user_confirmed: false`.
+        - label: "Confirmed that the confirmed draft appeared in Proton Mail with `sent: false`."
         - label: Confirmed that no send, delete, move, or attachment-download tool was exposed.
         - label: Completed the optional attachment check.
 

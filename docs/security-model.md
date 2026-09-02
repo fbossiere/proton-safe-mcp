@@ -10,7 +10,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 - Header, folder, or IMAP search injection.
 - Client attempts to make the server read arbitrary local paths.
 - Oversized, reordered, truncated, substituted, or expired attachment uploads.
-- Draft changes after conversational confirmation or local approval.
+- Draft changes after conversational confirmation.
 - Accidental exposure of the Proton account password.
 - Leakage of the Bridge credential, tunnel runtime API key, or account-specific ChatGPT app ID.
 - A remote client attempting to turn the tunnel into general access to the Bridge host.
@@ -25,7 +25,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 | Reads | `BODY.PEEK`, bounded plain text, no received attachment bytes or persisted files |
 | Received attachments | Explicit index selection; PDF/TXT/CSV allowlist; byte, page, and character limits; SHA-256 result; no OCR or active content |
 | Outgoing attachments | No paths; type, size, order, lifetime, and SHA-256 validation |
-| Drafts | Exact conversational confirmation assertion by default; optional out-of-band approval with digest binding and expiry |
+| Drafts | Exact conversational confirmation assertion; validated recipients, headers, sizes, and attachment tokens |
 | Draft bodies | Plain text plus a server-generated HTML alternative; client markup is escaped, never rendered |
 | Sender identity | From header restricted to the startup allowlist, re-checked at the IMAP write and bound into the approval digest |
 | Credentials | Bridge-generated IMAP password in the OS keyring |
@@ -36,7 +36,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 
 The Proton Safe plugin adds workflow instructions and install metadata. It does not add authority.
 The code-enforced MCP tool surface remains the capability boundary, and the plugin cannot send a
-draft or create a local approval marker for enhanced mode.
+draft.
 
 For the primary local deployment, ChatGPT desktop or Codex launches the MCP server directly over
 STDIO on the Bridge machine. The plugin skills are defense-in-depth guidance, not authorization
@@ -71,9 +71,11 @@ in the user's private plugin copy.
   product that requested it. Proton end-to-end encryption no longer applies after Bridge decrypts
   the message locally.
 - Attachment bytes are temporarily readable by the local Unix account; use full-disk encryption.
-- The server cannot verify surrounding conversation history. The direct draft tool's required
+- The server cannot verify surrounding conversation history. The draft tool's required
   `user_confirmed: true` value is a client assertion, not a separate authorization channel.
-- An MCP client with unrestricted shell access as the same user may be able to forge local approval state.
+- A draft the server creates is inert — it cannot leave the account without a manual send in Proton
+  Mail — but it can still be crafted to look like the user's own message. Reviewing recipients in
+  Proton Mail before sending is the human control this design relies on.
 - Tool annotations are client hints, not authorization controls.
 - Bridge uses a self-signed TLS certificate. Verification is disabled only because the target is fixed to loopback.
 - Unrelated write-capable tools in the same autonomous workflow can defeat the project's intended blast-radius reduction.
