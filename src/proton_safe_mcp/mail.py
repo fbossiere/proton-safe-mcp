@@ -23,6 +23,8 @@ from .errors import BridgeError
 from .received_attachments import ReceivedAttachmentTextExtractor
 from .secrets import get_bridge_password
 
+# Bound at import time so the handlers below keep catching the real protocol errors even
+# when imaplib.IMAP4 itself is replaced by a test double.
 _IMAP_ABORT = imaplib.IMAP4.abort
 _IMAP_ERROR = imaplib.IMAP4.error
 
@@ -91,6 +93,16 @@ def _safe_search_text(value: str) -> str:
         raise BridgeError("Invalid IMAP search text")
     # imaplib sends this as a quoted argument; escaping prevents criteria injection.
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _require_uid(uid: str) -> None:
+    if not uid.isdigit():
+        raise BridgeError("uid must contain digits only")
+
+
+def _require_range(name: str, value: int, minimum: int, maximum: int) -> None:
+    if not minimum <= value <= maximum:
+        raise BridgeError(f"{name} must be between {minimum} and {maximum}")
 
 
 def _capability_name(value: object) -> str:
@@ -180,50 +192,35 @@ class ProtonBridgeClient:
     def list_messages(
         self, folder: str = "INBOX", limit: int = 20, unread_only: bool = False
     ) -> list[dict[str, Any]]:
-        if not 1 <= limit <= 100:
-            raise BridgeError("limit must be between 1 and 100")
+        _require_range("limit", limit, 1, 100)
         with self.connection() as client:
             self._select(client, folder)
             criterion = "UNSEEN" if unread_only else "ALL"
-            status, data = client.uid("SEARCH", criterion)
-            if status != "OK":
-                raise BridgeError("Unable to list messages")
-            uids = (data[0] or b"").split()[-limit:]
-            results = [self._fetch_summary(client, uid) for uid in reversed(uids)]
-            return [item for item in results if item]
+            return self._summaries(client, (criterion,), limit, "Unable to list messages")
 
     def search_messages(
         self, query: str, folder: str = "INBOX", limit: int = 20
     ) -> list[dict[str, Any]]:
         if not query.strip():
             raise BridgeError("query is required")
-        if not 1 <= limit <= 100:
-            raise BridgeError("limit must be between 1 and 100")
+        _require_range("limit", limit, 1, 100)
         with self.connection() as client:
             self._select(client, folder)
-            status, data = client.uid("SEARCH", "TEXT", _safe_search_text(query))
-            if status != "OK":
-                raise BridgeError("Unable to search messages")
-            uids = (data[0] or b"").split()[-limit:]
-            results = [self._fetch_summary(client, uid) for uid in reversed(uids)]
-            return [item for item in results if item]
+            return self._summaries(
+                client,
+                ("TEXT", _safe_search_text(query)),
+                limit,
+                "Unable to search messages",
+            )
 
     def read_message(
         self, uid: str, folder: str = "INBOX", max_chars: int = 20_000
     ) -> dict[str, Any]:
-        if not uid.isdigit():
-            raise BridgeError("uid must contain digits only")
-        if not 500 <= max_chars <= 100_000:
-            raise BridgeError("max_chars must be between 500 and 100000")
+        _require_uid(uid)
+        _require_range("max_chars", max_chars, 500, 100_000)
         with self.connection() as client:
             self._select(client, folder)
-            status, data = client.uid("FETCH", uid, "(BODY.PEEK[] FLAGS)")
-            if status != "OK":
-                raise BridgeError("Unable to read message")
-            raw = self._extract_fetch_bytes(data)
-            if raw is None:
-                raise BridgeError("Message not found")
-            message = BytesParser(policy=policy.default).parsebytes(raw)
+            message = self._fetch_message(client, uid)
             body = self._body_as_text(message)
             truncated = len(body) > max_chars
             return {
@@ -251,23 +248,13 @@ class ProtonBridgeClient:
         max_chars: int = 20_000,
         max_pages: int = 50,
     ) -> dict[str, Any]:
-        if not uid.isdigit():
-            raise BridgeError("uid must contain digits only")
-        if not 0 <= attachment_index <= 99:
-            raise BridgeError("attachment_index must be between 0 and 99")
-        if not 500 <= max_chars <= 100_000:
-            raise BridgeError("max_chars must be between 500 and 100000")
-        if not 1 <= max_pages <= 50:
-            raise BridgeError("max_pages must be between 1 and 50")
+        _require_uid(uid)
+        _require_range("attachment_index", attachment_index, 0, 99)
+        _require_range("max_chars", max_chars, 500, 100_000)
+        _require_range("max_pages", max_pages, 1, 50)
         with self.connection() as client:
             self._select(client, folder)
-            status, data = client.uid("FETCH", uid, "(BODY.PEEK[] FLAGS)")
-            if status != "OK":
-                raise BridgeError("Unable to read message")
-            raw = self._extract_fetch_bytes(data)
-            if raw is None:
-                raise BridgeError("Message not found")
-            message = BytesParser(policy=policy.default).parsebytes(raw)
+            message = self._fetch_message(client, uid)
             parts = self._attachment_parts(message)
             if attachment_index >= len(parts):
                 raise BridgeError("Attachment index not found")
@@ -366,6 +353,29 @@ class ProtonBridgeClient:
             raise BridgeError(f"Unable to open mailbox {folder!r}")
 
     @staticmethod
+    def _summaries(
+        client: imaplib.IMAP4, criteria: tuple[str, ...], limit: int, failure: str
+    ) -> list[dict[str, Any]]:
+        """Return the newest `limit` matches, skipping any message that cannot be summarized."""
+        status, data = client.uid("SEARCH", *criteria)
+        if status != "OK":
+            raise BridgeError(failure)
+        uids = (data[0] or b"").split()[-limit:]
+        summaries = (ProtonBridgeClient._fetch_summary(client, uid) for uid in reversed(uids))
+        return [item for item in summaries if item]
+
+    @staticmethod
+    def _fetch_message(client: imaplib.IMAP4, uid: str) -> Message:
+        """Fetch one message without setting \\Seen, and parse it."""
+        status, data = client.uid("FETCH", uid, "(BODY.PEEK[] FLAGS)")
+        if status != "OK":
+            raise BridgeError("Unable to read message")
+        raw = ProtonBridgeClient._extract_fetch_bytes(data)
+        if raw is None:
+            raise BridgeError("Message not found")
+        return BytesParser(policy=policy.default).parsebytes(raw)
+
+    @staticmethod
     def _fetch_summary(client: imaplib.IMAP4, uid: bytes) -> dict[str, Any] | None:
         uid_str = uid.decode(errors="replace")
         status, data = client.uid(
@@ -412,18 +422,20 @@ class ProtonBridgeClient:
             content_type = part.get_content_type()
             if content_type not in {"text/plain", "text/html"}:
                 continue
-            content: object
-            try:
-                if not isinstance(part, EmailMessage):
-                    raise LookupError("legacy Message part")
-                content = part.get_content()
-            except (LookupError, UnicodeDecodeError):
+            content: str | None = None
+            if isinstance(part, EmailMessage):
+                # A part with an unknown charset or undecodable bytes falls through to the
+                # replacement-character decode below rather than being dropped.
+                try:
+                    decoded = part.get_content()
+                except (LookupError, UnicodeDecodeError):
+                    decoded = None
+                content = decoded if isinstance(decoded, str) else None
+            if content is None:
                 payload = part.get_payload(decode=True)
                 if not isinstance(payload, bytes):
                     continue
                 content = payload.decode("utf-8", errors="replace")
-            if not isinstance(content, str):
-                continue
             if content_type == "text/plain":
                 plain_parts.append(content)
             else:

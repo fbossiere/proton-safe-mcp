@@ -11,7 +11,7 @@ from pydantic import Field
 
 from .attachments import AttachmentStore
 from .config import Settings
-from .drafts import DraftContent, validate_draft
+from .drafts import validate_draft
 from .errors import ProtonMCPError
 from .mail import ProtonBridgeClient
 
@@ -45,31 +45,15 @@ def _call(function: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         raise ToolError(str(exc)) from exc
 
 
-def _consume_attachment_tokens(
-    result: dict[str, Any], attachment_tokens: tuple[str, ...]
-) -> dict[str, Any]:
-    cleanup_warnings: list[str] = []
+def _consume_staged_attachments(attachment_tokens: tuple[str, ...]) -> list[str]:
+    """Destroy every single-use token, returning the failures worth reporting to the client."""
+    warnings: list[str] = []
     for token in attachment_tokens:
         try:
             attachments.consume(token)
         except ProtonMCPError as exc:
-            cleanup_warnings.append(str(exc))
-    if cleanup_warnings:
-        result["cleanup_warnings"] = cleanup_warnings
-    return result
-
-
-def _append_draft(draft: DraftContent) -> dict[str, Any]:
-    return _call(
-        bridge.append_draft,
-        from_address=draft.from_address,
-        to=draft.to,
-        cc=draft.cc,
-        bcc=draft.bcc,
-        subject=draft.subject,
-        body_text=draft.body_text,
-        attachments=draft.attachments,
-    )
+            warnings.append(str(exc))
+    return warnings
 
 
 @mcp.tool(
@@ -271,9 +255,11 @@ def finish_attachment_upload(
         "openWorldHint": False,
     }
 )
-def discard_attachment(attachment_token: str) -> dict[str, bool]:
+def discard_attachment(
+    attachment_token: Annotated[str, Field(min_length=1, max_length=200)],
+) -> dict[str, bool]:
     """Permanently remove one staged attachment before it is used."""
-    _call(attachments.discard, attachment_token)
+    _call(attachments.consume, attachment_token)
     return {"discarded": True}
 
 
@@ -318,7 +304,9 @@ def create_confirmed_draft(
             ),
         ),
     ] = None,
-    attachment_tokens: Annotated[list[str] | None, Field(max_length=10)] = None,
+    attachment_tokens: Annotated[
+        list[Annotated[str, Field(min_length=1, max_length=200)]] | None, Field(max_length=10)
+    ] = None,
     cc: Annotated[list[str] | None, Field(max_length=25)] = None,
     bcc: Annotated[list[str] | None, Field(max_length=25)] = None,
 ) -> dict[str, Any]:
@@ -339,8 +327,19 @@ def create_confirmed_draft(
         attachment_tokens=attachment_tokens,
         attachments=resolved,
     )
-    result = _append_draft(draft)
-    return _consume_attachment_tokens(result, draft.attachment_tokens)
+    result: dict[str, Any] = _call(
+        bridge.append_draft,
+        from_address=draft.from_address,
+        to=draft.to,
+        cc=draft.cc,
+        bcc=draft.bcc,
+        subject=draft.subject,
+        body_text=draft.body_text,
+        attachments=draft.attachments,
+    )
+    if warnings := _consume_staged_attachments(draft.attachment_tokens):
+        result["cleanup_warnings"] = warnings
+    return result
 
 
 def run() -> None:

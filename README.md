@@ -154,6 +154,7 @@ ChatGPT desktop/Codex installation, direct MCP registration, and the optional re
 | --- | --- | --- |
 | Read-only mail | `mailbox_status` | Bridge connectivity + INBOX counts |
 | | `list_folders` | |
+| | `list_sender_addresses` | The fixed From allowlist a draft may use |
 | | `list_messages` | Never marks messages as read |
 | | `search_messages` | Injection-safe IMAP `TEXT` search |
 | | `read_message` | Bounded plain text; no attachment bytes |
@@ -200,7 +201,7 @@ proton-safe-mcp serve    # run the MCP server over STDIO
 | `PROTON_BRIDGE_ALIASES` | empty | Comma-separated additional From addresses a draft may use |
 | `PROTON_IMAP_PORT` | `1143` | Local Bridge IMAP port |
 | `PROTON_MCP_STATE_DIR` | `~/.local/state/proton-safe-mcp` | Private attachment staging state |
-| `PROTON_MCP_MAX_ATTACHMENT_BYTES` | `20971520` | Per-file maximum, capped at 25 MiB |
+| `PROTON_MCP_MAX_ATTACHMENT_BYTES` | `20971520` | Maximum per file and per draft, capped at 25 MiB |
 | `PROTON_MCP_MAX_RECEIVED_ATTACHMENT_BYTES` | `10485760` | Received-file extraction maximum, capped at 25 MiB |
 | `PROTON_MCP_MAX_CHUNK_BYTES` | `393216` | Decoded chunk maximum, capped at 1 MiB |
 | `PROTON_MCP_UPLOAD_TTL_SECONDS` | `1800` | Attachment staging lifetime |

@@ -134,3 +134,17 @@ def test_unconfigured_or_injected_sender_is_rejected(settings, sender):
 def test_draft_validation_rejects_an_unconfigured_sender(settings):
     with pytest.raises(DraftError, match="not a configured sender address"):
         _validate(settings, from_address="attacker@example.com")
+
+
+@pytest.mark.parametrize(
+    "address",
+    ["@example.com", "user@", "user@localhost", "us er@example.com", "user@exam ple.com"],
+)
+def test_rejects_structurally_incomplete_addresses(address):
+    with pytest.raises(DraftError):
+        validate_address(address)
+
+
+def test_rejects_a_local_part_outside_the_supported_character_set():
+    with pytest.raises(DraftError, match="Unsupported email address syntax"):
+        validate_address("usér@example.com")

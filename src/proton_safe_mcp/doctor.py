@@ -29,160 +29,134 @@ class CheckResult:
     detail: str
 
 
-def _package_version() -> str:
+def _python_check() -> CheckResult:
+    supported = sys.version_info >= (3, 11)
+    detail = "supported" if supported else "3.11 or newer required"
+    return CheckResult(
+        "Python", "PASS" if supported else "FAIL", f"{platform.python_version()} ({detail})"
+    )
+
+
+def _package_check() -> CheckResult:
     try:
-        return version("proton-safe-mcp")
+        installed = version("proton-safe-mcp")
     except PackageNotFoundError:
-        return "development checkout"
+        installed = "development checkout"
+    return CheckResult("Package", "PASS", installed)
+
+
+def _platform_check() -> CheckResult:
+    operating_system = platform.system() or "unknown"
+    supported = operating_system == "Linux"
+    detail = "supported" if supported else "Linux required"
+    return CheckResult(
+        "Platform", "PASS" if supported else "FAIL", f"{operating_system} ({detail})"
+    )
+
+
+def _configuration_check() -> tuple[Settings | None, CheckResult]:
+    """Read the configuration without creating directories, hiding any private path."""
+    try:
+        settings = Settings.from_env(create_directories=False)
+    except OSError as exc:
+        return None, CheckResult(
+            "Configuration", "FAIL", f"could not read local configuration ({type(exc).__name__})"
+        )
+    except ProtonMCPError as exc:
+        return None, CheckResult("Configuration", "FAIL", str(exc))
+    return settings, CheckResult(
+        "Configuration", "PASS", "Bridge account and loopback IMAP port are configured"
+    )
+
+
+def _sender_addresses_check(settings: Settings) -> CheckResult:
+    alias_count = len(settings.sender_addresses) - 1
+    return CheckResult(
+        "Sender addresses",
+        "PASS",
+        (
+            f"primary address plus {alias_count} alias(es) from PROTON_BRIDGE_ALIASES"
+            if alias_count
+            else "primary address only; set PROTON_BRIDGE_ALIASES to draft as an alias"
+        ),
+    )
+
+
+def _state_directory_check(settings: Settings) -> CheckResult:
+    try:
+        metadata = settings.state_dir.stat()
+    except FileNotFoundError:
+        return CheckResult(
+            "State directory",
+            "WARN",
+            "not created yet; first use will create it with private permissions",
+        )
+    except OSError as exc:
+        return CheckResult(
+            "State directory", "FAIL", f"could not inspect permissions ({type(exc).__name__})"
+        )
+    mode = stat.S_IMODE(metadata.st_mode)
+    private = stat.S_ISDIR(metadata.st_mode) and mode & 0o700 == 0o700 and mode & 0o077 == 0
+    return CheckResult(
+        "State directory",
+        "PASS" if private else "FAIL",
+        (
+            "private permissions"
+            if private
+            else "must grant rwx to the owner and be inaccessible to group and others"
+        ),
+    )
+
+
+def _credential_check(settings: Settings | None) -> CheckResult:
+    if settings is None:
+        return CheckResult("Credential", "SKIP", "configuration must pass first")
+    try:
+        get_bridge_password(settings.bridge_user)
+    except keyring.errors.KeyringError as exc:
+        return CheckResult("Credential", "FAIL", f"OS keyring lookup failed ({type(exc).__name__})")
+    except ProtonMCPError as exc:
+        return CheckResult("Credential", "FAIL", str(exc))
+    if os.environ.get("PROTON_BRIDGE_PASSWORD"):
+        return CheckResult(
+            "Credential",
+            "WARN",
+            "PROTON_BRIDGE_PASSWORD is set; unset it to use the OS keyring "
+            "(run `proton-safe-mcp setup`)",
+        )
+    return CheckResult("Credential", "PASS", "available from the OS keyring")
+
+
+def _bridge_check(settings: Settings) -> CheckResult:
+    try:
+        ProtonBridgeClient(settings).status()
+    except ProtonMCPError as exc:
+        return CheckResult("Bridge", "FAIL", str(exc))
+    return CheckResult("Bridge", "PASS", "authenticated IMAP connection succeeded")
 
 
 def run_checks() -> list[CheckResult]:
     """Run non-destructive checks without returning credentials or mailbox data."""
 
-    results: list[CheckResult] = []
-    python_ok = sys.version_info >= (3, 11)
-    python_detail = "supported" if python_ok else "3.11 or newer required"
-    results.append(
-        CheckResult(
-            "Python",
-            "PASS" if python_ok else "FAIL",
-            f"{platform.python_version()} ({python_detail})",
-        )
-    )
-    results.append(CheckResult("Package", "PASS", _package_version()))
-
-    operating_system = platform.system() or "unknown"
-    linux_supported = operating_system == "Linux"
-    platform_detail = "supported" if linux_supported else "Linux required"
-    results.append(
-        CheckResult(
-            "Platform",
-            "PASS" if linux_supported else "FAIL",
-            f"{operating_system} ({platform_detail})",
-        )
-    )
-    if not linux_supported:
+    results = [_python_check(), _package_check(), _platform_check()]
+    if results[-1].status == "FAIL":
+        # Nothing below is meaningful off Linux, and it must not touch credentials.
         return results
 
-    settings: Settings | None = None
-    try:
-        settings = Settings.from_env(create_directories=False)
-    except OSError as exc:
-        results.append(
-            CheckResult(
-                "Configuration",
-                "FAIL",
-                f"could not read local configuration ({type(exc).__name__})",
-            )
-        )
-    except ProtonMCPError as exc:
-        results.append(CheckResult("Configuration", "FAIL", str(exc)))
-    else:
-        results.append(
-            CheckResult(
-                "Configuration",
-                "PASS",
-                "Bridge account and loopback IMAP port are configured",
-            )
-        )
-        alias_count = len(settings.sender_addresses) - 1
-        results.append(
-            CheckResult(
-                "Sender addresses",
-                "PASS",
-                (
-                    f"primary address plus {alias_count} alias(es) from PROTON_BRIDGE_ALIASES"
-                    if alias_count
-                    else "primary address only; set PROTON_BRIDGE_ALIASES to draft as an alias"
-                ),
-            )
-        )
-        try:
-            state_metadata = settings.state_dir.stat()
-        except FileNotFoundError:
-            results.append(
-                CheckResult(
-                    "State directory",
-                    "WARN",
-                    "not created yet; first use will create it with private permissions",
-                )
-            )
-        except OSError as exc:
-            results.append(
-                CheckResult(
-                    "State directory",
-                    "FAIL",
-                    f"could not inspect permissions ({type(exc).__name__})",
-                )
-            )
-        else:
-            mode = stat.S_IMODE(state_metadata.st_mode)
-            private = (
-                stat.S_ISDIR(state_metadata.st_mode) and mode & 0o700 == 0o700 and mode & 0o077 == 0
-            )
-            results.append(
-                CheckResult(
-                    "State directory",
-                    "PASS" if private else "FAIL",
-                    (
-                        "private permissions"
-                        if private
-                        else ("must grant rwx to the owner and be inaccessible to group and others")
-                    ),
-                )
-            )
+    settings, configuration = _configuration_check()
+    results.append(configuration)
+    if settings is not None:
+        results.append(_sender_addresses_check(settings))
+        results.append(_state_directory_check(settings))
 
-    credential_available = False
-    if settings is None:
-        results.append(CheckResult("Credential", "SKIP", "configuration must pass first"))
-    else:
-        try:
-            get_bridge_password(settings.bridge_user)
-        except keyring.errors.KeyringError as exc:
-            results.append(
-                CheckResult(
-                    "Credential",
-                    "FAIL",
-                    f"OS keyring lookup failed ({type(exc).__name__})",
-                )
-            )
-        except ProtonMCPError as exc:
-            results.append(CheckResult("Credential", "FAIL", str(exc)))
-        else:
-            credential_available = True
-            environment_fallback = bool(os.environ.get("PROTON_BRIDGE_PASSWORD"))
-            results.append(
-                CheckResult(
-                    "Credential",
-                    "WARN" if environment_fallback else "PASS",
-                    (
-                        "PROTON_BRIDGE_PASSWORD is set; unset it to use the OS keyring "
-                        "(run `proton-safe-mcp setup`)"
-                        if environment_fallback
-                        else "available from the OS keyring"
-                    ),
-                )
-            )
-
-    if settings is None or not credential_available:
+    credential = _credential_check(settings)
+    results.append(credential)
+    if settings is None or credential.status == "FAIL":
         results.append(
             CheckResult("Bridge", "SKIP", "configuration and credential must pass first")
         )
     else:
-        try:
-            status = ProtonBridgeClient(settings).status()
-            connected = status.get("connected") is True
-        except ProtonMCPError as exc:
-            results.append(CheckResult("Bridge", "FAIL", str(exc)))
-        else:
-            results.append(
-                CheckResult(
-                    "Bridge",
-                    "PASS" if connected else "FAIL",
-                    "authenticated IMAP connection succeeded" if connected else "not connected",
-                )
-            )
-
+        results.append(_bridge_check(settings))
     return results
 
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import keyring.errors
+
 from proton_safe_mcp import cli, doctor
-from proton_safe_mcp.errors import BridgeError
+from proton_safe_mcp.errors import BridgeError, ConfigurationError
 
 
 def _configure(settings, monkeypatch):
@@ -173,3 +175,40 @@ def test_doctor_rejects_private_but_unusable_state_directory(settings, monkeypat
         assert "must grant rwx to the owner" in output
     finally:
         settings.state_dir.chmod(0o700)
+
+
+def _refuse_bridge(_self):
+    raise AssertionError("Bridge must not be probed without a usable credential")
+
+
+def test_doctor_hides_keyring_failure_details_and_skips_the_bridge(settings, monkeypatch, capsys):
+    _configure(settings, monkeypatch)
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
+
+    def fail(_user):
+        raise keyring.errors.KeyringError("private path not printed")
+
+    monkeypatch.setattr(doctor, "get_bridge_password", fail)
+    monkeypatch.setattr(doctor.ProtonBridgeClient, "status", _refuse_bridge)
+
+    assert cli.main(["doctor"]) == 1
+    output = capsys.readouterr().out
+    assert "[FAIL] Credential: OS keyring lookup failed (KeyringError)" in output
+    assert "private path not printed" not in output
+    assert "[SKIP] Bridge: configuration and credential must pass first" in output
+
+
+def test_doctor_reports_a_credential_that_was_never_stored(settings, monkeypatch, capsys):
+    _configure(settings, monkeypatch)
+    monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
+
+    def fail(_user):
+        raise ConfigurationError("No Proton Bridge password found. Run setup first.")
+
+    monkeypatch.setattr(doctor, "get_bridge_password", fail)
+    monkeypatch.setattr(doctor.ProtonBridgeClient, "status", _refuse_bridge)
+
+    assert cli.main(["doctor"]) == 1
+    output = capsys.readouterr().out
+    assert "[FAIL] Credential: No Proton Bridge password found" in output
+    assert "[SKIP] Bridge" in output

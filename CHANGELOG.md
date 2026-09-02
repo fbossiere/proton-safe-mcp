@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An empty or relative `XDG_STATE_HOME` is now ignored, as the XDG base directory specification
+  requires. It previously resolved to the working directory, so a client launched from an arbitrary
+  directory staged attachment bytes in `./proton-safe-mcp` instead of the private state directory.
+- A `PROTON_BRIDGE_USER` containing a line break is now reported as an invalid address rather than
+  as a missing variable.
+- Documented the `list_sender_addresses` tool in the README tool table, and removed the reference
+  to the approval digest and the second draft path that 2.0.0 deleted.
+
+### Changed
+
+- Bounded the attachment-token inputs of `discard_attachment` and `create_confirmed_draft` in the
+  published tool schema, matching every other tool input.
+- Internal cleanup with no behavior change: removed the `AttachmentStore.discard` alias, the unused
+  `cleanup_expired` count, the unreachable CLI exit path, and the leftover single-use draft helpers;
+  split `doctor.run_checks` into one function per check; and de-duplicated the IMAP fetch and search
+  paths in `mail.py`.
+
 ## [2.0.0] - 2026-09-02
 
 ### Removed

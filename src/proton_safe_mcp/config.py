@@ -49,7 +49,12 @@ def _sender_aliases(primary: str) -> tuple[str, ...]:
 def _state_dir() -> Path:
     if configured := os.environ.get("PROTON_MCP_STATE_DIR"):
         return Path(configured).expanduser().resolve()
-    base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    # An empty or relative XDG_STATE_HOME is ignored, as the XDG base directory
+    # specification requires: Path("") would stage attachments in the working directory.
+    xdg_state_home = os.environ.get("XDG_STATE_HOME", "")
+    base = (
+        Path(xdg_state_home) if xdg_state_home.startswith("/") else Path.home() / ".local" / "state"
+    )
     return (base / "proton-safe-mcp").resolve()
 
 
@@ -78,7 +83,7 @@ class Settings:
     @classmethod
     def from_env(cls, *, create_directories: bool = True) -> Settings:
         user = os.environ.get("PROTON_BRIDGE_USER", "").strip()
-        if not user or "\r" in user or "\n" in user:
+        if not user:
             raise ConfigurationError("PROTON_BRIDGE_USER is required")
         user = validate_address(user, error=ConfigurationError)
 
