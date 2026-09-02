@@ -74,11 +74,19 @@ cd proton-safe-mcp
 uv sync --extra dev
 ```
 
-Set only the Proton address and Bridge IMAP port in the MCP process environment:
+Set the Proton address and Bridge IMAP port in the MCP process environment. No credential is
+ever set here:
 
 ```bash
 export PROTON_BRIDGE_USER="your-address@proton.me"
 export PROTON_IMAP_PORT="1143"
+```
+
+To draft as another Proton address of the same account, add the optional sender allowlist in that
+same environment, as comma-separated bare addresses:
+
+```bash
+export PROTON_BRIDGE_ALIASES="billing@example.com,legal@example.com"
 ```
 
 Store the **Bridge-generated IMAP password** (shown in the Bridge UI), not your Proton account password:
@@ -106,6 +114,9 @@ to obtain the absolute command path when your client does not inherit your shell
   }
 }
 ```
+
+`PROTON_BRIDGE_ALIASES` goes in the same `env` block when a draft may use more than one From
+address. See [Sender addresses](https://fbossiere.github.io/proton-safe-mcp/configuration/#sender-addresses).
 
 Do not put `PROTON_BRIDGE_PASSWORD` in the client configuration. The server reads it from the OS keyring established by `setup`.
 

@@ -155,13 +155,15 @@ Put only these non-secret values in the file:
 
 ```ini
 PROTON_BRIDGE_USER=your-address@proton.me
+PROTON_BRIDGE_ALIASES=billing@example.com,legal@example.com
 PROTON_IMAP_PORT=1143
 ```
 
 The plugin's `.mcp.json` uses Codex's `env_vars` pass-through. That setting forwards values from
-the local Codex environment; it does not create values that are missing there. If either variable
-is absent, `proton-safe-mcp` exits during startup and `/mcp` can show the installed plugin with no
-Proton tools.
+the local Codex environment; it does not create values that are missing there.
+`PROTON_BRIDGE_ALIASES` is optional; omit it when no additional From address is needed. If either
+required variable is absent, `proton-safe-mcp` exits during startup and `/mcp` can show the
+installed plugin with no Proton tools.
 
 On Ubuntu, `environment.d` is read by the `systemd` user environment generator. Reload the user
 manager after creating or changing the file:
@@ -174,12 +176,13 @@ Verify the imported names without printing the address or port:
 
 ```bash
 systemctl --user show-environment |
-  awk -F= '$1 == "PROTON_BRIDGE_USER" || $1 == "PROTON_IMAP_PORT" { print $1 "=<set>" }'
+  awk -F= '$1 == "PROTON_BRIDGE_USER" || $1 == "PROTON_BRIDGE_ALIASES" || $1 == "PROTON_IMAP_PORT" { print $1 "=<set>" }'
 ```
 
-Both names must appear. If they do not, run `systemctl --user daemon-reload` again and repeat the
-check before starting ChatGPT. A graphical logout is not proof by itself: the user manager and the
-desktop session do not necessarily have the same environment or lifetime.
+The two required names must appear, plus `PROTON_BRIDGE_ALIASES` when configured. If they do not,
+run `systemctl --user daemon-reload` again and repeat the check before starting ChatGPT. A graphical
+logout is not proof by itself: the user manager and the desktop session do not necessarily have the
+same environment or lifetime.
 
 `echo "$PROTON_BRIDGE_USER"` in a terminal that was already running can still be empty. That shell
 does not receive environment changes retroactively. For a one-off CLI diagnostic in the current
@@ -269,7 +272,8 @@ If you only need the MCP tools, the plugin is not required. In ChatGPT desktop:
    --from proton-safe-mcp==2.0.1 proton-safe-mcp serve
    ```
 
-4. Forward `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT`, but never a Proton or Bridge password.
+4. Forward `PROTON_BRIDGE_USER`, optional `PROTON_BRIDGE_ALIASES`, and `PROTON_IMAP_PORT`, but
+   never a Proton or Bridge password.
 5. Save the server, restart the app, and use `/mcp` to verify the exposed tools.
 
 The same configuration is available to Codex CLI and the IDE extension on that Codex host. This

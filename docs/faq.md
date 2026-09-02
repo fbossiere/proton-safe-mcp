@@ -18,7 +18,7 @@ check for services launched by the user manager is:
 
 ```bash
 systemctl --user show-environment |
-  awk -F= '$1 == "PROTON_BRIDGE_USER" || $1 == "PROTON_IMAP_PORT" { print $1 "=<set>" }'
+  awk -F= '$1 == "PROTON_BRIDGE_USER" || $1 == "PROTON_BRIDGE_ALIASES" || $1 == "PROTON_IMAP_PORT" { print $1 "=<set>" }'
 ```
 
 For a one-off command in the current shell, explicitly load the non-secret file:
@@ -71,10 +71,11 @@ If every check passes there but `/mcp` still has no tools, fully quit ChatGPT. W
 No. The prepared-terminal command is a one-time diagnostic that proves environment inheritance is
 the remaining problem. After it succeeds, install the
 [persistent per-user menu launcher](troubleshooting.md#make-the-menu-launch-permanent). The normal
-ChatGPT icon will then load `PROTON_BRIDGE_USER` and `PROTON_IMAP_PORT` automatically.
+ChatGPT icon will then load `PROTON_BRIDGE_USER`, optional `PROTON_BRIDGE_ALIASES`, and
+`PROTON_IMAP_PORT` automatically.
 
-The launcher deliberately parses only those two non-secret settings. It does not source arbitrary
-shell code and never reads, stores, or exports the Bridge password.
+The launcher deliberately parses only those non-secret settings. It does not source arbitrary shell
+code and never reads, stores, or exports the Bridge password.
 
 ## Why can restarting ChatGPT from the menu still fail?
 
@@ -95,10 +96,11 @@ the Bridge password in plugin JSON.
 
 ## Which values may go in `environment.d`?
 
-Only the non-secret account identifier and local Bridge port:
+Only the non-secret account identifier, optional sending-alias allowlist, and local Bridge port:
 
 ```ini
 PROTON_BRIDGE_USER=your-address@proton.me
+PROTON_BRIDGE_ALIASES=billing@example.com,legal@example.com
 PROTON_IMAP_PORT=1143
 ```
 

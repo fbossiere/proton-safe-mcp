@@ -51,6 +51,7 @@ def test_plugin_launches_pinned_stdio_server_without_credentials_or_remote_bridg
     ]
 
     env_vars = set(server["env_vars"])
+    assert "PROTON_BRIDGE_ALIASES" in env_vars
     assert "PROTON_BRIDGE_USER" in env_vars
     assert "PROTON_IMAP_PORT" in env_vars
     assert "PROTON_BRIDGE_PASSWORD" not in env_vars
@@ -103,6 +104,7 @@ def test_plugin_docs_are_local_first_and_tunnel_optional():
     assert "env_vars" in guide
     assert "systemctl --user daemon-reload" in guide
     assert "systemd-run --user --wait --pipe" in guide
+    assert "proton_bridge_aliases" in guide
     assert "do not install an unrelated" in guide
 
 
@@ -127,6 +129,7 @@ def test_ubuntu_plugin_install_failures_are_documented():
     assert "exec /usr/bin/chatgpt" in troubleshooting
     assert "environment.d accepts quoted values" in troubleshooting
     assert "never evaluate the file as shell code" in troubleshooting
+    assert "proton_bridge_aliases" in troubleshooting
     assert "do not add `proton_bridge_password`" in troubleshooting
 
 

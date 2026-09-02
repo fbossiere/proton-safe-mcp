@@ -44,6 +44,7 @@ Use this sequence on Ubuntu:
 
    ```ini
    PROTON_BRIDGE_USER=your-address@proton.me
+   PROTON_BRIDGE_ALIASES=billing@example.com,legal@example.com
    PROTON_IMAP_PORT=1143
    ```
 
@@ -57,11 +58,12 @@ Use this sequence on Ubuntu:
 
    ```bash
    systemctl --user show-environment |
-     awk -F= '$1 == "PROTON_BRIDGE_USER" || $1 == "PROTON_IMAP_PORT" { print $1 "=<set>" }'
+     awk -F= '$1 == "PROTON_BRIDGE_USER" || $1 == "PROTON_BRIDGE_ALIASES" || $1 == "PROTON_IMAP_PORT" { print $1 "=<set>" }'
    ```
 
-   Both names must appear. Logging out and back in is not a substitute for this check; the user
-   manager may have retained its earlier environment.
+   The two required names must appear, plus `PROTON_BRIDGE_ALIASES` when configured. Logging out
+   and back in is not a substitute for this check; the user manager may have retained its earlier
+   environment.
 
 5. Test the corrected user-manager environment with the plugin's pinned runtime:
 
@@ -125,9 +127,10 @@ if [ ! -r "$settings_file" ]; then
 fi
 
 proton_bridge_user=""
+proton_bridge_aliases=""
 proton_imap_port=""
 
-# Parse only the two non-secret settings; never evaluate the file as shell code.
+# Parse only the non-secret settings; never evaluate the file as shell code.
 while IFS='=' read -r setting_name setting_value; do
     # environment.d accepts quoted values. Remove one matching outer quote pair
     # without evaluating substitutions, commands, or backslash escapes.
@@ -138,6 +141,7 @@ while IFS='=' read -r setting_name setting_value; do
 
     case "$setting_name" in
         PROTON_BRIDGE_USER) proton_bridge_user=$setting_value ;;
+        PROTON_BRIDGE_ALIASES) proton_bridge_aliases=$setting_value ;;
         PROTON_IMAP_PORT) proton_imap_port=$setting_value ;;
     esac
 done < "$settings_file"
@@ -155,6 +159,7 @@ case "$proton_imap_port" in
 esac
 
 export PROTON_BRIDGE_USER="$proton_bridge_user"
+export PROTON_BRIDGE_ALIASES="$proton_bridge_aliases"
 export PROTON_IMAP_PORT="$proton_imap_port"
 exec /usr/bin/chatgpt "$@"
 ```

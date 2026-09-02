@@ -6,9 +6,10 @@ IMAP password must already be stored with `proton-safe-mcp setup`.
 
 !!! warning "Never configure the Proton password"
 
-    The `env` blocks below contain only the Proton address and Bridge port. Never add your Proton
-    account password, recovery phrase, 2FA secret, hardware-key material, or even the
-    Bridge-generated IMAP password. The server obtains the Bridge credential from the OS keyring.
+    The `env` blocks below contain only non-secret settings: the Proton address, the Bridge port,
+    and the optional sender allowlist. Never add your Proton account password, recovery phrase,
+    2FA secret, hardware-key material, or even the Bridge-generated IMAP password. The server
+    obtains the Bridge credential from the OS keyring.
 
 Find the installed command before configuring a graphical client:
 
@@ -17,6 +18,10 @@ command -v proton-safe-mcp
 ```
 
 Use the returned absolute path wherever an example shows `/absolute/path/to/proton-safe-mcp`.
+
+Each example sets the two values the server needs. To draft as one of your account's other Proton
+addresses, add `PROTON_BRIDGE_ALIASES` alongside `PROTON_BRIDGE_USER` in the same place, as
+comma-separated bare addresses: see [Sender addresses](configuration.md#sender-addresses).
 
 ## ChatGPT and Codex plugin
 
