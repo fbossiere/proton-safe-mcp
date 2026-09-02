@@ -21,6 +21,22 @@ distinguishes bundled local MCP servers (`.mcp.json`) from registered MCP connec
 (`.app.json`). This project supports both deployment shapes without committing an account-specific
 connection ID.
 
+## Choose the draft approval mode
+
+Approval is selected per draft in the conversation; it is not a plugin setting and is not enabled
+by `proton-safe-mcp setup`. The `setup` command only stores the Bridge-generated IMAP password in
+the operating-system keyring.
+
+By default, the plugin presents the exact recipients, subject, body, and attachments for
+confirmation, then calls `create_confirmed_draft`. To use the separate terminal gate for one draft,
+say:
+
+> Use enhanced-security mode with terminal approval for this draft.
+
+The plugin will prepare a pending proposal, return its local approval command, and wait for you to
+run it before creating the Proton draft. See [Draft approval](draft-approval.md) for the complete
+sequence and the `uvx` fallback when the CLI is not installed globally.
+
 ## Choose a deployment
 
 ### ChatGPT desktop and Codex on the Bridge machine
