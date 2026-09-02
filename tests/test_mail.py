@@ -11,7 +11,12 @@ import pytest
 
 from proton_safe_mcp.attachments import Attachment
 from proton_safe_mcp.errors import BridgeError
-from proton_safe_mcp.mail import ProtonBridgeClient, _safe_folder, _safe_search_text
+from proton_safe_mcp.mail import (
+    ProtonBridgeClient,
+    _decode_header,
+    _safe_folder,
+    _safe_search_text,
+)
 
 
 def _client_with(settings, fake_imap):
@@ -886,3 +891,67 @@ def test_append_draft_refuses_a_sender_outside_the_startup_allowlist(settings):
             body_text="Please review.",
             attachments=(),
         )
+
+
+def test_append_draft_carries_the_confirmed_cc_recipients(settings):
+    message = _appended_draft(settings, cc=("cc@example.com", "second@example.com"))
+
+    assert message["Cc"] == "cc@example.com, second@example.com"
+    assert message["To"] == "recipient@example.com"
+
+
+@pytest.mark.parametrize(
+    ("call", "expected"),
+    [
+        (lambda client: client.list_messages(), "Unable to list messages"),
+        (lambda client: client.search_messages("invoice"), "Unable to search messages"),
+    ],
+)
+def test_a_refused_search_is_reported_without_bridge_internals(settings, call, expected):
+    class FakeIMAP:
+        def select(self, _folder, *, readonly):
+            assert readonly is True
+            return "OK", [b"1"]
+
+        def uid(self, _command, *_args):
+            return "NO", [b"SEARCH failed for /home/private/index"]
+
+    with pytest.raises(BridgeError) as caught:
+        call(_client_with(settings, FakeIMAP()))
+
+    assert str(caught.value) == expected
+    assert "/home/private" not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    ("fetch_response", "expected"),
+    [
+        (("NO", [b"FETCH failed for /home/private/store"]), "Unable to read message"),
+        # A well-formed response that carries no message payload at all.
+        (("OK", [b"42 (FLAGS ())"]), "Message not found"),
+    ],
+)
+def test_an_unreadable_fetch_is_reported_for_every_reader(settings, fetch_response, expected):
+    class FakeIMAP:
+        def select(self, _folder, *, readonly):
+            assert readonly is True
+            return "OK", [b"1"]
+
+        def uid(self, _command, *_args):
+            return fetch_response
+
+    client = _client_with(settings, FakeIMAP())
+    for read in (
+        lambda: client.read_message("42"),
+        lambda: client.extract_attachment_text("42", attachment_index=0),
+    ):
+        with pytest.raises(BridgeError) as caught:
+            read()
+        assert str(caught.value) == expected
+        assert "/home/private" not in str(caught.value)
+
+
+def test_an_undecodable_header_is_returned_verbatim_instead_of_raising():
+    # Headers are attacker-controlled: an unknown encoded-word charset must not crash a listing.
+    assert _decode_header("=?x-attacker-charset?B?aGk=?=") == "=?x-attacker-charset?B?aGk=?="
+    assert _decode_header(None) == ""

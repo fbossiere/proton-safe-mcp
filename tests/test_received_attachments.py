@@ -167,3 +167,67 @@ def test_active_or_binary_formats_are_not_extracted():
             max_chars=500,
             max_pages=1,
         )
+
+
+def _fake_pdf(monkeypatch, *page_texts: str) -> None:
+    """Replace PdfReader with a reader whose pages return exactly `page_texts`."""
+
+    class FakePage:
+        def __init__(self, text: str):
+            self.text = text
+
+        def extract_text(self):
+            return self.text
+
+    class FakeReader:
+        def __init__(self):
+            self.is_encrypted = False
+            self.pages = [FakePage(text) for text in page_texts]
+
+    monkeypatch.setattr(
+        "proton_safe_mcp.received_attachments.PdfReader", lambda *_args, **_kwargs: FakeReader()
+    )
+
+
+def test_unknown_attachment_charset_falls_back_to_utf8():
+    # The charset comes from an attacker-controlled MIME header, so an unknown value
+    # must degrade to a UTF-8 read rather than raise.
+    result = ReceivedAttachmentTextExtractor().extract(
+        data="café".encode(),
+        content_type="text/plain",
+        charset="x-attacker-controlled",
+        max_chars=50,
+        max_pages=1,
+    )
+
+    assert result["text"] == "café"
+    assert result["truncated"] is False
+
+
+def test_pdf_extraction_stops_when_the_character_budget_is_spent(monkeypatch):
+    _fake_pdf(monkeypatch, "aaaa", "bbbb")
+
+    result = ReceivedAttachmentTextExtractor().extract(
+        data=b"%PDF-1.7 fake",
+        content_type="application/pdf",
+        charset=None,
+        max_chars=6,
+        max_pages=50,
+    )
+
+    # The second page cannot fit even its separator, so it is reported as truncated.
+    assert result == {"text": "aaaa", "truncated": True, "pages_read": 1, "total_pages": 2}
+
+
+def test_pdf_extraction_truncates_inside_an_oversized_page(monkeypatch):
+    _fake_pdf(monkeypatch, "aaaaaaaa")
+
+    result = ReceivedAttachmentTextExtractor().extract(
+        data=b"%PDF-1.7 fake",
+        content_type="application/pdf",
+        charset=None,
+        max_chars=4,
+        max_pages=50,
+    )
+
+    assert result == {"text": "aaaa", "truncated": True, "pages_read": 1, "total_pages": 1}

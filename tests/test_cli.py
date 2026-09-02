@@ -60,3 +60,13 @@ def test_setup_rejects_mismatched_passwords(env, monkeypatch, capsys):
 
     assert cli.main(["setup"]) == 1
     assert "Passwords do not match" in capsys.readouterr().err
+
+
+def test_serve_runs_the_stdio_server(env, monkeypatch):
+    import proton_safe_mcp.server as server_module
+
+    started: list[bool] = []
+    monkeypatch.setattr(server_module, "run", lambda: started.append(True))
+
+    assert cli.main(["serve"]) == 0
+    assert started == [True]
