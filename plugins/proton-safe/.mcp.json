@@ -12,6 +12,7 @@
         "DBUS_SESSION_BUS_ADDRESS",
         "HOME",
         "PATH",
+        "PROTON_BRIDGE_ALIASES",
         "PROTON_BRIDGE_USER",
         "PROTON_IMAP_PORT",
         "PROTON_MCP_MAX_ATTACHMENT_BYTES",
