@@ -15,7 +15,7 @@
       "version": "latest"
     },
     // The contributor workflow ends at "open a PR", so ship the GitHub CLI too.
-    // It reuses the credentials the Dev Containers extension forwards from the host.
+    // Authenticate it once inside the container as documented in CONTRIBUTING.md.
     "ghcr.io/devcontainers/features/github-cli:1": {
       "version": "latest"
     }
@@ -58,6 +58,6 @@
 
   // Note: to run against a REAL Proton Bridge (not needed for tests), the
   // Bridge listens on 127.0.0.1 on the *host*. From inside the container that
-  // is not reachable directly — you'd run the container with host networking
-  // or point the client at host.docker.internal. Dev/test needs neither.
+  // is not reachable directly. On Linux, use host networking; otherwise run
+  // the server on the host. The Bridge host stays non-configurable by design.
 }

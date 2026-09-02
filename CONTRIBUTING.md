@@ -48,7 +48,9 @@ authentication it needs.
 The container is enough for the full local gate below — the test suite fakes the
 IMAP layer, so no Proton Bridge is required. To run against a *real* Bridge (not
 needed for tests), note it listens on `127.0.0.1` on the **host**, which the
-container cannot reach directly; use host networking or `host.docker.internal`.
+standard container cannot reach. On Linux, a container explicitly started with
+host networking can preserve that loopback boundary; otherwise, run the server
+directly on the host. The Bridge host deliberately remains non-configurable.
 
 ## Before opening a PR
 
@@ -94,7 +96,8 @@ git -c credential.helper='!f() { test "$1" = get \
   && echo "password=$(gh auth token)"; }; f' push -u origin HEAD
 ```
 
-Then open the PR against `main`:
+If the one-off command above already pushed the branch, skip the first command;
+then open the PR against `main`:
 
 ```bash
 git push -u origin HEAD

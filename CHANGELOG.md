@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented how to open a pull request from the dev container in `CONTRIBUTING.md`, including the
   one-time `gh` authentication and why the protocol must be HTTPS without a mounted SSH key.
 
+### Changed
+
+- Clarified that terminal approval is selected per draft in the conversation, is unrelated to
+  `proton-safe-mcp setup`, and can use the pinned `uvx` command when the CLI is not installed
+  globally.
+
 ## [1.2.0] - 2026-09-02
 
 ### Added

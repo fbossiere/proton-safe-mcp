@@ -404,7 +404,7 @@ def test_append_draft_keeps_bcc_and_attachment_but_never_sends(settings):
     assert result["sent"] is False
 
 
-def test_append_draft_failure_surfaces_a_bounded_bridge_error(settings):
+def test_append_draft_failure_surfaces_the_bridge_response(settings):
     class FakeIMAP:
         def append(self, _folder, _flags, _date_time, _payload):
             return "NO", [b"Over quota"]

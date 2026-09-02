@@ -64,13 +64,21 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
 
     tools = asyncio.run(inspect_tools())
     by_name = {tool.name: tool for tool in tools}
-    assert "send_message" not in by_name
-    assert "send_email" not in by_name
-    assert "download_attachment" not in by_name
-    assert "extract_attachment_text" in by_name
-    assert "create_confirmed_draft" in by_name
-    assert "prepare_draft" in by_name
-    assert "commit_approved_draft" in by_name
+    assert set(by_name) == {
+        "mailbox_status",
+        "list_folders",
+        "list_messages",
+        "search_messages",
+        "read_message",
+        "extract_attachment_text",
+        "begin_attachment_upload",
+        "upload_attachment_chunk",
+        "finish_attachment_upload",
+        "discard_attachment",
+        "create_confirmed_draft",
+        "prepare_draft",
+        "commit_approved_draft",
+    }
     assert by_name["read_message"].annotations.readOnlyHint is True
     assert by_name["extract_attachment_text"].annotations.readOnlyHint is True
     assert by_name["discard_attachment"].annotations.destructiveHint is True
@@ -84,6 +92,9 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
     assert "attachment_index" in extraction_schema["properties"]
     assert "path" not in extraction_schema["properties"]
     assert "filename" not in extraction_schema["properties"]
+
+    for tool in tools:
+        assert "path" not in tool.inputSchema.get("properties", {})
 
     direct_schema = by_name["create_confirmed_draft"].inputSchema
     assert "user_confirmed" in direct_schema["required"]
