@@ -30,6 +30,28 @@ uv sync --extra dev
 
 You do not need Proton Bridge to develop: the test suite fakes the IMAP layer.
 
+### Dev container (optional)
+
+A [dev container](.devcontainer/devcontainer.json) is provided for a zero-setup,
+CI-matching environment (Python 3.12 + [uv](https://docs.astral.sh/uv/)). It runs
+`uv sync --frozen --extra dev --extra docs` on create, so ruff, mypy, pytest,
+pip-audit and mkdocs are all ready. The GitHub CLI (`gh`) is included so you can
+open a pull request without leaving the container — see
+[Opening the pull request](#opening-the-pull-request) for the one-time
+authentication it needs.
+
+- **VS Code**: install the *Dev Containers* extension, open the repo, then run
+  **Dev Containers: Reopen in Container** from the command palette.
+- **GitHub Codespaces**: **Code → Create codespace on `main`**.
+- **CLI**: `devcontainer up --workspace-folder .` (from `@devcontainers/cli`).
+
+The container is enough for the full local gate below — the test suite fakes the
+IMAP layer, so no Proton Bridge is required. To run against a *real* Bridge (not
+needed for tests), note it listens on `127.0.0.1` on the **host**, which the
+standard container cannot reach. On Linux, a container explicitly started with
+host networking can preserve that loopback boundary; otherwise, run the server
+directly on the host. The Bridge host deliberately remains non-configurable.
+
 ## Before opening a PR
 
 Run the full local gate — it matches CI exactly:
@@ -49,6 +71,42 @@ Guidelines:
 - **Keep dependencies minimal.** The runtime dependency set is deliberately tiny. Adding a dependency needs a strong justification; `pypdf` exists solely for in-memory, bounded PDF text extraction.
 - **Update `CHANGELOG.md`** under the `[Unreleased]` heading using the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) categories.
 - Keep commits focused; one logical change per PR.
+
+### Opening the pull request
+
+The dev container ships `gh` but deliberately carries no credentials, so the
+first push needs a one-time authentication. **Choose HTTPS when `gh auth login`
+asks for a protocol**, unless you have mounted an SSH key into the container:
+picking SSH configures a protocol that has no key to use, and the push then
+fails with `could not read Username for 'https://github.com'`.
+
+```bash
+gh auth login        # GitHub.com -> HTTPS -> login with a web browser
+gh auth setup-git    # register gh as git's credential helper for github.com
+```
+
+VS Code injects its own credential helper into the container, which relays to
+the host and returns nothing when the host has no stored GitHub credential.
+`gh auth setup-git` takes precedence for `github.com`, which is what makes
+`git push` work. To push once without changing your git config:
+
+```bash
+git -c credential.helper='!f() { test "$1" = get \
+  && echo username=x-access-token \
+  && echo "password=$(gh auth token)"; }; f' push -u origin HEAD
+```
+
+If the one-off command above already pushed the branch, skip the first command;
+then open the PR against `main`:
+
+```bash
+git push -u origin HEAD
+gh pr create --base main --fill
+```
+
+Prefer `--body-file` over `--fill` when the change needs more explanation than
+the commit messages carry — reviewers read the PR body for *why* a rejection
+path or a validation rule is shaped the way it is.
 
 ## Reporting bugs
 
