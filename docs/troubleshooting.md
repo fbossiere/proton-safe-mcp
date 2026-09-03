@@ -70,7 +70,7 @@ Use this sequence on Ubuntu:
 
    ```bash
    systemd-run --user --wait --pipe \
-     uvx --from proton-safe-mcp==2.0.1 proton-safe-mcp doctor
+     uvx --from proton-safe-mcp==2.0.2 proton-safe-mcp doctor
    ```
 
    This privacy-safe command separates environment, keyring, and Bridge failures before ChatGPT is
@@ -224,7 +224,7 @@ Use this privacy-safe sequence on Ubuntu:
 
    ```bash
    systemd-run --user --wait --pipe \
-     uvx --from proton-safe-mcp==2.0.1 proton-safe-mcp doctor
+     uvx --from proton-safe-mcp==2.0.2 proton-safe-mcp doctor
    ```
 
    `doctor` should report a primary address plus the configured alias count. If it reports the
