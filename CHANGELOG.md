@@ -34,7 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   found in `Reply-To`, `From`, `To`, and `Cc` — each labelled with its header and flagged when
   it is one of the configured senders — and the body as a bounded `> ` quote. Every value is a
   suggestion drawn from untrusted headers: no address it reports is a confirmed recipient, and
-  the draft tool still takes its recipients as explicit inputs.
+  the draft tool still takes its recipients as explicit inputs. The `message_id` it reports is
+  validated first and comes back empty when the message carries nothing a reply can thread on,
+  so a draft is never refused over it after the user already confirmed one.
 
 ### Fixed
 

@@ -120,6 +120,20 @@ def _header_text(message: Message, name: str) -> str:
         return ""
 
 
+def _threadable_message_id(message: Message) -> str:
+    """Return the Message-ID a reply may thread on, or "" when there is none usable.
+
+    ``create_confirmed_draft`` revalidates and reverifies this value, so reporting one it
+    would reject just moves the failure to after the user confirmed a draft. An empty value
+    says up front that this message cannot be threaded onto, which leaves an untargeted
+    draft as the honest fallback rather than a refused write.
+    """
+    try:
+        return validate_message_id(_header_text(message, "Message-ID"))
+    except ProtonMCPError:
+        return ""
+
+
 def _decode_header(value: str | None) -> str:
     if not value:
         return ""
@@ -357,7 +371,7 @@ class ProtonBridgeClient:
             return {
                 "uid": uid,
                 "folder": folder,
-                "message_id": _header_text(message, "Message-ID"),
+                "message_id": _threadable_message_id(message),
                 "subject": subject,
                 "suggested_subject": _reply_subject(subject),
                 "date": message.get("Date", ""),

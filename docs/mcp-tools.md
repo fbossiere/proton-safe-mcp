@@ -78,7 +78,9 @@ extraction](received-attachments.md) for supported and rejected cases.
 
 Returns everything composing a reply needs, and returns all of it as *suggestions*:
 
-- `message_id` — the parent's identifier, to pass back as `reply_to_message_id`;
+- `message_id` — the parent's identifier, to pass back as `reply_to_message_id`. It is validated
+  before being reported, and comes back empty when the message carries nothing a reply can thread
+  on, so a draft is never refused over it after the user already confirmed one;
 - `suggested_subject` — the subject with one `Re: ` prefix, not stacked onto an existing one,
   whitespace collapsed, and bounded to what a draft accepts as a subject;
 - `candidate_recipients` — the bare addresses found in `Reply-To`, `From`, `To`, and `Cc`, each
@@ -147,6 +149,10 @@ Threading headers are the entire contribution. The reply target supplies **no re
 subject, and no body**: `to`, `cc`, `bcc`, `subject`, and `body_text` stay exactly the values the
 user confirmed. In particular, the quote from `get_reply_context` reaches the draft only by being
 part of the `body_text` the user confirmed — the server never appends anything to a body.
+
+When `get_reply_context` reports an empty `message_id`, that message cannot be threaded onto.
+Create the draft without a reply target instead — everything else about it, including the quote,
+still works.
 
 `reply_to_message_id` is a required assertion, not a convenience. At the IMAP write the server
 re-reads the headers of the message at `reply_to_uid` and refuses the draft unless it still

@@ -34,7 +34,12 @@ def resolve_reply_target(
     reply_to_folder: str | None,
     reply_to_message_id: str | None,
 ) -> tuple[str | None, str | None, str | None]:
-    """Validate the reply-threading inputs, which are all three present or all three absent.
+    """Validate the reply-threading inputs and return them resolved.
+
+    ``reply_to_uid`` and ``reply_to_message_id`` are both present or both absent, because a
+    UID identifies which message to thread onto and the identifier is what binds that to the
+    message the user confirmed. ``reply_to_folder`` is optional alongside them, defaulting to
+    INBOX, and is rejected on its own.
 
     Threading is the whole of what replying adds. The parent message contributes no
     recipient, no subject, and no body here: those stay explicit, confirmed inputs.

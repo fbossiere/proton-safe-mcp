@@ -1222,7 +1222,9 @@ def test_reply_context_never_claims_a_recipient_is_confirmed(settings):
 
     assert "to" not in context
     assert "cc" not in context
-    assert all("confirmed" not in item for item in context["candidate_recipients"][0])
+    # A candidate carries its address, where it was found, and whether it is the user's own.
+    # No field of it says, or could be read as saying, that it is a chosen recipient.
+    assert set(context["candidate_recipients"][0]) == {"address", "header", "is_own_address"}
 
 
 def test_reply_context_bounds_the_quote_and_reports_the_truncation(settings):
@@ -1353,4 +1355,36 @@ def test_a_crafted_identifier_does_not_abort_a_listing_or_a_read(settings):
     # parses. What matters on every version is that the surrounding read still completes.
     assert summaries[0]["message_id"] in ("", "<>")
     assert client.read_message("7")["message_id"] in ("", "<>")
-    assert client.fetch_reply_context("7")["message_id"] in ("", "<>")
+    # The reply context reports it as unusable on every version, rather than handing back an
+    # identifier the draft tool would reject after the user had confirmed a draft.
+    assert client.fetch_reply_context("7")["message_id"] == ""
+
+
+@pytest.mark.parametrize("raw_identifier", ["<>", "not-an-id", "<with space@example.com>"])
+def test_reply_context_reports_an_unusable_identifier_as_empty_but_still_answers(
+    settings, raw_identifier
+):
+    # Replying in-thread is off the table, but reading, quoting, and drafting an untargeted
+    # answer are not, so the rest of the context still comes back.
+    raw = (
+        f"From: christophe@example.com\r\n"
+        f"Subject: Probleme appartement\r\n"
+        f"Message-ID: {raw_identifier}\r\n\r\n"
+        f"Body text"
+    ).encode()
+
+    class FakeIMAP:
+        def select(self, _folder, *, readonly):
+            return "OK", [b"1"]
+
+        def uid(self, _command, _uid, _fields):
+            return "OK", [(b"42 (BODY[]", raw), b")"]
+
+    context = _client_with(settings, FakeIMAP()).fetch_reply_context("42")
+
+    assert context["message_id"] == ""
+    assert context["suggested_subject"] == "Re: Probleme appartement"
+    assert context["quoted_body"] == "> Body text"
+    assert context["candidate_recipients"] == [
+        {"address": "christophe@example.com", "header": "From", "is_own_address": False}
+    ]
