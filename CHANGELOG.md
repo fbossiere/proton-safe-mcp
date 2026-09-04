@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suggestion drawn from untrusted headers: no address it reports is a confirmed recipient, and
   the draft tool still takes its recipients as explicit inputs.
 
+### Fixed
+
+- A received message whose `Message-ID` header is `<>` or `<` no longer aborts the read that
+  touched it on Python 3.11, where the standard library's structured-header parser raises
+  `IndexError` on both shapes. `list_messages` and `search_messages` read that header for every
+  message they summarize, so one crafted message took out the whole listing rather than just
+  itself, and the error surfaced as an internal failure instead of a validation error. Header
+  reads now report an unparsable value as absent. Python 3.12 and later parse both shapes and
+  were unaffected.
+
 ## [2.0.2] - 2026-09-02
 
 ### Fixed

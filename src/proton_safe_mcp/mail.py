@@ -106,6 +106,20 @@ def _quoted_body(text: str, max_chars: int) -> tuple[str, bool]:
     return quoted, len(text) > max_chars
 
 
+def _header_text(message: Message, name: str) -> str:
+    """Return one header as stripped text, or "" when the stdlib cannot parse it.
+
+    A crafted ``Message-ID: <>`` or ``Message-ID: <`` makes the email package's structured
+    header parser raise IndexError on Python 3.11. Headers are attacker-controlled, so an
+    unparsable one is reported as absent rather than aborting the read that touched it —
+    which for a listing would otherwise be every message, not just the crafted one.
+    """
+    try:
+        return str(message.get(name, "")).strip()
+    except (IndexError, ValueError, TypeError):
+        return ""
+
+
 def _decode_header(value: str | None) -> str:
     if not value:
         return ""
@@ -264,7 +278,7 @@ class ProtonBridgeClient:
                 "cc": _decode_header(message.get("Cc")),
                 "subject": _decode_header(message.get("Subject")),
                 "date": message.get("Date", ""),
-                "message_id": message.get("Message-ID", ""),
+                "message_id": _header_text(message, "Message-ID"),
                 "body_text": body[:max_chars],
                 "truncated": truncated,
                 "attachments": self._attachment_metadata(message),
@@ -343,7 +357,7 @@ class ProtonBridgeClient:
             return {
                 "uid": uid,
                 "folder": folder,
-                "message_id": str(message.get("Message-ID", "")).strip(),
+                "message_id": _header_text(message, "Message-ID"),
                 "subject": subject,
                 "suggested_subject": _reply_subject(subject),
                 "date": message.get("Date", ""),
@@ -484,7 +498,7 @@ class ProtonBridgeClient:
         if raw is None:
             raise BridgeError("The message being replied to was not found")
         header = BytesParser(policy=policy.default).parsebytes(raw)
-        raw_parent_id = str(header.get("Message-ID", "")).strip()
+        raw_parent_id = _header_text(header, "Message-ID")
         if not raw_parent_id:
             raise BridgeError("The message being replied to carries no Message-ID to thread on")
         parent_id = validate_message_id(raw_parent_id, error=BridgeError)
@@ -493,7 +507,7 @@ class ProtonBridgeClient:
                 "The message at that UID no longer carries reply_to_message_id. Re-read the "
                 "message and confirm the reply again."
             )
-        return build_references(parse_message_ids(header.get("References")), parent_id)
+        return build_references(parse_message_ids(_header_text(header, "References")), parent_id)
 
     def _candidate_recipients(self, message: Message) -> list[dict[str, Any]]:
         """List the bare addresses found in the reply-relevant headers, as suggestions only.
@@ -574,7 +588,7 @@ class ProtonBridgeClient:
             "to": _decode_header(message.get("To")),
             "subject": _decode_header(message.get("Subject")),
             "date": message.get("Date", ""),
-            "message_id": message.get("Message-ID", ""),
+            "message_id": _header_text(message, "Message-ID"),
             "unread": "\\Seen" not in metadata,
             "size_bytes": int(size_match.group(1)) if size_match else None,
         }

@@ -16,6 +16,7 @@ from proton_safe_mcp.mail import (
     MAX_SUBJECT_CHARS,
     ProtonBridgeClient,
     _decode_header,
+    _header_text,
     _reply_subject,
     _safe_folder,
     _safe_search_text,
@@ -1096,7 +1097,6 @@ def test_a_reply_is_refused_when_the_parent_carries_no_identifier(settings):
         b"Message-ID: not-an-id\r\n\r\n",
         b"Message-ID: <with space@example.com>\r\n\r\n",
         b"Message-ID: <a<b@example.com>\r\n\r\n",
-        b"Message-ID: <>\r\n\r\n",
     ],
 )
 def test_a_parent_identifier_that_is_not_header_safe_is_refused(settings, raw_header):
@@ -1290,3 +1290,67 @@ def test_a_long_reference_chain_survives_header_folding_intact(settings):
         "<parent@example.com>",
     )
     assert result["references_count"] == 16
+
+
+@pytest.mark.parametrize("raw_header", [b"Message-ID: <>\r\n\r\n", b"Message-ID: <\r\n\r\n"])
+def test_a_reply_to_an_unparsable_parent_identifier_is_refused(settings, raw_header):
+    # These two shapes make the stdlib's Message-ID parser raise on Python 3.11 and parse to
+    # a non-header-safe value on 3.12+, so the refusal reason differs by version. What must
+    # hold on every version is that the reply is refused and nothing is written.
+    fake = _ReplyIMAP(raw_header)
+
+    with pytest.raises(BridgeError):
+        _client_with(settings, fake).append_draft(
+            **_reply_fields(settings, reply_to_message_id="<>")
+        )
+
+    assert fake.payload is None
+
+
+@pytest.mark.parametrize("raw_header", [b"Message-ID: <>\r\n\r\n", b"Message-ID: <\r\n\r\n"])
+def test_a_crafted_identifier_header_never_raises_on_read(raw_header):
+    # These two shapes make the stdlib's Message-ID parser raise IndexError on Python 3.11
+    # and parse to a non-header-safe value on 3.12+. Reading one must not raise on either,
+    # because a listing reads this header for every message it summarizes.
+    message = BytesParser(policy=policy.default).parsebytes(raw_header)
+
+    assert _header_text(message, "Message-ID") in ("", "<>", "<")
+
+
+def test_a_header_the_stdlib_cannot_parse_reads_as_absent():
+    class RaisingMessage:
+        def get(self, _name, _default=""):
+            raise IndexError("list index out of range")
+
+    assert _header_text(RaisingMessage(), "Message-ID") == ""
+
+
+def test_a_crafted_identifier_does_not_abort_a_listing_or_a_read(settings):
+    raw = (
+        b"From: sender@example.com\r\n"
+        b"Subject: Crafted identifier\r\n"
+        b"Message-ID: <>\r\n\r\n"
+        b"Body text"
+    )
+
+    class FakeIMAP:
+        def select(self, _folder, *, readonly):
+            return "OK", [b"1"]
+
+        def uid(self, command, *args):
+            if command == "SEARCH":
+                return "OK", [b"7"]
+            return "OK", [(b"7 (BODY[]", raw), b" FLAGS () RFC822.SIZE 99)"]
+
+    client = _client_with(settings, FakeIMAP())
+
+    summaries = client.list_messages(limit=1)
+
+    assert len(summaries) == 1
+    assert summaries[0]["from"] == "sender@example.com"
+    assert summaries[0]["subject"] == "Crafted identifier"
+    # Reported as absent where the stdlib parser raises on it, as the raw value where it
+    # parses. What matters on every version is that the surrounding read still completes.
+    assert summaries[0]["message_id"] in ("", "<>")
+    assert client.read_message("7")["message_id"] in ("", "<>")
+    assert client.fetch_reply_context("7")["message_id"] in ("", "<>")
