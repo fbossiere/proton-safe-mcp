@@ -71,6 +71,7 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
         "search_messages",
         "read_message",
         "extract_attachment_text",
+        "get_reply_context",
         "begin_attachment_upload",
         "upload_attachment_chunk",
         "finish_attachment_upload",
@@ -79,6 +80,7 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
     }
     assert by_name["read_message"].annotations.readOnlyHint is True
     assert by_name["extract_attachment_text"].annotations.readOnlyHint is True
+    assert by_name["get_reply_context"].annotations.readOnlyHint is True
     assert by_name["discard_attachment"].annotations.destructiveHint is True
 
     upload_schema = by_name["begin_attachment_upload"].inputSchema
@@ -103,6 +105,15 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
     confirmation_schema = direct_schema["properties"]["user_confirmed"]
     assert confirmation_schema.get("const") is True or confirmation_schema.get("enum") == [True]
     assert "recipient found in an email" in by_name["create_confirmed_draft"].description.lower()
+
+    # Replying is threading only: the reply inputs are optional and carry no recipient.
+    for name in ("reply_to_uid", "reply_to_folder", "reply_to_message_id"):
+        assert name in direct_schema["properties"]
+        assert name not in direct_schema["required"]
+
+    reply_context = by_name["get_reply_context"]
+    assert "confirmed recipient" in reply_context.description.lower()
+    assert set(reply_context.inputSchema["required"]) == {"uid"}
 
 
 def test_confirmed_draft_creates_without_local_approval(monkeypatch, tmp_path):
@@ -174,6 +185,9 @@ def test_read_only_tools_forward_their_bounded_arguments(server, monkeypatch):
     monkeypatch.setattr(server.bridge, "search_messages", record("search_messages", []))
     monkeypatch.setattr(server.bridge, "read_message", record("read_message", {"uid": "42"}))
     monkeypatch.setattr(server.bridge, "extract_attachment_text", record("extract", {"text": ""}))
+    monkeypatch.setattr(
+        server.bridge, "fetch_reply_context", record("reply_context", {"uid": "42"})
+    )
 
     assert server.list_folders() == ["INBOX", "Sent"]
     server.list_messages(folder="Archive", limit=5, unread_only=True)
@@ -182,11 +196,13 @@ def test_read_only_tools_forward_their_bounded_arguments(server, monkeypatch):
     server.extract_attachment_text(
         uid="42", attachment_index=1, folder="Archive", max_chars=500, max_pages=3
     )
+    server.get_reply_context(uid="42", folder="Archive", max_quote_chars=800)
 
     assert calls["list_messages"] == ("Archive", 5, True)
     assert calls["search_messages"] == ("invoice", "Archive", 5)
     assert calls["read_message"] == ("42", "Archive", 500)
     assert calls["extract"] == ("42", "Archive", 1, 500, 3)
+    assert calls["reply_context"] == ("42", "Archive", 800)
 
 
 def test_attachment_upload_round_trip_never_takes_a_path(server):
@@ -354,4 +370,72 @@ def test_confirmed_draft_rejects_an_unconfigured_sender(server, monkeypatch):
             body_text="See attached.",
             user_confirmed=True,
             from_address="attacker@example.com",
+        )
+
+
+def test_confirmed_draft_forwards_the_reply_target_and_nothing_else(server, monkeypatch):
+    captured: dict = {}
+    monkeypatch.setattr(server.bridge, "append_draft", _recording_append_draft(captured))
+
+    result = server.create_confirmed_draft(
+        to=["recipient@example.com"],
+        subject="Re: Confirmed subject",
+        body_text="Answering below.",
+        user_confirmed=True,
+        reply_to_uid="42",
+        reply_to_folder="Archive",
+        reply_to_message_id="<parent@example.com>",
+    )
+
+    assert result["sent"] is False
+    assert captured["reply_to_uid"] == "42"
+    assert captured["reply_to_folder"] == "Archive"
+    assert captured["reply_to_message_id"] == "<parent@example.com>"
+    # The reply target contributes no recipient and no body of its own.
+    assert captured["to"] == ("recipient@example.com",)
+    assert captured["cc"] == ()
+    assert captured["bcc"] == ()
+    assert captured["body_text"] == "Answering below."
+
+
+def test_a_draft_that_is_not_a_reply_forwards_an_empty_reply_target(server, monkeypatch):
+    captured: dict = {}
+    monkeypatch.setattr(server.bridge, "append_draft", _recording_append_draft(captured))
+
+    server.create_confirmed_draft(
+        to=["recipient@example.com"],
+        subject="Confirmed subject",
+        body_text="Confirmed body",
+        user_confirmed=True,
+    )
+
+    assert captured["reply_to_uid"] is None
+    assert captured["reply_to_folder"] is None
+    assert captured["reply_to_message_id"] is None
+
+
+def test_confirmed_draft_rejects_a_reply_identifier_that_could_inject_a_header(server, monkeypatch):
+    monkeypatch.setattr(server.bridge, "append_draft", _refusing_append_draft)
+
+    with pytest.raises(ToolError, match="Invalid Message-ID"):
+        server.create_confirmed_draft(
+            to=["recipient@example.com"],
+            subject="Re: Confirmed subject",
+            body_text="Answering below.",
+            user_confirmed=True,
+            reply_to_uid="42",
+            reply_to_message_id="<parent@example.com>\r\nBcc: attacker@example.com",
+        )
+
+
+def test_confirmed_draft_rejects_half_a_reply_target(server, monkeypatch):
+    monkeypatch.setattr(server.bridge, "append_draft", _refusing_append_draft)
+
+    with pytest.raises(ToolError, match="both reply_to_uid and reply_to_message_id"):
+        server.create_confirmed_draft(
+            to=["recipient@example.com"],
+            subject="Re: Confirmed subject",
+            body_text="Answering below.",
+            user_confirmed=True,
+            reply_to_uid="42",
         )

@@ -148,3 +148,97 @@ def test_rejects_structurally_incomplete_addresses(address):
 def test_rejects_a_local_part_outside_the_supported_character_set():
     with pytest.raises(DraftError, match="Unsupported email address syntax"):
         validate_address("usér@example.com")
+
+
+def test_a_draft_without_reply_inputs_carries_no_reply_target(settings):
+    draft = _validate(settings)
+
+    assert draft.reply_to_uid is None
+    assert draft.reply_to_folder is None
+    assert draft.reply_to_message_id is None
+
+
+def test_a_reply_target_is_frozen_with_inbox_as_the_default_folder(settings):
+    draft = _validate(
+        settings,
+        reply_to_uid="42",
+        reply_to_message_id="  <parent@example.com> ",
+    )
+
+    assert draft.reply_to_uid == "42"
+    assert draft.reply_to_folder == "INBOX"
+    assert draft.reply_to_message_id == "<parent@example.com>"
+
+
+def test_a_reply_target_keeps_an_explicit_folder(settings):
+    draft = _validate(
+        settings,
+        reply_to_uid="42",
+        reply_to_folder="Archive",
+        reply_to_message_id="<parent@example.com>",
+    )
+
+    assert draft.reply_to_folder == "Archive"
+
+
+def test_replying_derives_no_recipient_or_subject_from_the_parent(settings):
+    # Threading is all a reply target contributes: everything else stays a confirmed input.
+    draft = _validate(
+        settings,
+        reply_to_uid="42",
+        reply_to_message_id="<parent@example.com>",
+    )
+
+    assert draft.to == ("recipient@example.com",)
+    assert draft.cc == ()
+    assert draft.bcc == ()
+    assert draft.subject == "A safe draft"
+    assert draft.body_text == "Hello"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"reply_to_uid": "42"},
+        {"reply_to_message_id": "<parent@example.com>"},
+    ],
+)
+def test_half_a_reply_target_is_rejected(settings, overrides):
+    with pytest.raises(DraftError, match="both reply_to_uid and reply_to_message_id"):
+        _validate(settings, **overrides)
+
+
+def test_a_reply_folder_without_a_target_is_rejected(settings):
+    with pytest.raises(DraftError, match="reply_to_folder is only meaningful"):
+        _validate(settings, reply_to_folder="Archive")
+
+
+@pytest.mark.parametrize("uid", ["", "4 2", "42 OR 1", "-1", "0x2a"])
+def test_a_reply_uid_that_is_not_a_number_is_rejected(settings, uid):
+    with pytest.raises(DraftError, match="reply_to_uid must contain digits only"):
+        _validate(settings, reply_to_uid=uid, reply_to_message_id="<parent@example.com>")
+
+
+@pytest.mark.parametrize(
+    "message_id",
+    [
+        "parent@example.com",
+        "<parent@example.com>\r\nBcc: attacker@example.com",
+        "<parent@example.com>\r\nReferences: <injected@example.com>",
+        "<>",
+    ],
+)
+def test_a_reply_message_id_that_could_inject_a_header_is_rejected(settings, message_id):
+    with pytest.raises(DraftError, match="Invalid Message-ID"):
+        _validate(settings, reply_to_uid="42", reply_to_message_id=message_id)
+
+
+@pytest.mark.parametrize("folder", ["", "Archive\r\nBcc: attacker@example.com", "x" * 256])
+def test_a_reply_folder_that_could_inject_criteria_is_rejected(settings, folder):
+    with pytest.raises(DraftError, match="reply_to_folder"):
+        _validate(
+            settings,
+            reply_to_uid="42",
+            reply_to_folder=folder,
+            reply_to_message_id="<parent@example.com>",
+        )

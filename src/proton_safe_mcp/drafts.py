@@ -8,6 +8,9 @@ from .addresses import validate_address
 from .attachments import Attachment
 from .config import Settings
 from .errors import DraftError
+from .message_ids import validate_message_id
+
+MAX_FOLDER_CHARS = 255
 
 
 def resolve_sender(settings: Settings, value: str | None) -> str:
@@ -25,6 +28,41 @@ def resolve_sender(settings: Settings, value: str | None) -> str:
     )
 
 
+def resolve_reply_target(
+    *,
+    reply_to_uid: str | None,
+    reply_to_folder: str | None,
+    reply_to_message_id: str | None,
+) -> tuple[str | None, str | None, str | None]:
+    """Validate the reply-threading inputs and return them resolved.
+
+    ``reply_to_uid`` and ``reply_to_message_id`` are both present or both absent, because a
+    UID identifies which message to thread onto and the identifier is what binds that to the
+    message the user confirmed. ``reply_to_folder`` is optional alongside them, defaulting to
+    INBOX, and is rejected on its own.
+
+    Threading is the whole of what replying adds. The parent message contributes no
+    recipient, no subject, and no body here: those stay explicit, confirmed inputs.
+    """
+    if reply_to_uid is None and reply_to_message_id is None:
+        if reply_to_folder is not None:
+            raise DraftError(
+                "reply_to_folder is only meaningful with reply_to_uid and reply_to_message_id"
+            )
+        return None, None, None
+    if reply_to_uid is None or reply_to_message_id is None:
+        raise DraftError(
+            "Replying in a thread requires both reply_to_uid and reply_to_message_id, copied "
+            "from the same get_reply_context result"
+        )
+    if not reply_to_uid.isdigit():
+        raise DraftError("reply_to_uid must contain digits only")
+    folder = "INBOX" if reply_to_folder is None else reply_to_folder
+    if not folder or "\r" in folder or "\n" in folder or len(folder) > MAX_FOLDER_CHARS:
+        raise DraftError("reply_to_folder contains a line break or is too long")
+    return reply_to_uid, folder, validate_message_id(reply_to_message_id)
+
+
 @dataclass(frozen=True, slots=True)
 class DraftContent:
     from_address: str
@@ -35,6 +73,9 @@ class DraftContent:
     body_text: str
     attachment_tokens: tuple[str, ...]
     attachments: tuple[Attachment, ...]
+    reply_to_uid: str | None = None
+    reply_to_folder: str | None = None
+    reply_to_message_id: str | None = None
 
 
 def validate_draft(
@@ -48,9 +89,17 @@ def validate_draft(
     body_text: str,
     attachment_tokens: list[str],
     attachments: list[Attachment],
+    reply_to_uid: str | None = None,
+    reply_to_folder: str | None = None,
+    reply_to_message_id: str | None = None,
 ) -> DraftContent:
     """Validate and freeze the exact content of a draft before any IMAP write."""
     sender = resolve_sender(settings, from_address)
+    reply_uid, reply_folder, reply_message_id = resolve_reply_target(
+        reply_to_uid=reply_to_uid,
+        reply_to_folder=reply_to_folder,
+        reply_to_message_id=reply_to_message_id,
+    )
     recipients = tuple(validate_address(item) for item in to)
     cc_values = tuple(validate_address(item) for item in cc)
     bcc_values = tuple(validate_address(item) for item in bcc)
@@ -79,4 +128,7 @@ def validate_draft(
         body_text=body_text,
         attachment_tokens=tuple(attachment_tokens),
         attachments=tuple(attachments),
+        reply_to_uid=reply_uid,
+        reply_to_folder=reply_folder,
+        reply_to_message_id=reply_message_id,
     )
