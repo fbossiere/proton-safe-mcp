@@ -30,7 +30,7 @@ Stop and explain the missing prerequisite if any of these requirements is not me
 Install the reviewed release:
 
 ```bash
-uv tool install proton-safe-mcp==2.0.2
+uv tool install proton-safe-mcp==2.0.3
 ```
 
 Find the executable path:
