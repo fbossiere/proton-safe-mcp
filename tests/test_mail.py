@@ -12,11 +12,15 @@ import pytest
 from proton_safe_mcp.attachments import Attachment
 from proton_safe_mcp.errors import BridgeError
 from proton_safe_mcp.mail import (
+    MAX_CANDIDATE_RECIPIENTS,
+    MAX_SUBJECT_CHARS,
     ProtonBridgeClient,
     _decode_header,
+    _reply_subject,
     _safe_folder,
     _safe_search_text,
 )
+from proton_safe_mcp.message_ids import parse_message_ids
 
 
 def _client_with(settings, fake_imap):
@@ -955,3 +959,334 @@ def test_an_undecodable_header_is_returned_verbatim_instead_of_raising():
     # Headers are attacker-controlled: an unknown encoded-word charset must not crash a listing.
     assert _decode_header("=?x-attacker-charset?B?aGk=?=") == "=?x-attacker-charset?B?aGk=?="
     assert _decode_header(None) == ""
+
+
+def _parent_headers(
+    *, message_id: str | None = "<parent@example.com>", references: str | None = None
+) -> bytes:
+    lines = []
+    if message_id is not None:
+        lines.append(f"Message-ID: {message_id}")
+    if references is not None:
+        lines.append(f"References: {references}")
+    return ("\r\n".join(lines) + "\r\n\r\n").encode()
+
+
+class _ReplyIMAP:
+    """A Bridge double that answers the parent-header fetch and records the APPEND."""
+
+    def __init__(self, header_bytes: bytes = b"", *, fetch_status: str = "OK"):
+        self.header_bytes = header_bytes
+        self.fetch_status = fetch_status
+        self.selected: list[str] = []
+        self.fetched: list[tuple[str, str, str]] = []
+        self.payload: bytes | None = None
+
+    def select(self, folder, *, readonly):
+        assert readonly is True
+        self.selected.append(folder)
+        return "OK", [b"1"]
+
+    def uid(self, command, uid, fields):
+        self.fetched.append((command, uid, fields))
+        if self.fetch_status != "OK":
+            return self.fetch_status, [b"FETCH failed"]
+        return "OK", [(b"1 (BODY[HEADER.FIELDS]", self.header_bytes), b")"]
+
+    def append(self, _folder, _flags, _date_time, payload):
+        self.payload = payload
+        return "OK", [b"APPEND completed"]
+
+
+def _reply_fields(settings, **overrides):
+    fields = {
+        "from_address": settings.default_sender,
+        "to": ("recipient@example.com",),
+        "cc": (),
+        "bcc": (),
+        "subject": "Re: Project brief",
+        "body_text": "Answering below.",
+        "attachments": (),
+        "reply_to_uid": "42",
+        "reply_to_message_id": "<parent@example.com>",
+    }
+    fields.update(overrides)
+    return fields
+
+
+def test_a_reply_threads_on_the_parent_and_extends_its_reference_chain(settings):
+    fake = _ReplyIMAP(_parent_headers(references="<root@example.com> <mid@example.com>"))
+
+    result = _client_with(settings, fake).append_draft(**_reply_fields(settings))
+
+    message = BytesParser(policy=policy.default).parsebytes(fake.payload)
+    assert parse_message_ids(message["In-Reply-To"]) == ("<parent@example.com>",)
+    assert parse_message_ids(message["References"]) == (
+        "<root@example.com>",
+        "<mid@example.com>",
+        "<parent@example.com>",
+    )
+    assert result["in_reply_to"] == "<parent@example.com>"
+    assert result["references_count"] == 3
+    assert result["replied_to"] == {"uid": "42", "folder": "INBOX"}
+    assert result["sent"] is False
+
+
+def test_a_reply_reads_the_parent_headers_without_marking_it_read(settings):
+    fake = _ReplyIMAP(_parent_headers())
+
+    _client_with(settings, fake).append_draft(**_reply_fields(settings, reply_to_folder="Archive"))
+
+    assert fake.selected == ['"Archive"']
+    assert fake.fetched == [("FETCH", "42", "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID REFERENCES)])")]
+
+
+def test_a_reply_to_a_thread_start_references_only_the_parent(settings):
+    fake = _ReplyIMAP(_parent_headers())
+
+    result = _client_with(settings, fake).append_draft(**_reply_fields(settings))
+
+    message = BytesParser(policy=policy.default).parsebytes(fake.payload)
+    assert parse_message_ids(message["References"]) == ("<parent@example.com>",)
+    assert result["references_count"] == 1
+
+
+def test_a_long_parent_identifier_survives_header_folding_intact(settings):
+    long_id = "<" + "a" * 200 + "@example.com>"
+    fake = _ReplyIMAP(_parent_headers(message_id=long_id))
+
+    _client_with(settings, fake).append_draft(
+        **_reply_fields(settings, reply_to_message_id=long_id)
+    )
+
+    message = BytesParser(policy=policy.default).parsebytes(fake.payload)
+    assert parse_message_ids(message["In-Reply-To"]) == (long_id,)
+    assert parse_message_ids(message["References"]) == (long_id,)
+
+
+def test_a_draft_that_is_not_a_reply_carries_no_threading_header(settings):
+    message = _appended_draft(settings)
+
+    assert message["In-Reply-To"] is None
+    assert message["References"] is None
+
+
+def test_a_reply_is_refused_when_the_parent_no_longer_matches_the_confirmed_identifier(settings):
+    # The UID still resolves, but to a different message than the user confirmed against.
+    fake = _ReplyIMAP(_parent_headers(message_id="<someone-else@example.com>"))
+
+    with pytest.raises(BridgeError, match="no longer carries reply_to_message_id"):
+        _client_with(settings, fake).append_draft(**_reply_fields(settings))
+
+    assert fake.payload is None
+
+
+def test_a_reply_is_refused_when_the_parent_carries_no_identifier(settings):
+    fake = _ReplyIMAP(_parent_headers(message_id=None, references="<root@example.com>"))
+
+    with pytest.raises(BridgeError, match="no Message-ID to thread on"):
+        _client_with(settings, fake).append_draft(**_reply_fields(settings))
+
+    assert fake.payload is None
+
+
+@pytest.mark.parametrize(
+    "raw_header",
+    [
+        b"Message-ID: not-an-id\r\n\r\n",
+        b"Message-ID: <with space@example.com>\r\n\r\n",
+        b"Message-ID: <a<b@example.com>\r\n\r\n",
+        b"Message-ID: <>\r\n\r\n",
+    ],
+)
+def test_a_parent_identifier_that_is_not_header_safe_is_refused(settings, raw_header):
+    # Nothing that could fold into a header of its own reaches In-Reply-To or References,
+    # even when the client repeats it faithfully.
+    fake = _ReplyIMAP(raw_header)
+    doctored = raw_header.decode().split(": ", 1)[1].strip()
+
+    with pytest.raises(BridgeError, match="Invalid Message-ID"):
+        _client_with(settings, fake).append_draft(
+            **_reply_fields(settings, reply_to_message_id=doctored)
+        )
+
+    assert fake.payload is None
+
+
+def test_a_reply_identifier_padded_with_a_second_address_is_refused(settings):
+    # The stored header parses down to one identifier, so a client value carrying an extra
+    # address past it no longer matches and the reply is refused rather than threaded.
+    fake = _ReplyIMAP(b"Message-ID: <ok@example.com> extra@example.com>\r\n\r\n")
+
+    with pytest.raises(BridgeError, match="no longer carries reply_to_message_id"):
+        _client_with(settings, fake).append_draft(
+            **_reply_fields(settings, reply_to_message_id="<ok@example.com> extra@example.com>")
+        )
+
+    assert fake.payload is None
+
+
+def test_a_reply_is_refused_when_the_parent_cannot_be_fetched(settings):
+    fake = _ReplyIMAP(_parent_headers(), fetch_status="NO")
+
+    with pytest.raises(BridgeError, match="Unable to read the message being replied to"):
+        _client_with(settings, fake).append_draft(**_reply_fields(settings))
+
+    assert fake.payload is None
+
+
+def test_a_reply_is_refused_when_the_parent_is_gone(settings):
+    class MissingIMAP(_ReplyIMAP):
+        def uid(self, _command, _uid, _fields):
+            return "OK", [None]
+
+    fake = MissingIMAP()
+
+    with pytest.raises(BridgeError, match="was not found"):
+        _client_with(settings, fake).append_draft(**_reply_fields(settings))
+
+    assert fake.payload is None
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"reply_to_message_id": None},
+        {"reply_to_uid": None},
+    ],
+)
+def test_half_a_reply_target_is_refused_at_the_write_boundary(settings, overrides):
+    fake = _ReplyIMAP(_parent_headers())
+
+    with pytest.raises(BridgeError, match="both reply_to_uid and reply_to_message_id"):
+        _client_with(settings, fake).append_draft(**_reply_fields(settings, **overrides))
+
+    assert fake.payload is None
+
+
+def test_a_reply_uid_that_is_not_a_number_is_refused(settings):
+    fake = _ReplyIMAP(_parent_headers())
+
+    with pytest.raises(BridgeError, match="uid must contain digits only"):
+        _client_with(settings, fake).append_draft(**_reply_fields(settings, reply_to_uid="1 OR 1"))
+
+    assert fake.payload is None
+
+
+def _reply_context(settings, message, **kwargs):
+    class FakeIMAP:
+        def select(self, _folder, *, readonly):
+            assert readonly is True
+            return "OK", [b"1"]
+
+        def uid(self, command, uid, fields):
+            assert (command, uid, fields) == ("FETCH", "42", "(BODY.PEEK[] FLAGS)")
+            return "OK", [(b"42 (BODY[]", message.as_bytes()), b")"]
+
+    return _client_with(settings, FakeIMAP()).fetch_reply_context("42", **kwargs)
+
+
+def test_reply_context_reports_labelled_candidates_and_a_quote_as_suggestions(settings):
+    message = EmailMessage()
+    message["Message-ID"] = "<parent@example.com>"
+    message["Reply-To"] = "billing@example.com"
+    message["From"] = "Christophe Bonnin <christophe@example.com>"
+    message["To"] = "user@example.com, Darya Gnap <darya@example.com>"
+    message["Cc"] = "christophe@example.com, broken-address"
+    message["Subject"] = "Probleme appartement"
+    message.set_content("Ligne une\n\nLigne deux")
+
+    context = _reply_context(settings, message)
+
+    assert context["message_id"] == "<parent@example.com>"
+    assert context["suggested_subject"] == "Re: Probleme appartement"
+    assert context["quoted_body"] == "> Ligne une\n>\n> Ligne deux"
+    assert context["quote_truncated"] is False
+    # Reply-To first, then From, then To and Cc; duplicates collapsed, own address flagged,
+    # and anything that is not a header-safe bare address dropped rather than reported.
+    assert context["candidate_recipients"] == [
+        {"address": "billing@example.com", "header": "Reply-To", "is_own_address": False},
+        {"address": "christophe@example.com", "header": "From", "is_own_address": False},
+        {"address": "user@example.com", "header": "To", "is_own_address": True},
+        {"address": "darya@example.com", "header": "To", "is_own_address": False},
+    ]
+    assert "untrusted data" in context["security_notice"]
+
+
+def test_reply_context_never_claims_a_recipient_is_confirmed(settings):
+    message = EmailMessage()
+    message["From"] = "christophe@example.com"
+    message.set_content("Body")
+
+    context = _reply_context(settings, message)
+
+    assert "to" not in context
+    assert "cc" not in context
+    assert all("confirmed" not in item for item in context["candidate_recipients"][0])
+
+
+def test_reply_context_bounds_the_quote_and_reports_the_truncation(settings):
+    message = EmailMessage()
+    message.set_content("x" * 4_000)
+
+    context = _reply_context(settings, message, max_quote_chars=500)
+
+    assert context["quote_truncated"] is True
+    assert len(context["quoted_body"]) == 502  # the bounded text plus one "> " prefix
+
+
+def test_reply_context_caps_the_number_of_candidates(settings):
+    message = EmailMessage()
+    message["To"] = ", ".join(f"person{index}@example.com" for index in range(40))
+    message.set_content("Body")
+
+    context = _reply_context(settings, message)
+
+    assert len(context["candidate_recipients"]) == MAX_CANDIDATE_RECIPIENTS
+
+
+def test_reply_context_rejects_an_out_of_range_quote_bound(settings):
+    message = EmailMessage()
+    message.set_content("Body")
+
+    with pytest.raises(BridgeError, match="max_quote_chars must be between"):
+        _reply_context(settings, message, max_quote_chars=1)
+
+
+@pytest.mark.parametrize(
+    ("subject", "expected"),
+    [
+        ("Probleme appartement", "Re: Probleme appartement"),
+        ("RE: Probleme appartement", "RE: Probleme appartement"),
+        ("Re[2]: Budget", "Re[2]: Budget"),
+        ("re : Budget", "re : Budget"),
+        ("Recipe for disaster", "Re: Recipe for disaster"),
+        ("", "Re:"),
+        ("  spaced   out  ", "Re: spaced out"),
+        # A crafted encoded-word can decode to a line break; collapsing whitespace is what
+        # keeps the suggestion something the draft tool will still accept as a subject.
+        ("Injected\r\nBcc: attacker@example.com", "Re: Injected Bcc: attacker@example.com"),
+    ],
+)
+def test_a_suggested_reply_subject_neither_stacks_nor_folds(subject, expected):
+    assert _reply_subject(subject) == expected
+
+
+def test_a_suggested_reply_subject_is_bounded_to_what_a_draft_accepts():
+    assert len(_reply_subject("x" * 2_000)) == MAX_SUBJECT_CHARS
+
+
+def test_a_long_reference_chain_survives_header_folding_intact(settings):
+    # References folds at the spaces between identifiers. The chain has to come back whole,
+    # or the reply lands outside the thread it was confirmed against.
+    parent_chain = tuple(f"<{'c' * 40}{index}@example.com>" for index in range(15))
+    fake = _ReplyIMAP(_parent_headers(references=" ".join(parent_chain)))
+
+    result = _client_with(settings, fake).append_draft(**_reply_fields(settings))
+
+    message = BytesParser(policy=policy.default).parsebytes(fake.payload)
+    assert parse_message_ids(message["References"]) == (
+        *parent_chain,
+        "<parent@example.com>",
+    )
+    assert result["references_count"] == 16

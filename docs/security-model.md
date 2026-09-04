@@ -7,7 +7,9 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 - Adversarial instructions embedded in email bodies or headers.
 - A model selecting recipients, a sending identity, or outgoing attachments from untrusted mail or extracted attachment content.
 - Malformed, oversized, encrypted, active, or prompt-injected received attachments.
-- Header, folder, or IMAP search injection.
+- Header, folder, or IMAP search injection, including through a Message-ID read out of a
+  received message and written into a reply's `In-Reply-To` or `References`.
+- A reply threaded onto a different message than the one the user confirmed against.
 - Client attempts to make the server read arbitrary local paths.
 - Oversized, reordered, truncated, substituted, or expired attachment uploads.
 - Draft changes after conversational confirmation.
@@ -26,7 +28,8 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 | Received attachments | Explicit index selection; PDF/TXT/CSV allowlist; byte, page, and character limits; SHA-256 result; no OCR or active content |
 | Outgoing attachments | No paths; type, size, order, lifetime, and SHA-256 validation |
 | Drafts | Exact conversational confirmation assertion; validated recipients, headers, sizes, and attachment tokens |
-| Draft bodies | Plain text plus a server-generated HTML alternative; client markup is escaped, never rendered |
+| Draft bodies | Plain text plus a server-generated HTML alternative; client markup is escaped, never rendered; nothing appended server-side |
+| Reply threading | Threading headers only; validated bracketed message-ids; bounded reference chain; parent Message-ID reverified at the IMAP write |
 | Sender identity | From header restricted to the startup allowlist, re-checked at the IMAP write |
 | Credentials | Bridge-generated IMAP password in the OS keyring |
 | State | `0700` directories, `0600` files, defensive no-follow behavior |
@@ -67,6 +70,11 @@ in the user's private plugin copy.
 - Byte, page, and character limits reduce but do not eliminate CPU, memory, or parser-vulnerability
   risk from adversarial PDFs.
 - A model sees the content of mail it reads and attachments it uploads.
+- `get_reply_context` reports candidate recipients drawn from untrusted headers. Labelling them is
+  a review aid, not a control: what keeps a wrong address out of a draft is that recipients remain
+  explicit, confirmed inputs.
+- Reverifying the parent Message-ID binds a reply to the message the user confirmed against. It
+  does not authenticate that message, whose headers the sender chose.
 - A tunnel keeps the MCP server private but does not keep returned mail content from the OpenAI
   product that requested it. Proton end-to-end encryption no longer applies after Bridge decrypts
   the message locally.

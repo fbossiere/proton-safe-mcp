@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Drafts can now be replies. `create_confirmed_draft` accepts `reply_to_uid`,
+  `reply_to_folder`, and `reply_to_message_id`, and sets `In-Reply-To` plus a `References`
+  chain built from the parent's own chain, so the draft waits in Proton Mail inside the
+  thread instead of as a standalone message.
+
+  Threading headers are the entire contribution. The message being replied to supplies no
+  recipient, no subject, and no body: those stay explicit inputs the user confirmed. In
+  particular the server still appends nothing to a body, so a reply quote reaches the draft
+  only as part of the confirmed `body_text` — the stored draft remains exactly what the user
+  approved.
+
+  `reply_to_message_id` is a required assertion rather than a convenience. At the IMAP write
+  the server re-reads the headers of the message at `reply_to_uid` and refuses the draft
+  unless it still carries exactly that Message-ID, so a mailbox that changed since the
+  confirmation is rejected instead of threaded onto a different message. Both identifiers are
+  validated as bracketed message-ids restricted to printable US-ASCII with no whitespace,
+  because a Message-ID read out of a received message is attacker-controlled input going into
+  a header the server writes; the reference chain is bounded in entry count and rendered
+  length.
+
+- A read-only `get_reply_context` tool returns what composing a reply needs: the parent's
+  Message-ID, a `Re:` subject that does not stack onto an existing one, the bare addresses
+  found in `Reply-To`, `From`, `To`, and `Cc` — each labelled with its header and flagged when
+  it is one of the configured senders — and the body as a bounded `> ` quote. Every value is a
+  suggestion drawn from untrusted headers: no address it reports is a confirmed recipient, and
+  the draft tool still takes its recipients as explicit inputs.
+
 ## [2.0.2] - 2026-09-02
 
 ### Fixed

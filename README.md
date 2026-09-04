@@ -46,7 +46,11 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 - Draft creation requires an explicit client assertion that the user confirmed the exact recipients, subject, body, and attachments in the conversation.
 - The Bridge-generated IMAP password is stored in the operating-system keyring.
 - Draft bodies are stored as plain text plus a server-generated HTML alternative that
-  HTML-escapes the confirmed body, so quoted markup can never be rendered.
+  HTML-escapes the confirmed body, so quoted markup can never be rendered. Nothing is ever
+  appended to a body server-side, including a reply quote.
+- Replying adds threading headers only. Recipients are never derived from the message being
+  replied to, its Message-ID is reverified at the IMAP write, and both identifiers are validated
+  so neither can continue into a header of its own.
 - Recipient, subject, and folder inputs are validated against header/criteria injection.
 - State files are private to the Unix account (`0700` directories, `0600` files, `O_NOFOLLOW`).
 
@@ -170,11 +174,12 @@ ChatGPT desktop/Codex installation, direct MCP registration, and the optional re
 | | `search_messages` | Injection-safe IMAP `TEXT` search |
 | | `read_message` | Bounded plain text; no attachment bytes |
 | | `extract_attachment_text` | Bounded PDF/TXT/CSV text; no raw bytes or files |
+| | `get_reply_context` | Candidate reply recipients, `Re:` subject, and a bounded quote — all suggestions |
 | Attachment staging | `begin_attachment_upload` | Declares filename, type, size, SHA-256 |
 | | `upload_attachment_chunk` | Ordered base64 chunks |
 | | `finish_attachment_upload` | Verifies hash, returns single-use token |
 | | `discard_attachment` | |
-| Drafts | `create_confirmed_draft` | Requires exact conversational confirmation |
+| Drafts | `create_confirmed_draft` | Requires exact conversational confirmation; optionally threads onto a reply target |
 
 There is deliberately no `send_message` tool.
 

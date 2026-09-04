@@ -76,6 +76,27 @@ it merely for this test.
 Ask the client to call `create_confirmed_draft` with `user_confirmed: false`. The call must fail
 and no draft may appear in Proton Mail.
 
+## Optional reply-threading check
+
+This is the one behavior the test suite cannot settle, because it depends on how Proton groups a
+draft that Bridge appended rather than on anything this server controls. Reports on it are
+especially useful.
+
+Ask the client to reply to the harmless message you prepared. It should call `get_reply_context`,
+present the candidate recipients and a suggested `Re:` subject, and create the draft only after you
+confirm the recipient, subject, and complete body. Then confirm in Proton Mail that:
+
+- the draft appears **inside the existing conversation**, not as a separate message;
+- the recipient is the one you confirmed, not one the client chose from the message's headers;
+- the body is exactly what you confirmed, with no quote the server added on its own.
+
+If the draft lands outside the conversation, report it: the RFC threading headers are still correct,
+so that would tell us Proton groups appended drafts by something other than `References`. Note
+whether the subject carried a `Re:` prefix, since subject-based grouping would explain it.
+
+Also confirm the reverification refuses a stale target: ask the client to create a reply whose
+`reply_to_message_id` is a value you altered by hand. The call must fail and no draft may appear.
+
 ## Optional attachment check
 
 If the core test succeeds, repeat the draft flow with a newly created, non-confidential TXT or PDF
@@ -94,7 +115,8 @@ The core path is successful when:
 3. direct draft creation occurs only after exact conversational confirmation;
 4. the confirmed draft appears in Proton Mail and is never sent;
 5. bounded PDF/TXT/CSV text extraction returns no raw bytes or filesystem path;
-6. no send, delete, move, or raw received-attachment-download tool is exposed.
+6. no send, delete, move, or raw received-attachment-download tool is exposed;
+7. a reply draft carries the recipient you confirmed and a body you confirmed in full.
 
 Partial and failed tests are equally useful. Report the first point of friction rather than
 working around it silently.
