@@ -58,4 +58,4 @@ Linux and Proton Mail Bridge users can also run the
 [10-minute external test](external-testing.md) and report installation friction without sharing
 private mail content.
 
-The current stable version is [v2.0.2](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.0.2).
+The current stable version is [v2.0.3](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.0.3).

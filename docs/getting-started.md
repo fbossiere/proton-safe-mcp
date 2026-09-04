@@ -13,7 +13,7 @@ This guide installs Proton Safe MCP from a reviewed release and registers its lo
 ## 1. Install a reviewed release
 
 ```bash
-uv tool install proton-safe-mcp==2.0.2
+uv tool install proton-safe-mcp==2.0.3
 ```
 
 This installs the `proton-safe-mcp` command in uv's tool directory. Run
