@@ -27,7 +27,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "fastmcp==3.4.7",
+  "fastmcp==4.0.1",
   "keyring>=25.6,<26",
   "pypdf>=6.1,<7",
 ]
