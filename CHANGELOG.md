@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Pin Hatchling 1.27 so built distributions keep Core Metadata 2.4, which Twine 6.2 can validate.
+- Pin Hatchling to the 1.27 series so built distributions keep Core Metadata 2.4, which Twine 6.2 can validate.
 
 ## [2.0.3] - 2026-09-04
 
