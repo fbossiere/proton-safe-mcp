@@ -13,7 +13,8 @@ You need:
 
 - Linux with Proton Mail Bridge installed, signed in, and running;
 - a Proton plan that supports Bridge;
-- Python 3.11 or newer and [`uv`](https://docs.astral.sh/uv/);
+- Python 3.11 or newer (3.11 through 3.14 are tested in CI) and
+  [`uv`](https://docs.astral.sh/uv/);
 - Claude Code, Cursor, or VS Code;
 - one harmless unread message that you sent to yourself for this test.
 

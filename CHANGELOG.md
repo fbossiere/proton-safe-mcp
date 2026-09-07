@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Test and document Python 3.14 as a supported runtime alongside Python 3.11-3.13.
+
+### Fixed
+
+- Pin Hatchling 1.27 so built distributions keep Core Metadata 2.4, which Twine 6.2 can validate.
+
 ## [2.0.3] - 2026-09-04
 
 ### Added

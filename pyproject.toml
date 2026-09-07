@@ -1,5 +1,6 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+# Hatchling 1.28+ emits Core Metadata 2.5, which Twine 6.2 rejects.
+requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -22,6 +23,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Communications :: Email",
   "Topic :: Security",
   "Typing :: Typed",

@@ -19,7 +19,7 @@ STDIO MCP server that connects to the official Proton Mail Bridge on `127.0.0.1`
 - Linux
 - Proton Mail Bridge installed, signed in, and running
 - a Proton plan that supports Bridge
-- Python 3.11 or newer
+- Python 3.11 or newer (3.11 through 3.14 are tested in CI)
 - `uv`
 - a Secret Service keyring such as `gnome-keyring`
 
