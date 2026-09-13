@@ -217,7 +217,8 @@ error. The compact run creates 1280 × 660 pixel images from a 640 × 330 logica
 leaving room for window decorations on a 1280 × 720 display at 200% scaling.
 
 The tests check the footer geometry on every screen in both languages, reach each Bridge
-field in the small viewport, expand advanced options with the keyboard, retain their values
+field in the small viewport (including when only the caret was visible), check Tab
+navigation, expand advanced options with the keyboard, retain their values
 across Back, and verify step progress. The existing secret clearing, migration opt-in and
 partial disconnection tests continue to run. These checks do **not** establish rendering
 or accessibility under an actual Wayland compositor, X11 desktop or screen reader; the

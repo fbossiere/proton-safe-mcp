@@ -25,6 +25,37 @@ def status_text(status: str, language: str) -> str:
     return translate(f"status.{status}", language)
 
 
+class FormScrollArea(QtWidgets.QScrollArea):
+    """Bring the full focused field into view, including its border and padding."""
+
+    def ensureWidgetVisible(
+        self, childWidget: QtWidgets.QWidget, xmargin: int = 50, ymargin: int = 50
+    ) -> None:
+        super().ensureWidgetVisible(childWidget, xmargin, ymargin)
+        page = self.widget()
+        if page is None or not page.isAncestorOf(childWidget):
+            return
+        # QScrollArea can stop when only an input's cursor rectangle is visible.
+        # Our padded fields need the full control visible, not just the text caret.
+        viewport = self.viewport()
+        bounds = QtCore.QRect(childWidget.mapTo(viewport, QtCore.QPoint()), childWidget.size())
+        if bounds.height() > viewport.height():
+            return
+        padding = min(ymargin, (viewport.height() - bounds.height()) // 2)
+        bar = self.verticalScrollBar()
+        if bounds.top() < 0:
+            bar.setValue(bar.value() + bounds.top() - padding)
+        elif bounds.bottom() >= viewport.height():
+            bar.setValue(bar.value() + bounds.bottom() - viewport.height() + 1 + padding)
+
+    def focusNextPrevChild(self, next: bool) -> bool:
+        moved = super().focusNextPrevChild(next)
+        focused = self.focusWidget()
+        if moved and focused is not None and focused.hasFocus():
+            self.ensureWidgetVisible(focused)
+        return moved
+
+
 class WrappedLabel(QtWidgets.QLabel):
     """Keep changing, wrapped text fully visible inside a scrollable layout."""
 

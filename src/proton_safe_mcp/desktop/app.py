@@ -19,7 +19,15 @@ from ..onboarding.messages import OFFICIAL_LINKS, detect_language, explain, tran
 from ..onboarding.models import Check, ClientInstallation, Code, InstallState
 from ..onboarding.service import BridgeCandidate, SetupService, Snapshot
 from .theme import app_icon, apply_theme
-from .widgets import CheckRow, DetailsBox, Disclosure, SecretField, WrappedLabel, status_text
+from .widgets import (
+    CheckRow,
+    DetailsBox,
+    Disclosure,
+    FormScrollArea,
+    SecretField,
+    WrappedLabel,
+    status_text,
+)
 from .workers import TaskRunner
 
 WINDOW_MINIMUM = QtCore.QSize(560, 300)
@@ -53,7 +61,7 @@ class Screen(QtWidgets.QWidget):
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-        self.content_scroll = QtWidgets.QScrollArea()
+        self.content_scroll = FormScrollArea()
         self.content_scroll.setWidgetResizable(True)
         self.content_scroll.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff

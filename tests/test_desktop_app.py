@@ -872,3 +872,52 @@ def test_long_diagnostic_text_grows_instead_of_being_cropped(wizard, application
     assert detail.height() >= detail.heightForWidth(detail.width())
     assert row.rect().contains(detail.geometry())
     window.close()
+
+
+def test_scrolling_reveals_the_whole_field_even_when_its_caret_is_visible(wizard, application):
+    window, _service = wizard
+    window.resize(640, 330)
+    window.show_screen("bridge")
+    window.show()
+    screen = window.screens["bridge"]
+    for _ in range(10):
+        application.processEvents()
+    scroll = screen.content_scroll
+    field = screen.secret.field()
+    viewport = scroll.viewport()
+    page_y = field.mapTo(scroll.widget(), QtCore.QPoint()).y()
+    # Leave eight pixels of the padded control below the viewport, but keep its caret
+    # inside it. Qt's native ensureWidgetVisible returns early in precisely this case.
+    scroll.verticalScrollBar().setValue(page_y - (viewport.height() - field.height() + 8))
+    bounds = QtCore.QRect(field.mapTo(viewport, QtCore.QPoint()), field.size())
+    assert not viewport.rect().contains(bounds)
+    caret = field.inputMethodQuery(QtCore.Qt.InputMethodQuery.ImCursorRectangle)
+    assert viewport.rect().contains(caret.translated(bounds.topLeft()))
+    QtWidgets.QScrollArea.ensureWidgetVisible(scroll, field)
+    bounds = QtCore.QRect(field.mapTo(viewport, QtCore.QPoint()), field.size())
+    assert not viewport.rect().contains(bounds)
+    scroll.ensureWidgetVisible(field)
+    bounds = QtCore.QRect(field.mapTo(viewport, QtCore.QPoint()), field.size())
+    assert viewport.rect().contains(bounds)
+    window.close()
+
+
+def test_tab_scrolls_the_next_bridge_field_fully_into_view(wizard, application):
+    from PySide6 import QtTest
+
+    window, _service = wizard
+    window.resize(640, 330)
+    window.show_screen("bridge")
+    window.show()
+    screen = window.screens["bridge"]
+    for _ in range(10):
+        application.processEvents()
+    screen.user.setFocus()
+    QtTest.QTest.keyClick(screen.user, QtCore.Qt.Key.Key_Tab)
+    application.processEvents()
+    field = screen.secret.field()
+    assert field.hasFocus()
+    viewport = screen.content_scroll.viewport()
+    bounds = QtCore.QRect(field.mapTo(viewport, QtCore.QPoint()), field.size())
+    assert viewport.rect().contains(bounds)
+    window.close()
