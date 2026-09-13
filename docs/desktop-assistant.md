@@ -60,8 +60,8 @@ password, second factor and session stay entirely inside Bridge.
 For a short walkthrough, use the [download and installation page](download.md)
 or [le guide en français](fr/telecharger.md).
 
-Download [the Ubuntu 24.04 x86_64 installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/proton-safe-assistant_2.1.1_amd64.deb)
-from the [v2.1.1 release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.1).
+Download [the Ubuntu 24.04 x86_64 installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb)
+from the [v2.1.2 release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2).
 Open it with Ubuntu's graphical package installer, then launch **Proton Safe** from the
 applications menu. Python and `uv` are bundled; you do not need to install them.
 
@@ -70,7 +70,7 @@ compatible local ChatGPT desktop / Codex installation on the same computer.
 
 The release also carries a `.sha256` file and `BUILD-PROVENANCE.txt` naming the source
 commit and build host. To verify a download, put the `.deb` and its `.sha256` file together
-and run `sha256sum -c proton-safe-assistant_2.1.1_amd64.deb.sha256`.
+and run `sha256sum -c proton-safe-assistant_2.1.2_amd64.deb.sha256`.
 CI artefacts remain available for testing unreleased changes, and the scripts in
 `packaging/` support building from source.
 

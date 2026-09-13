@@ -13,7 +13,7 @@ and historical implementation evidence.
 
 ## How to get the package
 
-The `.deb` is never committed. Download it from the [GitHub Release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.1),
+The `.deb` is never committed. Download it from the [GitHub Release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2),
 which also carries `BUILD-PROVENANCE.txt` (package name, SHA-256, source commit
 and build host) and the `.sha256` file. For an unreleased change, use the CI
 `desktop-package` artefact instead. Before installing:

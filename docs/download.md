@@ -27,14 +27,14 @@ Python and `uv` are included. You do not need to install them or edit a configur
 
 ## Get the installer
 
-[Download for Ubuntu — v2.1.1 (.deb)](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/proton-safe-assistant_2.1.1_amd64.deb){ .md-button .md-button--primary }
+[Download for Ubuntu — v2.1.2 (.deb)](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb){ .md-button .md-button--primary }
 
 Free, MIT licensed, hosted on the project's **official GitHub Release**. No GitHub account
 is needed to download it. This is an independent project, not affiliated with or endorsed by Proton.
 
-[Release notes and all files](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.1)
-· [Checksum file](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/proton-safe-assistant_2.1.1_amd64.deb.sha256)
-· [Build provenance](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/BUILD-PROVENANCE.txt)
+[Release notes and all files](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2)
+· [Checksum file](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb.sha256)
+· [Build provenance](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/BUILD-PROVENANCE.txt)
 
 ## Install, connect, try
 
@@ -58,7 +58,7 @@ is needed to download it. This is an independent project, not affiliated with or
     Downloads folder and run:
 
     ```bash
-    sudo apt install ./proton-safe-assistant_2.1.1_amd64.deb
+    sudo apt install ./proton-safe-assistant_2.1.2_amd64.deb
     ```
 
     Then launch **Proton Safe** normally, never with `sudo`.
@@ -67,13 +67,13 @@ is needed to download it. This is an independent project, not affiliated with or
     Put the `.deb` and its `.sha256` file in the same folder. In a terminal in that folder:
 
     ```bash
-    sha256sum -c proton-safe-assistant_2.1.1_amd64.deb.sha256
+    sha256sum -c proton-safe-assistant_2.1.2_amd64.deb.sha256
     ```
 
-    The published v2.1.1 installer has SHA-256:
+    The published v2.1.2 installer has SHA-256:
 
     ```text
-    bf9612173d6dae36135ee11605f3cab44125b06a7be3a9f1179cce9334204512
+    66ab3963e4ab0985d86a1d25dcbaea483e30bd0febd8ed1ec56183c96f83a567
     ```
 
     The checksum detects a damaged or mismatched download. Obtain both files from the
