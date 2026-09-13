@@ -22,10 +22,20 @@ proven.
 | Interface | Real widgets on Qt's `offscreen` platform: keyboard reach, accessible names, status text, secret handling, cancellation, the whole wizard | — | Wayland, X11, 1280 × 720, 200 % scaling on a real display |
 | Keyring backend packaging | Real: the built bundle is asked whether it carries the Secret Service backend, and distinguishes that from an unreachable session | — | Storing and reading a credential in a real keyring |
 
-Two defects were found by these tests and fixed rather than worked around: the Bridge screen
-decided whether to take the typed secret from widget visibility, which left the secret in the
-field on a window that was not shown; and the client check treated "this client cannot list
-its plugins" as "the plugin is gone".
+Four defects were found by these tests and fixed rather than worked around:
+
+1. The Bridge screen decided whether to take the typed secret from widget visibility, which
+   left the secret in the field on a window that was not shown.
+2. The client check treated "this client cannot list its plugins" as "the plugin is gone".
+3. Disconnecting with the erase option set deleted the journal even when client entries could
+   not be removed, destroying the only record a retry had to work from.
+4. After a refused disconnection, reopening the assistant showed a healthy installation
+   rather than an outstanding removal.
+
+A fifth gap was reported rather than a defect found by a test: migrating an existing
+`proton-safe@personal` plugin was detected as a conflict and left the user with a disabled
+button and no way forward. It now has an explicit, unticked take-over choice, covered by an
+end-to-end migration test rather than only by a detection test.
 
 ### Batch 0 is partially validated
 
@@ -81,8 +91,8 @@ QT_QPA_PLATFORM=offscreen uv run pytest -q
 | A12 adversarial client output never leaks | `tests/test_onboarding_service.py` |
 | A13 locked or unapproved keyring blocks | `tests/test_onboarding_service.py` |
 | A14 cancellation during a slow test | `tests/test_onboarding_service.py`, `tests/test_desktop_app.py` |
-| A15 removal touches only managed resources | `tests/test_onboarding_service.py` |
-| A16 historic plugin migration | `tests/test_onboarding_service.py` |
+| A15 removal touches only managed resources, and a refused removal keeps what a retry needs | `tests/test_onboarding_service.py` |
+| A16 historic plugin migration, end to end and resumable | `tests/test_onboarding_service.py`, `tests/test_desktop_app.py` |
 | A17 engine works without Qt | `tests/test_managed_mode.py`, `tests/test_desktop_package.py` |
 | A18 package update and plugin resources | `tests/test_onboarding_service.py` |
 | A19 local success is never a client confirmation | `tests/test_onboarding_service.py`, `tests/test_desktop_app.py` |

@@ -60,8 +60,9 @@ pass.
 | 6 | **Confirmed draft, nothing sent** — prepare a draft after explicit confirmation; it lands in `Drafts` in Proton Mail and is **not** sent. Confirm no message left the account. | ☐ | ☐ | ☒ | |
 | 7 | **Full restart** — restart the session or the machine, open Bridge and the client normally, and confirm the connection still works **with no `PROTON_*` variable exported anywhere**. | ☐ | ☐ | ☒ | |
 | 8 | **Repair** — change the Bridge password in Bridge, confirm the assistant reports an authentication failure specifically, then repair it. The previous credential must only be replaced after the new one is accepted. | ☐ | ☐ | ☒ | |
-| 9 | **Migration of an existing installation** — with the CLI or published plugin already set up, run the assistant: the plan is shown first, the working credential is reused without retyping, no duplicate server is created, other plugins survive, and `uv` / Python / `environment.d` are left alone. | ☐ | ☐ | ☒ | |
+| 9 | **Migration of an existing installation** — with `proton-safe@personal` already installed, run the assistant: the plan is shown first, the take-over choice appears **unticked**, ticking it completes the migration, the working credential is reused without retyping, exactly one Proton Safe server remains, other plugins and the `personal` marketplace survive, and `uv` / Python / `environment.d` are left alone. | ☐ | ☐ | ☒ | |
 | 10 | **Disconnection** — only the assistant's own entries are removed; other plugins, Bridge, mail, drafts and attachments are untouched. A still-running server is announced as needing a client restart rather than claimed revoked. | ☐ | ☐ | ☒ | |
+| 11 | **Disconnection refused by the client** — make the removal fail, confirm the configuration, credential and tracking record are all kept, that reopening shows the installation as needing repair, and that a retry after fixing the client both removes the entries and carries out any deferred erase. | ☐ | ☐ | ☒ | |
 
 ## Additional observations
 

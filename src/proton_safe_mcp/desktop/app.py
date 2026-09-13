@@ -317,6 +317,20 @@ class ActivateScreen(Screen):
         self.body.addWidget(self.summary)
         self.body.addWidget(_body(translate("activate.uses", self.language)))
         self.body.addWidget(_body(translate("activate.limits", self.language)))
+        # The take-over choice: hidden unless an earlier Proton Safe installation was
+        # found, unticked by default, and the only thing that authorises replacing it.
+        self.migrate_notice = _body("")
+        self.migrate_notice.setVisible(False)
+        self.body.addWidget(self.migrate_notice)
+        self.migrate = QtWidgets.QCheckBox(translate("activate.migrate.label", self.language))
+        # Named at construction: a control must be announced even before a plan fills in
+        # which entry it would take over.
+        self.migrate.setAccessibleName(translate("activate.migrate.label", self.language))
+        self.migrate.setVisible(False)
+        self.migrate.setChecked(False)
+        self.migrate.toggled.connect(self._refresh_primary)
+        self.body.addWidget(self.migrate)
+
         self.plan_details = DetailsBox(self.language)
         self.body.addWidget(self.plan_details)
         self.primary.clicked.connect(self._activate)
@@ -338,6 +352,9 @@ class ActivateScreen(Screen):
         )
         self.set_status(translate("common.working", self.language))
         self.primary.setEnabled(False)
+        self.migrate.setVisible(False)
+        self.migrate_notice.setVisible(False)
+        self.migrate.setChecked(False)
         self.window_ref.run(
             lambda _token: self.window_ref.service.plan_client(installation),
             self._show_plan,
@@ -353,9 +370,32 @@ class ActivateScreen(Screen):
                     "activate.replaces", self.language, entries=", ".join(self._plan.replaces)
                 )
             )
+        if self._plan.requires_migration:
+            entries = ", ".join(step.detail for step in self._plan.migrations)
+            lines += [
+                f"{step.action} {step.target} {step.detail}" for step in self._plan.migrations
+            ]
+            label = translate("activate.migrate", self.language, entries=entries)
+            self.migrate.setText(label)
+            self.migrate.setAccessibleName(label)
+            self.migrate.setVisible(True)
+            self.migrate_notice.setText(translate("activate.migrate.explain", self.language))
+            self.migrate_notice.setVisible(True)
         self.plan_details.set_text("\n".join(lines))
         if self._plan.has_conflicts:
+            # Not something the assistant can take over on its own.
             self.show_code(str(Code.CONFIG_CONFLICT))
+            self.primary.setEnabled(False)
+            return
+        self._refresh_primary()
+
+    def _refresh_primary(self) -> None:
+        """Enable the action only once any take-over has been explicitly authorised."""
+        if self._plan is None or self._plan.has_conflicts:
+            self.primary.setEnabled(False)
+            return
+        if self._plan.requires_migration and not self.migrate.isChecked():
+            self.show_code(str(Code.MIGRATION_REQUIRED))
             self.primary.setEnabled(False)
             return
         self.set_status("")
@@ -365,10 +405,11 @@ class ActivateScreen(Screen):
         if self._plan is None or self._assets is None:
             return
         plan, assets = self._plan, self._assets
+        migrate = self.migrate.isChecked()
         self.set_status(translate("common.working", self.language))
         self.primary.setEnabled(False)
         self.window_ref.run(
-            lambda _token: self.window_ref.service.activate(plan, assets),
+            lambda _token: self.window_ref.service.activate(plan, assets, migrate=migrate),
             self._activated,
             self.show_code,
         )
@@ -376,6 +417,7 @@ class ActivateScreen(Screen):
     def _activated(self, outcome: Any) -> None:
         self.primary.setEnabled(True)
         if not outcome.ok:
+            # A refused take-over is resumable: the plan and the choice stay on screen.
             self.show_code(str(outcome.code))
             return
         self.window_ref.show_screen("verify")

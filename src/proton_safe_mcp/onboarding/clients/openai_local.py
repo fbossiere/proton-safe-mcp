@@ -246,6 +246,7 @@ class OpenAILocalAdapter:
                 # targeted decision rather than silently overwritten.
                 conflicts.append(name)
         installed = self.installed_plugins(installation) or []
+        migrations: list[PlanStep] = []
         for reference in installed:
             plugin, _, marketplace = reference.partition("@")
             if plugin != MANAGED_PLUGIN:
@@ -253,19 +254,33 @@ class OpenAILocalAdapter:
             if marketplace == assets.marketplace_name:
                 replaces.append(reference)
             else:
-                conflicts.append(reference)
+                # This project's own plugin from another marketplace, typically the
+                # published `proton-safe@personal`. The assistant can take it over, but
+                # only when the user asks: it is still a change to something they set up.
+                migrations.append(PlanStep("remove", RESOURCE_PLUGIN, reference))
         return RegistrationPlan(
             installation=installation,
             steps=tuple(steps),
             replaces=tuple(dict.fromkeys(replaces)),
             conflicts=tuple(dict.fromkeys(conflicts)),
+            migrations=tuple(migrations),
         )
 
-    def apply(self, plan: RegistrationPlan, assets: ManagedPluginAssets) -> RegistrationOutcome:
+    def apply(
+        self,
+        plan: RegistrationPlan,
+        assets: ManagedPluginAssets,
+        *,
+        migrate: bool = False,
+    ) -> RegistrationOutcome:
         """Register the local marketplace then the plugin, reporting what was created.
 
         The client may start a server as soon as a plugin is installed, so this is only
         ever called after the configuration and the credential are already saved.
+
+        ``migrate`` authorises taking over an earlier Proton Safe plugin installed from
+        another marketplace. Without it, such a plan stops and asks: an installation the
+        user made themselves is never replaced silently.
         """
         installation = plan.installation
         if not self.supports_automatic_install(installation):
@@ -279,6 +294,40 @@ class OpenAILocalAdapter:
             return RegistrationOutcome(
                 ok=False, code=Code.CONFIG_CONFLICT, details={"entries": list(plan.conflicts)}
             )
+        if plan.requires_migration and not migrate:
+            return RegistrationOutcome(
+                ok=False,
+                code=Code.MIGRATION_REQUIRED,
+                details={"entries": [step.detail for step in plan.migrations]},
+            )
+
+        migrated: list[PlanStep] = []
+        if plan.requires_migration:
+            if CAP_PLUGIN_REMOVE not in installation.capabilities:
+                # Nothing has been written yet, so the honest answer is to name the entry
+                # the user must remove in their client rather than leave two servers.
+                return RegistrationOutcome(
+                    ok=False,
+                    code=Code.MIGRATION_MANUAL,
+                    manual_step_required=True,
+                    details={"entries": [step.detail for step in plan.migrations]},
+                )
+            for step in plan.migrations:
+                result = self._run(
+                    [str(installation.executable), "plugin", "remove", step.detail],
+                    timeout=MUTATION_TIMEOUT_SECONDS,
+                )
+                if not result.ok:
+                    return RegistrationOutcome(
+                        ok=False,
+                        code=Code.MIGRATION_MANUAL,
+                        migrated=tuple(migrated),
+                        manual_step_required=True,
+                        details={"entries": [step.detail]},
+                    )
+                migrated.append(step)
+            # Only the plugin entry is taken over. Its marketplace is left registered,
+            # because other plugins the user installed may come from it.
 
         created: list[PlanStep] = []
         marketplace = self._run(
@@ -298,6 +347,7 @@ class OpenAILocalAdapter:
                 if marketplace.timed_out
                 else Code.CLIENT_COMMAND_FAILED,
                 created=(),
+                migrated=tuple(migrated),
                 details={"step": "marketplace"},
             )
         created.append(PlanStep("add", RESOURCE_MARKETPLACE, assets.marketplace_name))
@@ -325,13 +375,15 @@ class OpenAILocalAdapter:
                 ok=False,
                 code=Code.CLIENT_ACTION_REQUIRED,
                 created=tuple(created),
+                migrated=tuple(migrated),
                 manual_step_required=True,
                 details={"step": "verify"},
             )
         return RegistrationOutcome(
             ok=True,
-            code=Code.CLIENT_REGISTERED,
+            code=Code.MIGRATION_DONE if migrated else Code.CLIENT_REGISTERED,
             created=tuple(created),
+            migrated=tuple(migrated),
             # Registering a plugin does not load it into a running client.
             manual_step_required=True,
         )

@@ -416,7 +416,7 @@ def test_a_managed_entry_is_told_apart_from_the_historic_one():
 # -- A16: the historic plugin migrates without a double registration -------------
 
 
-def test_a16_a_historic_plugin_in_another_marketplace_is_a_targeted_conflict(
+def test_a16_a_historic_plugin_in_another_marketplace_is_offered_as_a_migration(
     service, bridge, client
 ):
     client.plugins.append("proton-safe@personal")
@@ -424,8 +424,147 @@ def test_a16_a_historic_plugin_in_another_marketplace_is_a_targeted_conflict(
 
     plan, _assets = service.plan_client(_installation(service))
 
-    assert "proton-safe@personal" in plan.conflicts
+    # This project's own plugin can be taken over; it is not an unresolvable conflict.
+    assert [step.detail for step in plan.migrations] == ["proton-safe@personal"]
+    assert plan.requires_migration
+    assert not plan.has_conflicts
     assert plan.replaces == ()
+
+
+def test_a16_a_migration_is_refused_until_the_user_asks_for_it(service, bridge, client):
+    client.plugins.append("proton-safe@personal")
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+
+    outcome = service.activate(plan, assets)
+
+    assert not outcome.ok
+    assert outcome.code is Code.MIGRATION_REQUIRED
+    assert outcome.details["entries"] == ["proton-safe@personal"]
+    # Nothing was written, and the old installation is untouched.
+    assert client.plugins == ["proton-safe@personal"]
+    assert client.marketplaces == []
+    assert service.journal().resources == []
+
+
+def test_a16_an_authorised_migration_completes_end_to_end(service, bridge, client, fake_keyring):
+    """The whole migration, not just its detection."""
+    client.plugins.append("proton-safe@personal")
+    client.plugins.append("unrelated-tool@personal")
+    client.marketplaces.append("personal")
+    assert service.save_bridge(_candidate()).ok
+    stored_secret = fake_keyring.store[("proton-safe-mcp", ACCOUNT)]
+    plan, assets = service.plan_client(_installation(service))
+
+    outcome = service.activate(plan, assets, migrate=True)
+
+    assert outcome.ok
+    assert outcome.code is Code.MIGRATION_DONE
+    assert [step.detail for step in outcome.migrated] == ["proton-safe@personal"]
+    # Exactly one managed connection, and the old one is gone.
+    assert client.plugins == ["unrelated-tool@personal", assets.plugin_reference]
+    # Other plugins and their marketplace survive.
+    assert "personal" in client.marketplaces
+    assert "unrelated-tool@personal" in client.plugins
+    # The credential was never retyped and never changed.
+    assert fake_keyring.store[("proton-safe-mcp", ACCOUNT)] == stored_secret
+    # The state is honest: registered, not yet confirmed by the client.
+    assert service.snapshot().state is InstallState.CLIENT_VERIFICATION_PENDING
+    recorded = service.journal()
+    assert recorded.migrated_from == ["proton-safe@personal"]
+    assert recorded.pending_step == ""
+
+
+def test_a16_a_migration_reuses_the_stored_credential_without_retyping(
+    service, bridge, client, fake_keyring
+):
+    client.plugins.append("proton-safe@personal")
+    service.save_bridge(_candidate())
+    bridge.commands.clear()
+
+    # The Bridge screen hands over no password when the field is left empty.
+    assert service.save_bridge(BridgeCandidate(ACCOUNT, 1143, (), None)).ok
+    plan, assets = service.plan_client(_installation(service))
+    assert service.activate(plan, assets, migrate=True).ok
+
+    assert fake_keyring.store[("proton-safe-mcp", ACCOUNT)] == GOOD_SECRET
+    assert bridge.commands == ["LOGIN", "NOOP", "LOGOUT"]
+
+
+def test_a16_a_second_run_after_a_migration_finds_nothing_left_to_migrate(service, bridge, client):
+    client.plugins.append("proton-safe@personal")
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets, migrate=True)
+
+    second_plan, _assets = service.plan_client(_installation(service))
+
+    assert second_plan.migrations == ()
+    assert assets.plugin_reference in second_plan.replaces
+    assert not second_plan.has_conflicts
+
+
+def test_a16_a_client_that_cannot_remove_asks_for_a_manual_step_and_writes_nothing(
+    service, bridge, client
+):
+    client.plugins.append("proton-safe@personal")
+    client.capabilities.discard("remove")
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+
+    outcome = service.activate(plan, assets, migrate=True)
+
+    assert not outcome.ok
+    assert outcome.code is Code.MIGRATION_MANUAL
+    assert outcome.manual_step_required
+    assert outcome.details["entries"] == ["proton-safe@personal"]
+    # Refusing before writing avoids leaving two Proton Safe servers registered.
+    assert client.plugins == ["proton-safe@personal"]
+    assert client.marketplaces == []
+
+
+def test_a16_an_interrupted_migration_is_resumable(service, bridge, client, monkeypatch):
+    client.plugins.append("proton-safe@personal")
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+
+    # The client accepts the removal, then fails to install the replacement.
+    client.fail_on = "marketplace"
+    first = service.activate(plan, assets, migrate=True)
+
+    assert not first.ok
+    assert [step.detail for step in first.migrated] == ["proton-safe@personal"]
+    recorded = service.journal()
+    assert recorded.pending_step == ""
+    assert recorded.migrated_from == ["proton-safe@personal"]
+    # The local connection survived the failed client step.
+    assert service.config_path.exists()
+    assert service.snapshot().state is InstallState.CLIENT_REGISTRATION_PENDING
+
+    # Reopening the assistant: the old entry is already gone, so nothing is re-migrated.
+    client.fail_on = None
+    resumed_plan, resumed_assets = service.plan_client(_installation(service))
+    assert resumed_plan.migrations == ()
+    assert not resumed_plan.has_conflicts
+
+    outcome = service.activate(resumed_plan, resumed_assets)
+
+    assert outcome.ok
+    assert client.plugins == [resumed_assets.plugin_reference]
+
+
+def test_an_unmanaged_server_entry_is_never_offered_as_a_migration(service, bridge, codex_home):
+    """The assistant cannot rewrite the client's own file, so this stays a conflict."""
+    service.save_bridge(_candidate())
+    (codex_home / "config.toml").write_text(
+        '[mcp_servers.my-proton]\ncommand = "uvx"\nargs = ["proton-safe-mcp"]\n',
+        encoding="utf-8",
+    )
+
+    plan, _assets = service.plan_client(_installation(service))
+
+    assert "my-proton" in plan.conflicts
+    assert plan.migrations == ()
 
 
 def test_a16_other_plugins_are_left_alone_by_a_removal(service, bridge, client):
@@ -908,3 +1047,164 @@ def test_the_recorded_verification_holds_no_address_or_secret(service, bridge):
 
     assert ACCOUNT not in recorded
     assert GOOD_SECRET not in recorded
+
+
+# -- a failed removal must not destroy what a retry needs -------------------------
+
+
+def _fresh_service(service):
+    """A new SetupService on the same paths, as reopening the application would."""
+    return SetupService(
+        config_path=service.config_path,
+        journal_path=service.journal_path,
+        plugin_dir=service.plugin_dir,
+        adapters=service.adapters,
+        runtime=service.runtime,
+    )
+
+
+def test_a_partial_removal_keeps_the_journal_a_retry_needs(service, bridge, client, fake_keyring):
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+    client.capabilities.discard("remove")
+
+    outcome = service.disconnect(erase_local=True)
+
+    assert not outcome.ok
+    assert outcome.code is Code.CLIENT_ACTION_REQUIRED
+    assert outcome.details["remaining"]
+    # The erase is deferred, not performed: the journal is the only record of what is
+    # still registered in the client and of which installation owns it.
+    assert service.journal_path.exists()
+    assert service.config_path.exists()
+    assert ("proton-safe-mcp", ACCOUNT) in fake_keyring.store
+    recorded = service.journal()
+    assert recorded.erase_local_requested is True
+    assert [item.name for item in recorded.resources]
+
+
+def test_a_failed_removal_then_reopen_then_a_successful_retry(
+    service, bridge, client, fake_keyring
+):
+    """Partial failure, close, reopen, retry: the whole recovery path."""
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+    registered = list(client.plugins)
+    assert registered == [assets.plugin_reference]
+
+    # The client cannot remove anything yet.
+    client.capabilities.discard("remove")
+    first = service.disconnect(erase_local=True)
+    assert not first.ok
+    assert client.plugins == registered
+
+    # The application is closed and reopened: only the journal survives in memory-free
+    # form, and it must still name what has to be taken back.
+    reopened = _fresh_service(service)
+    snapshot = reopened.snapshot()
+    assert snapshot.state is InstallState.REPAIR_REQUIRED
+    assert [item.name for item in reopened.journal().resources] == [
+        assets.marketplace_name,
+        assets.plugin_reference,
+    ]
+    assert reopened.journal().erase_local_requested is True
+
+    # The user fixes their client, then retries.
+    client.capabilities.add("remove")
+    second = reopened.disconnect()
+
+    assert second.ok
+    assert client.plugins == []
+    assert client.marketplaces == []
+    # The deferred erase is honoured now that the entries are actually gone.
+    assert not reopened.config_path.exists()
+    assert ("proton-safe-mcp", ACCOUNT) not in fake_keyring.store
+    assert not reopened.journal_path.exists()
+
+
+def test_a_retry_without_asking_again_still_honours_the_earlier_erase_request(
+    service, bridge, client, fake_keyring
+):
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+    client.capabilities.discard("remove")
+    service.disconnect(erase_local=True)
+
+    client.capabilities.add("remove")
+    # The second call does not repeat erase_local; the recorded intent carries it.
+    outcome = _fresh_service(service).disconnect()
+
+    assert outcome.ok
+    assert not service.config_path.exists()
+    assert ("proton-safe-mcp", ACCOUNT) not in fake_keyring.store
+
+
+def test_a_partial_removal_without_an_erase_request_keeps_everything_too(
+    service, bridge, client, fake_keyring
+):
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+    client.capabilities.discard("remove")
+
+    outcome = service.disconnect(erase_local=False)
+
+    assert not outcome.ok
+    assert service.journal_path.exists()
+    assert service.config_path.exists()
+    assert service.journal().erase_local_requested is False
+    assert ("proton-safe-mcp", ACCOUNT) in fake_keyring.store
+
+
+def test_a_clean_removal_without_an_erase_request_keeps_the_local_data(
+    service, bridge, client, fake_keyring
+):
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+
+    outcome = service.disconnect(erase_local=False)
+
+    assert outcome.ok
+    assert service.config_path.exists()
+    assert ("proton-safe-mcp", ACCOUNT) in fake_keyring.store
+    assert service.journal().resources == []
+
+
+def test_an_outstanding_disconnect_is_visible_after_reopening(service, bridge, client):
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+    service.confirm_client_manually()
+    assert service.snapshot().state is InstallState.READY
+
+    client.capabilities.discard("remove")
+    service.disconnect()
+
+    reopened = _fresh_service(service)
+    snapshot = reopened.snapshot()
+    assert snapshot.state is InstallState.REPAIR_REQUIRED
+    assert str(Code.CLIENT_ACTION_REQUIRED) in snapshot.notes
+
+
+def test_registering_again_withdraws_an_outstanding_disconnect(service, bridge, client):
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+    client.capabilities.discard("remove")
+    service.disconnect(erase_local=True)
+    assert service.journal().disconnect_pending is True
+
+    client.capabilities.add("remove")
+    reopened = _fresh_service(service)
+    new_plan, new_assets = reopened.plan_client(_installation(reopened))
+    reopened.activate(new_plan, new_assets)
+
+    recorded = reopened.journal()
+    assert recorded.disconnect_pending is False
+    # A withdrawn disconnect must not erase the local data later on.
+    assert recorded.erase_local_requested is False
+    assert reopened.snapshot().state is InstallState.CLIENT_VERIFICATION_PENDING

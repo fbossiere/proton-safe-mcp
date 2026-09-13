@@ -70,6 +70,9 @@ class Code(StrEnum):
     CLIENT_ACTION_REQUIRED = "CLIENT_ACTION_REQUIRED"
     CLIENT_VERIFIED_MANUALLY = "CLIENT_VERIFIED_MANUALLY"
     CLIENT_REMOVED = "CLIENT_REMOVED"
+    MIGRATION_REQUIRED = "MIGRATION_REQUIRED"
+    MIGRATION_DONE = "MIGRATION_DONE"
+    MIGRATION_MANUAL = "MIGRATION_MANUAL"
     UNSUPPORTED_CLIENT = "UNSUPPORTED_CLIENT"
     CLIENT_COMMAND_FAILED = "CLIENT_COMMAND_FAILED"
     CLIENT_COMMAND_TIMEOUT = "CLIENT_COMMAND_TIMEOUT"
@@ -78,6 +81,7 @@ class Code(StrEnum):
     INSTALLATION_INCOMPLETE = "INSTALLATION_INCOMPLETE"
     CANCELLED = "CANCELLED"
     PLUGIN_ASSETS_INVALID = "PLUGIN_ASSETS_INVALID"
+    LOCAL_DATA_KEPT = "LOCAL_DATA_KEPT"
 
 
 CheckStatus = str  # "pass" | "warn" | "action_required" | "fail" | "skip"
@@ -156,12 +160,22 @@ class RegistrationPlan:
     steps: tuple[PlanStep, ...]
     #: Existing Proton Safe entries this plan replaces or disables, by name.
     replaces: tuple[str, ...] = ()
-    #: Entries that look like Proton Safe but are not managed by the assistant.
+    #: Entries that look like Proton Safe but that the assistant cannot take over on its
+    #: own — an MCP server someone registered by hand, for instance. They need a targeted
+    #: decision and are never overwritten.
     conflicts: tuple[str, ...] = ()
+    #: This project's own plugin installed from another marketplace. The assistant can
+    #: take these over, but only when the user explicitly asks for the migration.
+    migrations: tuple[PlanStep, ...] = ()
 
     @property
     def has_conflicts(self) -> bool:
         return bool(self.conflicts)
+
+    @property
+    def requires_migration(self) -> bool:
+        """Whether finishing this plan means taking over an existing installation."""
+        return bool(self.migrations)
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,6 +184,9 @@ class RegistrationOutcome:
     code: Code
     #: What the assistant actually created, for the removal path.
     created: tuple[PlanStep, ...] = ()
+    #: Entries taken over from a previous installation, so a resumed run knows they are
+    #: already gone and does not try to remove them twice.
+    migrated: tuple[PlanStep, ...] = ()
     #: True when the client needs a restart or an in-app step before tools appear.
     manual_step_required: bool = False
     details: dict[str, Any] = field(default_factory=dict)

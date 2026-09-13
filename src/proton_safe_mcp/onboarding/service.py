@@ -199,7 +199,12 @@ class SetupService:
         credential = has_bridge_password(stored.bridge_user)
         registered = bool(recorded.owned("plugin"))
         plugin_current = plugin_assets.is_current(self.plugin_dir)
-        if recorded.pending_step:
+        if recorded.disconnect_pending:
+            # A disconnect the client refused. Reopening must not look like a healthy
+            # installation, or the outstanding entries would never be taken back.
+            state = InstallState.REPAIR_REQUIRED
+            notes.append(Code.CLIENT_ACTION_REQUIRED)
+        elif recorded.pending_step:
             state = InstallState.REPAIR_REQUIRED
             notes.append(Code.INSTALLATION_INCOMPLETE)
         elif not credential:
@@ -362,11 +367,20 @@ class SetupService:
         self,
         plan: RegistrationPlan,
         assets: plugin_assets.ManagedPluginAssets,
+        *,
+        migrate: bool = False,
     ) -> RegistrationOutcome:
-        """Apply the plan, recording the pending step so an interruption is recoverable."""
+        """Apply the plan, recording the pending step so an interruption is recoverable.
+
+        ``migrate`` carries the user's explicit decision to take over an earlier Proton
+        Safe installation. It is never inferred from the plan alone.
+        """
         adapter = self.adapter_for(plan.installation)
         recorded = self.journal()
-        recorded.pending_step = "client_registration"
+        recorded.pending_step = "client_migration" if migrate else "client_registration"
+        # Registering again withdraws any outstanding disconnect request.
+        recorded.disconnect_pending = False
+        recorded.erase_local_requested = False
         recorded.plugin_version = assets.plugin_version
         recorded.resource_digest = assets.resource_digest
         recorded.plugin_dir = str(assets.marketplace_dir)
@@ -375,11 +389,15 @@ class SetupService:
         recorded.runtime_command = list(self.serve_command())
         self._save_journal(recorded)
 
-        outcome = adapter.apply(plan, assets)
+        outcome = adapter.apply(plan, assets, migrate=migrate)
 
         recorded = self.journal()
         for step in outcome.created:
             recorded.record(ManagedResource(step.target, step.detail, plan.installation.adapter))
+        # Entries taken over are recorded so a resumed run knows they are already gone.
+        for step in outcome.migrated:
+            if step.detail not in recorded.migrated_from:
+                recorded.migrated_from.append(step.detail)
         recorded.pending_step = ""
         if outcome.ok:
             recorded.state = InstallState.CLIENT_VERIFICATION_PENDING
@@ -474,6 +492,11 @@ class SetupService:
         Bridge, mail, drafts and attachments are never touched, and no general cleanup of
         `~/.codex`, `~/.config` or the keyring happens. A credential that predates the
         managed setup is only removed when the user explicitly asks for it.
+
+        When client entries could not be removed, the local erase is deferred and the
+        journal is kept: it is the only record of what is still registered and of which
+        installation owns it. The request is remembered and honoured once the removal
+        actually succeeds.
         """
         recorded = self.journal()
         resources = [(item.kind, item.name) for item in recorded.resources]
@@ -487,21 +510,35 @@ class SetupService:
         remaining = list(recorded.resources)
         recorded.state = InstallState.REPAIR_REQUIRED if remaining else InstallState.DISCONNECTED
         recorded.client_confirmed_manually = False
+        # The request is remembered whether or not it can be honoured now, so a later
+        # successful removal finishes what the user asked for.
+        recorded.erase_local_requested = recorded.erase_local_requested or erase_local
+        recorded.disconnect_pending = bool(remaining)
         self._save_journal(recorded)
 
-        if erase_local:
+        if remaining:
+            # Client entries are still registered, so the journal is what a retry needs:
+            # it names the resources and which installation owns them. Erasing it here
+            # would strand those entries with nothing left to remove them by, so the
+            # local erase is deferred rather than performed.
+            return Outcome(
+                ok=False,
+                code=Code.CLIENT_ACTION_REQUIRED,
+                details={
+                    "remaining": [item.name for item in remaining],
+                    "local_data_kept": recorded.erase_local_requested,
+                },
+            )
+
+        if recorded.erase_local_requested:
             stored = self.stored_configuration()
             if stored is not None:
                 delete_bridge_password(stored.bridge_user)
             self.config_path.unlink(missing_ok=True)
             journal_store.clear(self.journal_path)
 
-        if remaining or (outcome is not None and outcome.manual_step_required):
-            return Outcome(
-                ok=not remaining,
-                code=Code.CLIENT_ACTION_REQUIRED if remaining else Code.CLIENT_RESTART_REQUIRED,
-                details={"remaining": [item.name for item in remaining]},
-            )
+        if outcome is not None and outcome.manual_step_required:
+            return Outcome(ok=True, code=Code.CLIENT_RESTART_REQUIRED, details={"remaining": []})
         return Outcome.success(Code.CLIENT_REMOVED)
 
     # -- export ------------------------------------------------------------------

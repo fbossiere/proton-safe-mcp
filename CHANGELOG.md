@@ -46,7 +46,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Errors now carry a stable `code`. User-visible text is translated from the code and never
   parsed out of an exception message. French and English strings live in one catalogue.
 
+- A guided take-over for an existing Proton Safe plugin installed from another marketplace,
+  typically the published `proton-safe@personal`. The assistant offers an explicit, unticked
+  choice; without it nothing is written and the plan stops with a stated reason. Taking over
+  removes only that plugin entry — its marketplace stays registered, because other plugins
+  may come from it — reuses the stored credential without a retype, and records what it took
+  over so a resumed run does not try to remove it twice. A client with no removal command
+  stops before writing anything and names the entry to remove by hand, rather than leaving
+  two Proton Safe servers registered.
+
+  An entry the assistant does not own, such as a hand-registered MCP server, remains a
+  conflict to resolve: the client's own configuration file is never rewritten.
+
 ### Changed
+
+- Disconnecting no longer erases local data while client entries are still registered. The
+  tracking record is the only thing a retry has to work from, so it is kept, the erase is
+  deferred, and the request is remembered and carried out once the entries are actually gone.
+  A refused disconnection now also shows up at the next start as an installation needing
+  repair rather than a healthy one, and registering again withdraws the pending request.
 
 - The plugin resources under `plugins/proton-safe/` now also ship inside the wheel as
   package data, so the managed plugin is rendered from the exact revision the runtime was

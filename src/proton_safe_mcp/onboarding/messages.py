@@ -137,6 +137,26 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
         "fr": "Aucun envoi, aucune suppression, aucun déplacement de message.",
         "en": "No sending, no deletion, no moving of messages.",
     },
+    "activate.migrate.label": {
+        "fr": "Reprendre la connexion Proton Safe existante",
+        "en": "Take over the existing Proton Safe connection",
+    },
+    "activate.migrate": {
+        "fr": "Reprendre la connexion Proton Safe existante : {entries}",
+        "en": "Take over the existing Proton Safe connection: {entries}",
+    },
+    "activate.migrate.explain": {
+        "fr": (
+            "Votre compte et votre identifiant Bridge sont conservés. L'ancienne entrée "
+            "est retirée de votre assistant, puis la nouvelle est installée. Vos autres "
+            "plugins ne sont pas touchés."
+        ),
+        "en": (
+            "Your account and Bridge credential are kept. The old entry is removed from "
+            "your assistant, then the new one is installed. Your other plugins are left "
+            "alone."
+        ),
+    },
     "activate.replaces": {
         "fr": "Remplace l'entrée Proton Safe existante : {entries}",
         "en": "Replaces the existing Proton Safe entry: {entries}",
@@ -279,6 +299,48 @@ CODE_MESSAGES: Final[dict[str, dict[str, tuple[str, str]]]] = {
     Code.CLIENT_VERIFIED_MANUALLY: {
         "fr": ("Vous avez confirmé voir les outils dans votre assistant.", ""),
         "en": ("You confirmed seeing the tools in your assistant.", ""),
+    },
+    Code.MIGRATION_REQUIRED: {
+        "fr": (
+            "Une connexion Proton Safe installée autrement existe déjà.",
+            "Cochez la reprise pour la remplacer, ou retirez-la vous-même dans votre assistant.",
+        ),
+        "en": (
+            "A Proton Safe connection installed another way already exists.",
+            "Tick the take-over option to replace it, or remove it yourself in your assistant.",
+        ),
+    },
+    Code.MIGRATION_DONE: {
+        "fr": (
+            "L'ancienne connexion a été remplacée par la nouvelle.",
+            "Il reste à vérifier qu'elle est chargée dans une nouvelle conversation.",
+        ),
+        "en": (
+            "The previous connection was replaced by the new one.",
+            "It still needs checking in a new conversation.",
+        ),
+    },
+    Code.MIGRATION_MANUAL: {
+        "fr": (
+            "L'ancienne connexion doit être retirée dans votre assistant.",
+            "Retirez-la depuis ses réglages de plugins, puis relancez l'activation ici. "
+            "Rien n'a été modifié.",
+        ),
+        "en": (
+            "The previous connection has to be removed in your assistant.",
+            "Remove it from its plugin settings, then run the activation again here. "
+            "Nothing was changed.",
+        ),
+    },
+    Code.LOCAL_DATA_KEPT: {
+        "fr": (
+            "La configuration et l'identifiant ont été conservés.",
+            "Ils seront effacés une fois les entrées retirées de votre assistant.",
+        ),
+        "en": (
+            "The configuration and credential were kept.",
+            "They will be erased once the entries are removed from your assistant.",
+        ),
     },
     Code.CLIENT_REMOVED: {
         "fr": (

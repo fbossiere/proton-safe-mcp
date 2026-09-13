@@ -62,6 +62,15 @@ class Journal:
     last_checks: dict[str, str] = field(default_factory=dict)
     #: A step began but its completion was not recorded: the next start must repair.
     pending_step: str = ""
+    #: Earlier Proton Safe entries this installation took over, so a resumed run does not
+    #: try to remove them again.
+    migrated_from: list[str] = field(default_factory=list)
+    #: The user asked to erase the local configuration and credential, but client entries
+    #: were still registered. The erase happens once they are actually gone.
+    erase_local_requested: bool = False
+    #: The user asked to disconnect and some client entries could not be removed. The next
+    #: start must surface that rather than presenting a normal, healthy installation.
+    disconnect_pending: bool = False
 
     def record(self, resource: ManagedResource) -> None:
         if not any(

@@ -144,6 +144,13 @@ leaves other plugins, Bridge, your mail, your drafts and your attachments untouc
 Erasing the saved configuration and credential is a separate checkbox, off by default; a
 credential you had before the managed setup is never removed implicitly.
 
+If your client refuses to remove an entry, the disconnection stops and **keeps everything
+local**, including the record of what is still registered — that record is the only thing a
+retry has to work from, so erasing it would strand those entries. Your request to erase is
+remembered and carried out once the entries are actually gone. Reopening the assistant shows
+the installation as needing repair rather than as healthy, so the outstanding removal stays
+visible. Registering again withdraws the pending disconnection, erase request included.
+
 A server the client has already started keeps running until the client restarts. The
 assistant says so rather than claiming immediate revocation, and it never kills a process
 found by name.
@@ -164,14 +171,35 @@ raw command output.
 ## Migrating from the CLI or the published plugin
 
 The assistant detects an existing Proton Safe registration by what it launches, not by its
-name, and shows a plan before changing anything:
+name, and shows a plan before changing anything.
 
-- a working credential is reused without asking you to type it again;
+Two different situations, kept apart:
+
+**This project's own plugin from another marketplace** — typically the published
+`proton-safe@personal`. The assistant can take this over, and offers an explicit, unticked
+choice to do so: **« Reprendre la connexion Proton Safe existante »**. Nothing happens until
+you tick it. When you do, it removes that plugin entry from your assistant and installs the
+managed one in its place. If your client offers no removal command, the assistant stops
+before writing anything and names the entry for you to remove yourself — rather than leaving
+two Proton Safe servers registered.
+
+**An entry the assistant does not own** — an MCP server someone registered by hand, for
+instance. That is reported as a conflict for you to resolve. The assistant never rewrites
+your client's own configuration file.
+
+In both cases:
+
+- a working credential is reused without asking you to type it again, and a take-over never
+  touches the keyring;
+- only the plugin entry is taken over: the marketplace it came from stays registered,
+  because your other plugins may come from it;
 - `uv`, Python and an existing PyPI installation are left alone;
 - old `environment.d` files, shell profiles and custom launchers are not deleted — the new
-  connection simply ignores them, and they are listed under **Détails**;
-- an entry the assistant does not own is reported as a conflict for you to resolve, never
-  overwritten.
+  connection simply ignores them, and they are listed under **Détails**.
+
+A take-over that fails halfway is resumable. The entries already removed are recorded, so
+reopening the assistant does not try to remove them a second time, and the plan it shows
+reflects what is actually left.
 
 ## Limits worth knowing
 

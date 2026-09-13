@@ -392,8 +392,8 @@ class RecordingService:
     def plan_client(self, installation):
         return self.plan, self.assets
 
-    def activate(self, plan, assets):
-        self.activated.append((plan, assets))
+    def activate(self, plan, assets, *, migrate=False):
+        self.activated.append((plan, assets, migrate))
         return self._outcome
 
     def verify(self):
@@ -469,6 +469,8 @@ def test_the_whole_wizard_reaches_verification_without_touching_mail(wizard, app
     _settle(window, application)
 
     assert len(service.activated) == 1
+    # Nothing to take over, so no migration was authorised.
+    assert service.activated[0][2] is False
     assert window.stack.currentWidget() is window.screens["verify"]
     # Registered is not ready: the client step is still outstanding.
     assert "vérification" in window.screens["verify"].status.text().lower()
@@ -639,3 +641,113 @@ def test_copying_a_prompt_puts_exactly_that_text_on_the_clipboard(window, applic
     application.processEvents()
 
     assert QtWidgets.QApplication.clipboard().text() == screen.first_use_prompt.toPlainText()
+
+
+# -- the take-over choice on the activation screen ---------------------------------
+
+
+def _plan_with_migration(service):
+    from dataclasses import replace as dataclass_replace
+
+    from proton_safe_mcp.onboarding.models import PlanStep
+
+    return dataclass_replace(
+        service.plan,
+        migrations=(PlanStep("remove", "plugin", "proton-safe@personal"),),
+    )
+
+
+def test_a_take_over_is_offered_but_never_preselected(wizard, application):
+    window, service = wizard
+    service.plan = _plan_with_migration(service)
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+    screen = window.screens["activate"]
+
+    assert screen.migrate.isVisible() or screen.migrate.isVisibleTo(screen)
+    assert not screen.migrate.isChecked()
+    # The action stays out of reach until the user authorises the take-over.
+    assert not screen.primary.isEnabled()
+    assert "installée autrement" in screen.status.text()
+    assert "proton-safe@personal" in screen.migrate.text()
+    assert service.activated == []
+
+
+def test_ticking_the_take_over_enables_the_action_and_passes_the_choice_on(wizard, application):
+    window, service = wizard
+    service.plan = _plan_with_migration(service)
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+    screen = window.screens["activate"]
+
+    screen.migrate.setChecked(True)
+    assert screen.primary.isEnabled()
+    screen.primary.click()
+    _settle(window, application)
+
+    assert len(service.activated) == 1
+    assert service.activated[0][2] is True
+    assert window.stack.currentWidget() is window.screens["verify"]
+
+
+def test_the_take_over_explains_what_is_kept(wizard, application):
+    window, service = wizard
+    service.plan = _plan_with_migration(service)
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+    screen = window.screens["activate"]
+
+    notice = screen.migrate_notice.text()
+    assert "identifiant Bridge sont conservés" in notice
+    assert "autres plugins ne sont pas touchés" in notice
+
+
+def test_an_unresolvable_conflict_still_blocks_even_with_a_take_over_offered(wizard, application):
+    from dataclasses import replace as dataclass_replace
+
+    window, service = wizard
+    service.plan = dataclass_replace(_plan_with_migration(service), conflicts=("my-proton",))
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+    screen = window.screens["activate"]
+
+    screen.migrate.setChecked(True)
+
+    assert not screen.primary.isEnabled()
+    assert "existe déjà" in screen.status.text()
+
+
+def test_a_refused_take_over_leaves_the_screen_resumable(wizard, application):
+    from proton_safe_mcp.onboarding.models import RegistrationOutcome
+
+    window, service = wizard
+    service.plan = _plan_with_migration(service)
+    service._outcome = RegistrationOutcome(ok=False, code=Code.MIGRATION_MANUAL)
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+    screen = window.screens["activate"]
+    screen.migrate.setChecked(True)
+    screen.primary.click()
+    _settle(window, application)
+
+    assert window.stack.currentWidget() is window.screens["activate"]
+    assert "retirée dans votre assistant" in screen.status.text()
+    # The choice and the action are still there, so the user can retry after fixing it.
+    assert screen.migrate.isChecked()
+    assert screen.primary.isEnabled()
+
+
+def test_no_take_over_choice_is_shown_when_there_is_nothing_to_take_over(wizard, application):
+    window, service = wizard
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+    screen = window.screens["activate"]
+
+    assert not screen.migrate.isVisibleTo(screen)
+    assert screen.primary.isEnabled()

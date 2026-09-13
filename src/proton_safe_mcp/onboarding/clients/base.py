@@ -124,8 +124,18 @@ class ClientAdapter(Protocol):
         """Describe every modification before anything is written."""
         ...
 
-    def apply(self, plan: RegistrationPlan, assets: ManagedPluginAssets) -> RegistrationOutcome:
-        """Carry out the plan, verify it and report a partial activation honestly."""
+    def apply(
+        self,
+        plan: RegistrationPlan,
+        assets: ManagedPluginAssets,
+        *,
+        migrate: bool = False,
+    ) -> RegistrationOutcome:
+        """Carry out the plan, verify it and report a partial activation honestly.
+
+        ``migrate`` authorises taking over an earlier Proton Safe installation the plan
+        listed under ``migrations``. Without it, such a plan must stop and ask.
+        """
         ...
 
     def remove(
