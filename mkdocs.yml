@@ -10,6 +10,8 @@ theme:
   name: material
   custom_dir: docs/overrides
   font: false
+  logo: assets/proton-safe.svg
+  favicon: assets/proton-safe.svg
   language: en
   features:
     - content.code.copy
