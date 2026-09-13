@@ -94,6 +94,15 @@ SOURCE_COMMIT="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 if ! git -C "$ROOT" diff --quiet HEAD 2>/dev/null; then
     SOURCE_COMMIT="$SOURCE_COMMIT (working tree modified)"
 fi
+# On a pull request, CI checks out the merge commit, which is not a commit on the branch.
+# Recording the run and the branch gives a tester something they can actually navigate to.
+CI_CONTEXT=""
+if [ -n "${GITHUB_RUN_ID:-}" ]; then
+    CI_CONTEXT="ci run:        ${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-}/actions/runs/${GITHUB_RUN_ID}
+branch:        ${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-unknown}}
+note:          on a pull request the commit above is CI's merge commit, not a branch commit
+"
+fi
 BUILD_HOST="$( (. /etc/os-release 2>/dev/null && printf '%s' "$PRETTY_NAME") || printf unknown ) $(uname -m)"
 DIGEST="$(cd "$DIST_DIR" && sha256sum "$PACKAGE")"
 printf '%s\n' "$DIGEST" > "$DIST_DIR/$PACKAGE.sha256"
@@ -106,6 +115,7 @@ sha256:         ${DIGEST%% *}
 engine version: $VERSION
 source commit:  $SOURCE_COMMIT
 built on:       $BUILD_HOST
+$CI_CONTEXT
 
 Verify before installing:
 

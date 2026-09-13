@@ -17,7 +17,7 @@ proven.
 | Managed vs historic mode, credential policy | Real `Settings` loading with a contradictory environment | Keyring behaviour, through an in-memory approved backend | A real `gnome-keyring` session |
 | Bridge authentication and error classification | — | IMAP doubles that record every command issued | A real Proton Mail Bridge |
 | MCP runtime | Real: the installed executable is started as a child process and answers `initialize` and `tools/list` with the 13 reviewed tools | — | — |
-| Packaged bundle | Real: the built `.deb` is extracted and its assistant renders the plugin and starts its embedded runtime | — | Installation through Ubuntu's graphical package installer |
+| Packaged bundle | Real, on Debian 12 locally and on Ubuntu 24.04 in CI: the bundle is built, the `.deb` assembled, the archive contents checked, and the assistant renders the plugin and starts its embedded runtime | — | Installation through Ubuntu's graphical package installer, and running the interface on a real display |
 | Client registration | — | A Codex-like fake that models marketplace names, capability probes and refusals | **The real `codex plugin` commands** |
 | Interface | Real widgets on Qt's `offscreen` platform: keyboard reach, accessible names, status text, secret handling, cancellation, the whole wizard | — | Wayland, X11, 1280 × 720, 200 % scaling on a real display |
 | Keyring backend packaging | Real: the built bundle is asked whether it carries the Secret Service backend, and distinguishes that from an unreachable session | — | Storing and reading a credential in a real keyring |
@@ -35,12 +35,13 @@ Half of it is proven and half is not:
 | Batch 0 item | Status |
 |---|---|
 | Read the repository's instructions and reconcile the specification with HEAD | **Done.** HEAD is v2.0.3, not the v2.0.0 the specification was written against; the later changes were kept. |
-| Produce a minimal desktop package that starts, reaches the keyring and launches the embedded MCP runtime | **Partially validated.** The package is built, extracted and run: it starts, renders the plugin from its embedded resources and completes an MCP handshake with the embedded runtime. It also proves it *carries* the Secret Service backend — but it has never reached a real keyring, because no D-Bus session existed. |
+| Produce a minimal desktop package that starts, reaches the keyring and launches the embedded MCP runtime | **Partially validated.** On Ubuntu 24.04 in CI, the package builds, the bundled runtime starts and completes an MCP handshake, and the build proves the Secret Service backend is embedded and loadable. But it has never *reached* a real keyring, and the interface has never run on a real display, because CI has neither. |
 | Verify the target client and the local plugin path on a real version | **Not validated.** No ChatGPT desktop or Codex installation was available. |
 | Record versions, constraints and any change needed to the `.deb` / PySide6 choice | **Done.** Recorded in the version matrix above; neither choice needed to change, and `PySide6-Essentials` was chosen over the full `PySide6` to keep the bundle smaller. |
 
 Batch 0 therefore stays **partially validated** until the acceptance sheet's first four
-scenarios pass on the target system. Batches 1 to 4 were implemented on that basis, which is
+scenarios pass on the target system. Building on Ubuntu 24.04 is not installing on it: the
+graphical installer, the session keyring, Bridge and the client are all still unproven. Batches 1 to 4 were implemented on that basis, which is
 a deliberate, stated risk rather than an oversight: the client adapter is the part most
 likely to need revision once a real client answers.
 
@@ -48,12 +49,12 @@ likely to need revision once a real client answers.
 
 | Component | Version the code targets | Status |
 |---|---|---|
-| Ubuntu | 24.04 LTS, x86_64 | Declared target. **Not yet run on Ubuntu 24.04**; the package was built and verified on Debian 12 in a container. |
+| Ubuntu | 24.04 LTS, x86_64 | **Build verified.** CI builds the bundle and the `.deb` on `ubuntu-24.04`, and the bundled runtime starts there and completes an MCP handshake. **Installing and running the application on Ubuntu is still untested**: the runner has no display, no keyring daemon, no Bridge and no client. |
 | Python runtime | Bundled by PyInstaller; built with 3.12 in CI, 3.13 locally | Bundle verified: it starts and serves MCP. |
-| PySide6 | `PySide6-Essentials` 6.11.2 | Screens exercised on Qt's `offscreen` platform. **No Wayland or X11 session tested.** |
+| PySide6 | `PySide6-Essentials` 6.11.2 | Screens exercised on Qt's `offscreen` platform, on Debian 12 locally and on `ubuntu-24.04` in CI. **No Wayland or X11 session tested.** |
 | Proton Mail Bridge | Any version exposing local IMAP with STARTTLS | **Not tested**: no Bridge was reachable during implementation. |
 | ChatGPT desktop / Codex | Version exposing `plugin`, `plugin marketplace add`, `plugin add`, `plugin list` | **Not tested**: no client was installed during implementation. Capabilities are probed at runtime from the client's own `--help`, not guessed from a version number. |
-| Keyring | Secret Service (`gnome-keyring`) | Policy tested with an in-memory backend; the packaged build is checked to actually contain the Secret Service backend. **No real `gnome-keyring` session tested.** |
+| Keyring | Secret Service (`gnome-keyring`) | Policy tested with an in-memory backend. The packaged build is checked to actually contain the Secret Service backend, on Debian 12 and on Ubuntu 24.04. **No real `gnome-keyring` session tested.** |
 
 ## What the automated tests cover
 
