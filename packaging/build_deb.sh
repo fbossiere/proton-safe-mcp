@@ -121,7 +121,7 @@ Verify before installing:
     sha256sum -c $PACKAGE.sha256
 
 This package is produced from the sources at the commit above. It is never committed to
-the repository; obtain it from the CI build artefacts or build it yourself with
+the repository; obtain it from GitHub Releases or CI build artefacts, or build it with
 packaging/build_bundle.sh followed by packaging/build_deb.sh.
 PROVENANCE
 

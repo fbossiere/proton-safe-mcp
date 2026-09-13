@@ -8,11 +8,12 @@ diagnostics and its three plugin skills.
 The command-line path documented in [Getting started](getting-started.md) is unchanged and
 stays supported. Nothing in the assistant modifies an existing CLI installation.
 
-!!! warning "Validation status"
-    The assistant's automated tests pass, and the package has been built and verified end
-    to end in a container. **The full path has not yet been exercised against a real
-    Proton Mail Bridge or a real ChatGPT desktop / Codex installation.** See
-    [Desktop validation](desktop-testing.md) for what remains to be confirmed by hand.
+!!! info "Validation status"
+    On 13 September 2026, the maintainer reported that the installed assistant was tested
+    successfully in their own environment. Automated tests also exercise the interface and
+    packaged runtime. This is a successful user test, not a completed record of all eleven
+    acceptance scenarios. See [Desktop validation](desktop-testing.md) for the evidence and
+    remaining scenario-level checks.
 
 ## Interface preview
 
@@ -56,10 +57,21 @@ password, second factor and session stay entirely inside Bridge.
 
 ## Install
 
-Take the `.deb` from the CI `desktop` build artefact — it ships with its SHA-256 and a
-provenance file naming the source commit — or build it yourself with the scripts in
-`packaging/`. Verify it with `sha256sum -c`, then open it with the graphical package
-installer or from a file manager. It places:
+Download [the Ubuntu 24.04 x86_64 installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.0/proton-safe-assistant_2.1.0_amd64.deb)
+from the [v2.1.0 release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.0).
+Open it with Ubuntu's graphical package installer, then launch **Proton Safe** from the
+applications menu. Python and `uv` are bundled; you do not need to install them.
+
+You need Proton Mail Bridge, a Proton plan that supports Bridge, a session keyring and a
+compatible local ChatGPT desktop / Codex installation on the same computer.
+
+The release also carries a `.sha256` file and `BUILD-PROVENANCE.txt` naming the source
+commit and build host. To verify a download, put the `.deb` and its `.sha256` file together
+and run `sha256sum -c proton-safe-assistant_2.1.0_amd64.deb.sha256`.
+CI artefacts remain available for testing unreleased changes, and the scripts in
+`packaging/` support building from source.
+
+It places:
 
 ```text
 /opt/proton-safe-assistant/proton-safe-assistant   # the interface

@@ -1,10 +1,19 @@
 # Desktop validation
 
-This page separates what is already proven by automated tests from what still needs a human
-with a real Proton Mail Bridge and a real client. Nothing below is claimed as validated
-until someone has actually run it.
+## Maintainer test report — 13 September 2026
 
-## Validation report
+After installing and trying the assistant, the maintainer reported that it works successfully
+in their own environment. This provides a real user test in addition to the automated
+coverage. The report does not identify each action, every component version, or the exact
+package digest, so it does not establish that all repair, restart, migration and
+partial-disconnection scenarios were exercised. The [acceptance sheet](desktop-acceptance.md)
+remains available to record those separately.
+
+## Historical implementation report
+
+The tables in this section describe the original implementation environment, before that
+maintainer test. “Not tested” below means not tested in that original environment; it is
+not a claim that the assistant has never been used successfully on a real computer.
 
 Implementation environment: Debian 12 container, x86_64, Python 3.13, **no D-Bus session,
 no Secret Service daemon, no Proton Mail Bridge, no ChatGPT desktop or Codex installation,
@@ -37,7 +46,7 @@ A fifth gap was reported rather than a defect found by a test: migrating an exis
 button and no way forward. It now has an explicit, unticked take-over choice, covered by an
 end-to-end migration test rather than only by a detection test.
 
-### Batch 0 is partially validated
+### Original batch 0 evidence was partial
 
 The specification's batch 0 asks for proof of the distribution path before the rest is built.
 Half of it is proven and half is not:
@@ -49,13 +58,12 @@ Half of it is proven and half is not:
 | Verify the target client and the local plugin path on a real version | **Not validated.** No ChatGPT desktop or Codex installation was available. |
 | Record versions, constraints and any change needed to the `.deb` / PySide6 choice | **Done.** Recorded in the version matrix above; neither choice needed to change, and `PySide6-Essentials` was chosen over the full `PySide6` to keep the bundle smaller. |
 
-Batch 0 therefore stays **partially validated** until the acceptance sheet's first four
-scenarios pass on the target system. Building on Ubuntu 24.04 is not installing on it: the
-graphical installer, the session keyring, Bridge and the client are all still unproven. Batches 1 to 4 were implemented on that basis, which is
-a deliberate, stated risk rather than an oversight: the client adapter is the part most
-likely to need revision once a real client answers.
+For a detailed batch 0 sign-off, record the acceptance sheet's first four
+scenarios on the target system. The maintainer test above is the later real-world report;
+CI alone proves a build and automated behaviour, not interaction with every supported
+client or desktop session.
 
-## Version matrix
+## Original version matrix
 
 | Component | Version the code targets | Status |
 |---|---|---|

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-13
+
 ### Changed
 
 - Refreshed the desktop assistant with light/dark palettes, visible setup progress, a
@@ -16,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their accessible names and in the activation summary.
 
 ### Added
+
+- Release automation builds and verifies the Ubuntu installer, then attaches the `.deb`,
+  SHA-256 and source provenance to the draft GitHub Release. Both package builds must pass
+  before publishing to PyPI; the release is published only after all outputs are ready,
+  respecting GitHub release immutability.
 
 - A native **desktop setup assistant** for Ubuntu (PySide6), packaged as a `.deb` that
   carries its own Python runtime, the MCP server and the plugin resources. It configures
@@ -94,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   approved for a managed setup. A build missing the Secret Service backend is reported as a
   packaging fault rather than looking like a user's locked session, and no unapproved backend
   ever becomes a silent place to store the credential.
+
+### Fixed
+
+- Runtime diagnostics now enforce a real shared handshake deadline and byte limit, including
+  silent processes and responses without newlines. Malformed tool responses return a
+  redacted failure instead of raising an exception.
 
 ## [2.0.3] - 2026-09-04
 
@@ -308,7 +321,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.3...v2.1.0
 [2.0.3]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.0...v2.0.1

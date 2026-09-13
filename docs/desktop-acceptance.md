@@ -5,16 +5,18 @@ there until someone has actually run it. Do not mark a line as passed because th
 suite covers something similar: this sheet is only about the real path on Ubuntu 24.04 with
 a real Proton Mail Bridge and a real ChatGPT desktop / Codex installation.
 
-**Status at the time of the pull request: every line below is Not tested.** No line has been
-exercised on the target system, because the implementation environment had no Ubuntu, no
-Secret Service daemon, no Bridge and no client. See [Desktop validation](desktop-testing.md)
-for what *was* proven, and how.
+**Maintainer report, 13 September 2026:** the installed assistant was tested and reported
+working successfully. The report did not enumerate individual scenarios or environment
+versions, so it does not mark the eleven lines below as passed. This remains a worksheet
+for a detailed acceptance run. See [Desktop validation](desktop-testing.md) for automated
+and historical implementation evidence.
 
 ## How to get the package
 
-The `.deb` is never committed. Take it from the `desktop-package` artefact of the CI run for
-this branch, which also carries `BUILD-PROVENANCE.txt` (package name, SHA-256, source commit
-and build host) and the `.sha256` file. Before installing:
+The `.deb` is never committed. Download it from the [GitHub Release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.0),
+which also carries `BUILD-PROVENANCE.txt` (package name, SHA-256, source commit
+and build host) and the `.sha256` file. For an unreleased change, use the CI
+`desktop-package` artefact instead. Before installing:
 
 ```bash
 sha256sum -c proton-safe-assistant_<version>_amd64.deb.sha256
