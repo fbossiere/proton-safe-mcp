@@ -7,7 +7,7 @@ The test suite fakes the IMAP layer, so Proton Mail Bridge is not required for d
 ```bash
 git clone https://github.com/fbossiere/proton-safe-mcp.git
 cd proton-safe-mcp
-uv sync --extra dev --extra docs
+uv sync --frozen --extra dev --extra docs --extra desktop
 ```
 
 ## Quality gate
@@ -18,9 +18,15 @@ Run the same checks as CI:
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
-uv run pytest --cov
+QT_QPA_PLATFORM=offscreen uv run pytest --cov
+uv run pip-audit
 uv run mkdocs build --strict
+uv build --no-sources
 ```
+
+For the Ubuntu installer, also follow the bundle and package checks in
+[Desktop validation](desktop-testing.md). Qt needs `libegl1` and `libglib2.0-0t64`
+on Ubuntu 24.04 even with the offscreen platform.
 
 The repository test suite validates the checked-in plugin manifest, marketplace, MCP command,
 secret exclusions, and skill boundary. In a Codex development environment, also run the built-in

@@ -43,7 +43,7 @@ ChatGPT desktop / Codex ── STDIO ──> proton-safe-mcp
 ```
 
 No tunnel or dedicated server is required. The checked-in `.mcp.json` launches the pinned
-`proton-safe-mcp==2.0.3` release with `uvx`. ChatGPT desktop, Codex CLI, and the Codex IDE
+`proton-safe-mcp==2.1.0` release with `uvx`. ChatGPT desktop, Codex CLI, and the Codex IDE
 extension support local STDIO servers and share the MCP configuration for the same Codex host; see
 OpenAI's [MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=desktop).
 
@@ -75,6 +75,13 @@ submission; a public plugin would require a stable public HTTPS MCP endpoint and
 model.
 
 ## Install the local plugin (recommended local path)
+
+!!! tip "A managed alternative"
+    The [desktop setup assistant](desktop-assistant.md) performs the steps below for you on
+    Ubuntu. It registers its own `proton-safe-desktop` marketplace, so it cannot collide
+    with the `personal` marketplace this manual procedure uses, and it launches an absolute
+    runtime path with `--config` instead of `uvx` plus environment variables. The manual
+    procedure below remains supported and unchanged.
 
 Complete [Getting started](getting-started.md) first. Proton Mail Bridge must be running and
 `proton-safe-mcp setup` must have stored the Bridge-generated IMAP password in the operating-system
@@ -206,7 +213,7 @@ This diagnostic does not read or print mail:
 
 ```bash
 systemd-run --user --wait --pipe \
-  uvx --from proton-safe-mcp==2.0.3 proton-safe-mcp doctor
+  uvx --from proton-safe-mcp==2.1.0 proton-safe-mcp doctor
 ```
 
 All checks should pass. A failure here identifies the remaining layer directly: configuration,
@@ -269,7 +276,7 @@ If you only need the MCP tools, the plugin is not required. In ChatGPT desktop:
 3. Choose **STDIO** and configure `uvx` with these arguments:
 
    ```text
-   --from proton-safe-mcp==2.0.3 proton-safe-mcp serve
+   --from proton-safe-mcp==2.1.0 proton-safe-mcp serve
    ```
 
 4. Forward `PROTON_BRIDGE_USER`, optional `PROTON_BRIDGE_ALIASES`, and `PROTON_IMAP_PORT`, but
@@ -286,7 +293,7 @@ direct path provides the server tools but not the two workflow skills packaged b
 On the Linux machine that will run Bridge:
 
 ```bash
-uv tool install proton-safe-mcp==2.0.3
+uv tool install proton-safe-mcp==2.1.0
 export PROTON_BRIDGE_USER="your-address@proton.me"
 export PROTON_IMAP_PORT="1143"
 proton-safe-mcp setup

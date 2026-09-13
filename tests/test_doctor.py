@@ -14,16 +14,11 @@ def _configure(settings, monkeypatch):
 def test_doctor_reports_a_privacy_safe_success(settings, monkeypatch, capsys):
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user, **_kwargs: "not-printed")
     monkeypatch.setattr(
         doctor.ProtonBridgeClient,
-        "status",
-        lambda _self: {
-            "connected": True,
-            "account": settings.bridge_user,
-            "inbox_messages": 42,
-            "inbox_unread": 3,
-        },
+        "probe",
+        lambda _self: None,
     )
 
     assert cli.main(["doctor"]) == 0
@@ -64,11 +59,11 @@ def test_doctor_warns_when_environment_credential_is_used(settings, monkeypatch,
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
     monkeypatch.setenv("PROTON_BRIDGE_PASSWORD", "not-printed")
-    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user, **_kwargs: "not-printed")
     monkeypatch.setattr(
         doctor.ProtonBridgeClient,
-        "status",
-        lambda _self: {"connected": True},
+        "probe",
+        lambda _self: None,
     )
 
     assert cli.main(["doctor"]) == 0
@@ -81,12 +76,12 @@ def test_doctor_warns_when_environment_credential_is_used(settings, monkeypatch,
 def test_doctor_reports_bridge_failure(settings, monkeypatch, capsys):
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user, **_kwargs: "not-printed")
 
     def fail(_self):
         raise BridgeError("Proton Bridge IMAP error: connection refused")
 
-    monkeypatch.setattr(doctor.ProtonBridgeClient, "status", fail)
+    monkeypatch.setattr(doctor.ProtonBridgeClient, "probe", fail)
 
     assert cli.main(["doctor"]) == 1
     output = capsys.readouterr().out
@@ -99,11 +94,11 @@ def test_doctor_rejects_unsupported_platform(settings, monkeypatch, capsys):
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Darwin")
 
-    def unexpected_call(*_args):
+    def unexpected_call(*_args, **_kwargs):
         raise AssertionError("unsupported platforms must not access credentials or Bridge")
 
     monkeypatch.setattr(doctor, "get_bridge_password", unexpected_call)
-    monkeypatch.setattr(doctor.ProtonBridgeClient, "status", unexpected_call)
+    monkeypatch.setattr(doctor.ProtonBridgeClient, "probe", unexpected_call)
 
     assert cli.main(["doctor"]) == 1
     assert "[FAIL] Platform: Darwin (Linux required)" in capsys.readouterr().out
@@ -114,11 +109,11 @@ def test_doctor_does_not_create_the_state_directory(tmp_path, monkeypatch, capsy
     monkeypatch.setenv("PROTON_BRIDGE_USER", "bridge-user@example.com")
     monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(state_dir))
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user, **_kwargs: "not-printed")
     monkeypatch.setattr(
         doctor.ProtonBridgeClient,
-        "status",
-        lambda _self: {"connected": True},
+        "probe",
+        lambda _self: None,
     )
 
     assert cli.main(["doctor"]) == 0
@@ -138,17 +133,18 @@ def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
         bridge_user = "bridge-user"
         sender_addresses = ("bridge-user",)
         state_dir = UnreadableStateDirectory()
+        config_source = "environment"
 
     monkeypatch.setattr(
         doctor.Settings,
         "from_env",
         classmethod(lambda _cls, **_kwargs: DiagnosticSettings()),
     )
-    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user, **_kwargs: "not-printed")
     monkeypatch.setattr(
         doctor.ProtonBridgeClient,
-        "status",
-        lambda _self: {"connected": True},
+        "probe",
+        lambda _self: None,
     )
 
     assert cli.main(["doctor"]) == 1
@@ -160,11 +156,11 @@ def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
 def test_doctor_rejects_private_but_unusable_state_directory(settings, monkeypatch, capsys):
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user: "not-printed")
+    monkeypatch.setattr(doctor, "get_bridge_password", lambda _user, **_kwargs: "not-printed")
     monkeypatch.setattr(
         doctor.ProtonBridgeClient,
-        "status",
-        lambda _self: {"connected": True},
+        "probe",
+        lambda _self: None,
     )
     settings.state_dir.chmod(0o000)
 
@@ -185,11 +181,11 @@ def test_doctor_hides_keyring_failure_details_and_skips_the_bridge(settings, mon
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
 
-    def fail(_user):
+    def fail(_user, **_kwargs):
         raise keyring.errors.KeyringError("private path not printed")
 
     monkeypatch.setattr(doctor, "get_bridge_password", fail)
-    monkeypatch.setattr(doctor.ProtonBridgeClient, "status", _refuse_bridge)
+    monkeypatch.setattr(doctor.ProtonBridgeClient, "probe", _refuse_bridge)
 
     assert cli.main(["doctor"]) == 1
     output = capsys.readouterr().out
@@ -202,11 +198,11 @@ def test_doctor_reports_a_credential_that_was_never_stored(settings, monkeypatch
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
 
-    def fail(_user):
+    def fail(_user, **_kwargs):
         raise ConfigurationError("No Proton Bridge password found. Run setup first.")
 
     monkeypatch.setattr(doctor, "get_bridge_password", fail)
-    monkeypatch.setattr(doctor.ProtonBridgeClient, "status", _refuse_bridge)
+    monkeypatch.setattr(doctor.ProtonBridgeClient, "probe", _refuse_bridge)
 
     assert cli.main(["doctor"]) == 1
     output = capsys.readouterr().out

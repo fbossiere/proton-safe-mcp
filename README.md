@@ -58,16 +58,30 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 - Linux with the official Proton Mail Bridge installed, signed in, and running (developed and tested on Ubuntu).
 - A Proton plan that supports Bridge.
-- Python 3.11 or newer; CI tests every stable minor from 3.11 through 3.14.
-- [`uv`](https://docs.astral.sh/uv/).
+- Python 3.11–3.14 (tested in CI) for the command-line installation; bundled in the desktop installer.
+- [`uv`](https://docs.astral.sh/uv/) for the command-line installation.
 - A working Secret Service keyring (`gnome-keyring` or compatible).
 
 ## Installation
 
+### Desktop assistant — Ubuntu 24.04, x86_64
+
+[Download the installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.0/proton-safe-assistant_2.1.0_amd64.deb),
+open it with Ubuntu's package installer, then launch **Proton Safe**. The assistant guides
+you through Bridge connection and plugin activation in a compatible local ChatGPT desktop
+or Codex installation. Python and `uv` are included; no terminal setup is required.
+
+You still need Proton Mail Bridge, a compatible Proton plan and a session keyring.
+See the [desktop guide](https://fbossiere.github.io/proton-safe-mcp/desktop-assistant/)
+for prerequisites, screenshots and repair options. Checksums and build provenance are in
+the [release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.0).
+
+### Command-line installation — other MCP clients
+
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==2.0.3
+uv tool install proton-safe-mcp==2.1.0
 ```
 
 For development from source instead:

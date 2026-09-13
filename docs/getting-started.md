@@ -2,6 +2,12 @@
 
 This guide installs Proton Safe MCP from a reviewed release and registers its local STDIO server with an MCP-compatible client.
 
+!!! tip "Prefer not to use a terminal?"
+    On Ubuntu, the [desktop setup assistant](desktop-assistant.md) does all of this from a
+    native application: it needs neither Python nor `uv`, and it configures Bridge, the
+    plugin and the keyring for you. This command-line path stays fully supported, and the
+    assistant never modifies an installation made this way.
+
 ## Prerequisites
 
 - Linux with the official Proton Mail Bridge installed, signed in, and running.
@@ -13,7 +19,7 @@ This guide installs Proton Safe MCP from a reviewed release and registers its lo
 ## 1. Install a reviewed release
 
 ```bash
-uv tool install proton-safe-mcp==2.0.3
+uv tool install proton-safe-mcp==2.1.0
 ```
 
 This installs the `proton-safe-mcp` command in uv's tool directory. Run

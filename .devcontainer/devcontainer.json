@@ -24,12 +24,13 @@
   // Copy instead of hardlink so uv never warns when its cache and the project
   // live on different overlay layers inside the container.
   "remoteEnv": {
-    "UV_LINK_MODE": "copy"
+    "UV_LINK_MODE": "copy",
+    "QT_QPA_PLATFORM": "offscreen"
   },
 
-  // Reproduce the frozen dependency set from uv.lock, including dev + docs
+  // Reproduce the frozen dependency set from uv.lock, including dev + docs + desktop
   // extras so ruff, mypy, pytest, pip-audit and mkdocs are all available.
-  "postCreateCommand": "uv sync --frozen --extra dev --extra docs",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install --no-install-recommends -y libegl1 libglib2.0-0 && uv sync --frozen --extra dev --extra docs --extra desktop",
 
   "customizations": {
     "vscode": {

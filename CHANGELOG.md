@@ -9,11 +9,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Test and document Python 3.14 as a supported runtime alongside Python 3.11-3.13.
+- Include Python 3.14 in the CI matrix and supported runtime metadata.
+
+## [2.1.0] - 2026-09-13
+
+### Changed
+
+- Refreshed the desktop assistant with light/dark palettes, visible setup progress, a
+  compact reading column, status cards and a dedicated application icon. Navigation stays
+  visible while content scrolls at 200% scaling; the Bridge port and aliases move into
+  keyboard-accessible advanced options. Shorter action labels retain the target client in
+  their accessible names and in the activation summary.
+
+### Added
+
+- Release automation builds and verifies the Ubuntu installer, then attaches the `.deb`,
+  SHA-256 and source provenance to the draft GitHub Release. Both package builds must pass
+  before publishing to PyPI; the release is published only after all outputs are ready,
+  respecting GitHub release immutability.
+
+- A native **desktop setup assistant** for Ubuntu (PySide6), packaged as a `.deb` that
+  carries its own Python runtime, the MCP server and the plugin resources. It configures
+  Bridge, enables the existing plugin, verifies the result, repairs a connection and removes
+  it, with no terminal and no user-installed Python or `uv`. See
+  [Desktop assistant](docs/desktop-assistant.md).
+
+  Qt is an optional `desktop` extra. The PyPI package, its CLI and the whole engine test
+  suite keep working without it, and the desktop code is never imported at module level from
+  anywhere outside `proton_safe_mcp.desktop`.
+
+- A persistent **managed configuration** in `$XDG_CONFIG_HOME/proton-safe-mcp/config.toml`,
+  selected by a new `--config <absolute path>` option on `setup`, `serve` and `doctor`.
+
+  The two modes never mix. With `--config`, that file is the only source of settings and the
+  OS keyring the only source of the Bridge credential: no `PROTON_*` variable is read, and
+  `PROTON_BRIDGE_PASSWORD` is not a fallback. Without `--config`, every command behaves
+  exactly as before and never looks for the file, so creating one cannot change an
+  installation that has not been migrated.
+
+  The schema is closed and the file is treated as security-relevant: an unknown key, an
+  unknown future schema version, a symlink, an owner that is not the current account or
+  permissions readable by others all refuse the start instead of falling back to another
+  source. Writes are atomic, the directory is `0700` and the file `0600`, and no parent
+  directory is modified. The file holds no password and no host.
+
+- `doctor --json`, a redacted machine-readable report carrying stable check identifiers and
+  codes plus software and system versions — and no address, folder name, mailbox figure,
+  filesystem path, configuration value or raw command output. The text report is unchanged.
+
+- `ProtonBridgeClient.probe()`, a minimal authentication that issues LOGIN, NOOP and LOGOUT
+  and nothing else. The setup assistant uses it so installing can never read a message, mark
+  one as seen or create a draft. `doctor` now uses it too, which removes the INBOX counter
+  read its Bridge check previously performed.
+
+- Errors now carry a stable `code`. User-visible text is translated from the code and never
+  parsed out of an exception message. French and English strings live in one catalogue.
+
+- A guided take-over for an existing Proton Safe plugin installed from another marketplace,
+  typically the published `proton-safe@personal`. The assistant offers an explicit, unticked
+  choice; without it nothing is written and the plan stops with a stated reason. Taking over
+  removes only that plugin entry — its marketplace stays registered, because other plugins
+  may come from it — reuses the stored credential without a retype, and records what it took
+  over so a resumed run does not try to remove it twice. A client with no removal command
+  stops before writing anything and names the entry to remove by hand, rather than leaving
+  two Proton Safe servers registered.
+
+  An entry the assistant does not own, such as a hand-registered MCP server, remains a
+  conflict to resolve: the client's own configuration file is never rewritten.
+
+### Changed
+
+- Disconnecting no longer erases local data while client entries are still registered. The
+  tracking record is the only thing a retry has to work from, so it is kept, the erase is
+  deferred, and the request is remembered and carried out once the entries are actually gone.
+  A refused disconnection now also shows up at the next start as an installation needing
+  repair rather than a healthy one, and registering again withdraws the pending request.
+
+- The plugin resources under `plugins/proton-safe/` now also ship inside the wheel as
+  package data, so the managed plugin is rendered from the exact revision the runtime was
+  built from. Nothing is downloaded from `main` during an installation, and the rendered
+  plugin's version embeds the engine version and a digest of the resources so a package
+  update cannot leave a client serving the previous skills.
+
+  The managed registration uses its own `proton-safe-desktop` marketplace and launches an
+  absolute runtime path with `--config`. It requires neither `uvx` nor any `PROTON_*`
+  variable in the graphical session. The published `personal` marketplace entry and the
+  manual procedure are unchanged.
+
+- A refused IMAP LOGIN is now reported as an authentication failure rather than a generic
+  protocol error, while a dropped connection stays a connection failure. A cause that cannot
+  be determined reliably gets a generic connection code instead of being blamed on the
+  password.
+
+- The keyring is now classified explicitly: available, locked, unavailable, or a backend not
+  approved for a managed setup. A build missing the Secret Service backend is reported as a
+  packaging fault rather than looking like a user's locked session, and no unapproved backend
+  ever becomes a silent place to store the credential.
 
 ### Fixed
 
-- Pin Hatchling to the 1.27 series so built distributions keep Core Metadata 2.4, which Twine 6.2 can validate.
+- Runtime diagnostics now enforce a real shared handshake deadline and byte limit, including
+  silent processes and responses without newlines. Malformed tool responses return a
+  redacted failure instead of raising an exception.
 
 ## [2.0.3] - 2026-09-04
 
@@ -228,7 +325,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.3...v2.1.0
 [2.0.3]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.0...v2.0.1

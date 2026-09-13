@@ -39,7 +39,8 @@ jobs:
         with:
           python-version: "3.12"
           version: "latest-known"
-      - run: uv sync --frozen --extra dev
+      # The desktop package is type-checked too, so Qt must be installed here.
+      - run: uv sync --frozen --extra dev --extra desktop
       - run: uv run mypy
 
   test:
@@ -57,8 +58,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           version: "latest-known"
-      - run: uv sync --frozen --extra dev
-      - run: uv run pytest --cov --cov-report=term-missing
+      # Qt's offscreen platform needs no display but still loads these system libraries.
+      # Without them the interface tests would skip, and a green run would prove nothing.
+      - name: Install the Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libegl1 libglib2.0-0t64
+      - run: uv sync --frozen --extra dev --extra desktop
+      - run: QT_QPA_PLATFORM=offscreen uv run pytest --cov --cov-report=term-missing
+      # A module-level skip still exits 0, so assert directly that Qt was usable here.
+      # Without this, losing a system library would turn the interface tests into a
+      # silent skip and the run would stay green while proving nothing.
+      - name: Fail if Qt was not usable for the interface tests
+        run: QT_QPA_PLATFORM=offscreen uv run python -c "import PySide6.QtWidgets"
 
   audit:
     name: Dependency audit
@@ -90,3 +102,50 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  desktop:
+    name: Desktop package (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          version: "latest-known"
+      # Qt's xcb platform plugin resolves these from the system, which is also what the
+      # package declares in Depends; installing them here lets the build validate them.
+      - name: Install the Qt platform dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libegl1 libfontconfig1 libfreetype6 libxkbcommon0 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \
+            libxcb-xkb1 libdbus-1-3
+      - run: uv sync --frozen --extra dev --extra desktop --extra packaging
+      - name: Build the bundle
+        run: PYINSTALLER="$(pwd)/.venv/bin/pyinstaller" bash packaging/build_bundle.sh
+      - name: Build the package
+        run: bash packaging/build_deb.sh
+      - name: Build the wheel
+        run: uv build --no-sources
+      # Runs the package-level tests, which are skipped when no artefact exists.
+      - name: Verify the built artefacts
+        run: QT_QPA_PLATFORM=offscreen uv run pytest tests/test_desktop_package.py -q
+      - name: Check the assistant starts headless
+        run: QT_QPA_PLATFORM=offscreen uv run pytest tests/test_desktop_app.py -q
+      - name: Show the artefact provenance
+        run: cat dist/desktop/BUILD-PROVENANCE.txt
+      # Deliberately upload only. Publishing a release stays a separate, manual decision.
+      # The package is never committed; this artefact is how a tester obtains it, together
+      # with the source commit and the SHA-256 needed to verify what they downloaded.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-package
+          path: |
+            dist/desktop/*.deb
+            dist/desktop/*.deb.sha256
+            dist/desktop/BUILD-PROVENANCE.txt
+          if-no-files-found: error
