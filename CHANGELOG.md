@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Include Python 3.14 in the CI matrix and supported runtime metadata.
+
 ## [2.1.0] - 2026-09-13
 
 ### Changed
