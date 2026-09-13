@@ -22,7 +22,12 @@ QtCore = pytest.importorskip("PySide6.QtCore", reason=_QT, exc_type=ImportError)
 QtWidgets = pytest.importorskip("PySide6.QtWidgets", reason=_QT, exc_type=ImportError)
 
 from proton_safe_mcp.desktop.app import MainWindow  # noqa: E402
-from proton_safe_mcp.desktop.widgets import STATUS_MARKS, CheckRow, SecretField  # noqa: E402
+from proton_safe_mcp.desktop.widgets import (  # noqa: E402
+    STATUS_MARKS,
+    CheckRow,
+    Disclosure,
+    SecretField,
+)
 from proton_safe_mcp.onboarding.messages import OFFICIAL_LINKS, translate  # noqa: E402
 from proton_safe_mcp.onboarding.models import Check, Code, InstallState  # noqa: E402
 from proton_safe_mcp.onboarding.service import SetupService, Snapshot  # noqa: E402
@@ -93,15 +98,35 @@ def test_an_existing_installation_opens_on_the_dashboard(
     assert window.stack.currentWidget() is window.screens["dashboard"]
 
 
-def test_the_window_fits_a_1280_by_720_screen_at_200_percent_scaling(window):
-    minimum = window.minimumSize()
-
-    # At 200% scaling a 1280x720 screen offers roughly 640x360 logical pixels of room
-    # for content; the window must still be usable by scrolling rather than clipping.
-    assert minimum.width() <= 1280
-    assert minimum.height() <= 720
-    assert isinstance(window.centralWidget(), QtWidgets.QScrollArea)
-    assert window.centralWidget().widgetResizable()
+@pytest.mark.parametrize("language", ["fr", "en"])
+def test_the_window_fits_a_1280_by_720_screen_at_200_percent_scaling(
+    application, tmp_path, language
+):
+    service = RecordingService(tmp_path)
+    window = MainWindow(service, language=language)
+    window.selected_client = service.installation
+    # Leave room for the window decoration: 640x330 logical pixels on 1280x720 at 2x.
+    window.resize(640, 330)
+    window.show()
+    try:
+        for name, screen in window.screens.items():
+            window.show_screen(name)
+            _settle(window, application)
+            assert window.width() == 640
+            assert window.height() == 330
+            scroll = screen.content_scroll
+            assert scroll.horizontalScrollBar().maximum() == 0
+            assert scroll.viewport().height() > 100
+            for value in (0, scroll.verticalScrollBar().maximum()):
+                scroll.verticalScrollBar().setValue(value)
+                application.processEvents()
+                for button in (screen.back, screen.primary):
+                    if button.isVisible():
+                        position = button.mapTo(window, QtCore.QPoint(0, 0))
+                        assert window.rect().contains(QtCore.QRect(position, button.size()))
+    finally:
+        window.close()
+        window.deleteLater()
 
 
 def test_every_interactive_control_can_be_reached_with_the_keyboard(window):
@@ -188,9 +213,11 @@ def test_returning_to_the_bridge_screen_preserves_the_non_secret_fields(
 
 
 def test_technical_details_are_collapsed_by_default(window):
-    for screen in window.screens.values():
-        for box in screen.findChildren(QtWidgets.QGroupBox):
-            assert not box.isChecked()
+    boxes = window.findChildren(Disclosure)
+    assert len(boxes) == 4
+    for box in boxes:
+        assert not box.isChecked()
+        assert box.content.isHidden()
 
 
 def test_a_pending_client_step_is_never_reported_as_finished(window, application, monkeypatch):
@@ -464,7 +491,8 @@ def test_the_whole_wizard_reaches_verification_without_touching_mail(wizard, app
 
     activate = window.screens["activate"]
     assert activate.primary.isEnabled()
-    assert "ChatGPT desktop / Codex" in activate.primary.text()
+    assert "ChatGPT desktop / Codex" in activate.primary.accessibleName()
+    assert "ChatGPT desktop / Codex" in activate.summary.text()
     activate.primary.click()
     _settle(window, application)
 
@@ -670,7 +698,8 @@ def test_a_take_over_is_offered_but_never_preselected(wizard, application):
     # The action stays out of reach until the user authorises the take-over.
     assert not screen.primary.isEnabled()
     assert "installée autrement" in screen.status.text()
-    assert "proton-safe@personal" in screen.migrate.text()
+    assert "proton-safe@personal" in screen.migrate.accessibleName()
+    assert "proton-safe@personal" in screen.migrate_notice.text()
     assert service.activated == []
 
 
@@ -751,3 +780,90 @@ def test_no_take_over_choice_is_shown_when_there_is_nothing_to_take_over(wizard,
 
     assert not screen.migrate.isVisibleTo(screen)
     assert screen.primary.isEnabled()
+
+
+def test_advanced_fields_expand_by_keyboard_and_survive_back(wizard, application):
+    from PySide6 import QtTest
+
+    window, _service = wizard
+    window.show_screen("bridge")
+    window.show()
+    screen = window.screens["bridge"]
+    assert not screen.port.isVisible()
+    screen.advanced.toggle.setFocus()
+    QtTest.QTest.keyClick(screen.advanced.toggle, QtCore.Qt.Key.Key_Space)
+    assert screen.port.isVisible()
+    screen.port.setValue(1188)
+    screen.aliases.setText("alias@example.com")
+    screen.advanced.setChecked(False)
+    window.show_screen("client")
+    _settle(window, application)
+    window.go_back()
+    assert not screen.advanced.isChecked()
+    candidate = screen.candidate()
+    assert candidate.imap_port == 1188
+    assert candidate.aliases == ("alias@example.com",)
+    assert candidate.password is None
+    window.close()
+
+
+def test_bridge_fields_stay_inside_the_small_viewport(wizard, application):
+    window, _service = wizard
+    window.resize(640, 330)
+    window.show_screen("bridge")
+    window.show()
+    screen = window.screens["bridge"]
+    screen.advanced.setChecked(True)
+    application.processEvents()
+    for field in (screen.user, screen.secret.field(), screen.port, screen.aliases):
+        field.setFocus()
+        screen.content_scroll.ensureWidgetVisible(field)
+        application.processEvents()
+        viewport = screen.content_scroll.viewport()
+        position = field.mapTo(viewport, QtCore.QPoint(0, 0))
+        assert viewport.rect().contains(QtCore.QRect(position, field.size()))
+    window.close()
+
+
+def test_progress_follows_back_navigation(wizard, application):
+    window, _service = wizard
+    window.show_screen("bridge")
+    window.show_screen("client")
+    _settle(window, application)
+    assert window.step_label.text() == "Étape 4 sur 6"
+    window.go_back()
+    assert window.step_label.text() == "Étape 3 sur 6"
+    assert [segment.property("reached") for segment in window.segments] == [
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+    ]
+
+
+@pytest.mark.parametrize("width", [640, 900])
+def test_long_diagnostic_text_grows_instead_of_being_cropped(wizard, application, width):
+    window, service = wizard
+    window.resize(width, 700)
+    window.show()
+    window.show_screen("prerequisites")
+    _settle(window, application)
+    screen = window.screens["prerequisites"]
+    checks = service.prerequisites()
+    checks[2] = Check("keyring", "fail", Code.KEYRING_LOCKED)
+    screen._show(checks)
+    for _ in range(10):
+        application.processEvents()
+    row = screen.rows["keyring"]
+    detail = row._detail
+    assert detail.height() >= detail.heightForWidth(detail.width())
+    assert row.rect().contains(detail.geometry())
+    # A second resize must recalculate the wrapping, including when growing wider.
+    window.resize(900 if width == 640 else 640, 700)
+    for _ in range(10):
+        application.processEvents()
+    assert detail.height() >= detail.heightForWidth(detail.width())
+    assert row.rect().contains(detail.geometry())
+    window.close()

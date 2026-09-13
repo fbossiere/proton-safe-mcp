@@ -6,7 +6,7 @@ reader, a monochrome theme and a screen reader.
 
 from __future__ import annotations
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from ..onboarding.messages import explain, translate
 from ..onboarding.models import Check
@@ -25,6 +25,27 @@ def status_text(status: str, language: str) -> str:
     return translate(f"status.{status}", language)
 
 
+class WrappedLabel(QtWidgets.QLabel):
+    """Keep changing, wrapped text fully visible inside a scrollable layout."""
+
+    def __init__(self, text: str = "") -> None:
+        super().__init__(text)
+        self.setWordWrap(True)
+
+    def setText(self, text: str) -> None:
+        super().setText(text)
+        self._fit_height()
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._fit_height()
+
+    def _fit_height(self) -> None:
+        # Qt's default minimum size allows a wrapped label to shrink to a single line.
+        # In a scroll area there is no reason to crop: let the page grow vertically.
+        self.setMinimumHeight(max(0, self.heightForWidth(self.width())))
+
+
 class CheckRow(QtWidgets.QWidget):
     """One prerequisite or verification line: mark, label, status word and action."""
 
@@ -36,26 +57,39 @@ class CheckRow(QtWidgets.QWidget):
         super().__init__(parent)
         self._language = language
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(0, 4, 0, 4)
+        self.setObjectName("checkRow")
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        layout.setContentsMargins(14, 9, 14, 9)
+        layout.setSpacing(14)
 
         self._mark = QtWidgets.QLabel("·")
-        self._mark.setFixedWidth(24)
+        self._mark.setObjectName("checkMark")
+        self._mark.setFixedSize(32, 32)
         self._mark.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
-        self._label = QtWidgets.QLabel(label)
-        self._label.setMinimumWidth(160)
+        self._label = WrappedLabel(label)
+        self._label.setObjectName("checkTitle")
+        self._label.setWordWrap(True)
 
         self._status = QtWidgets.QLabel("")
-        self._status.setMinimumWidth(110)
+        self._status.setObjectName("badge")
+        self._status.setWordWrap(True)
+        self._status.setMaximumWidth(115)
 
-        self._detail = QtWidgets.QLabel("")
+        self._detail = WrappedLabel("")
         self._detail.setWordWrap(True)
+        self._detail.setObjectName("muted")
         self._detail.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred
         )
 
-        for widget in (self._mark, self._label, self._status, self._detail):
-            layout.addWidget(widget)
+        layout.addWidget(self._mark)
+        description = QtWidgets.QVBoxLayout()
+        description.setSpacing(3)
+        description.addWidget(self._label)
+        description.addWidget(self._detail)
+        layout.addLayout(description, 1)
+        layout.addWidget(self._status, 0, QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.TabFocus)
         self.setAccessibleName(label)
 
@@ -63,6 +97,10 @@ class CheckRow(QtWidgets.QWidget):
         message, action = explain(str(check.code), self._language)
         self._mark.setText(STATUS_MARKS.get(check.status, "·"))
         self._status.setText(status_text(check.status, self._language))
+        for widget in (self._mark, self._status):
+            widget.setProperty("state", check.status)
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
         # Anything but a clean pass also shows what to do about it.
         parts = [message] if check.status == "pass" else [message, action]
         if check.hint:
@@ -75,21 +113,55 @@ class CheckRow(QtWidgets.QWidget):
         )
 
 
-class DetailsBox(QtWidgets.QGroupBox):
+class Disclosure(QtWidgets.QWidget):
+    """Keyboard-operable disclosure, with a visible direction and a named toggle."""
+
+    toggled = QtCore.Signal(bool)
+
+    def __init__(self, title: str, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        self.toggle = QtWidgets.QToolButton()
+        self.toggle.setObjectName("disclosure")
+        self.toggle.setText(title)
+        self.toggle.setAccessibleName(title)
+        self.toggle.setCheckable(True)
+        self.toggle.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle.setArrowType(QtCore.Qt.ArrowType.RightArrow)
+        self.content = QtWidgets.QWidget()
+        self.content.setVisible(False)
+        layout.addWidget(self.toggle, 0, QtCore.Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.content)
+        self.toggle.toggled.connect(self._toggle)
+
+    def _toggle(self, expanded: bool) -> None:
+        self.content.setVisible(expanded)
+        self.toggle.setArrowType(
+            QtCore.Qt.ArrowType.DownArrow if expanded else QtCore.Qt.ArrowType.RightArrow
+        )
+        self.toggled.emit(expanded)
+
+    def isChecked(self) -> bool:
+        return self.toggle.isChecked()
+
+    def setChecked(self, checked: bool) -> None:
+        self.toggle.setChecked(checked)
+
+
+class DetailsBox(Disclosure):
     """Technical details, collapsed by default and never required to finish the flow."""
 
     def __init__(self, language: str, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(translate("common.details", language), parent)
-        self.setCheckable(True)
-        self.setChecked(False)
-        layout = QtWidgets.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self.content)
+        layout.setContentsMargins(0, 0, 0, 0)
         self._text = QtWidgets.QPlainTextEdit()
         self._text.setReadOnly(True)
         self._text.setMaximumHeight(160)
         self._text.setAccessibleName(translate("common.details", language))
         layout.addWidget(self._text)
-        self._text.setVisible(False)
-        self.toggled.connect(self._text.setVisible)
 
     def set_text(self, value: str) -> None:
         self._text.setPlainText(value)

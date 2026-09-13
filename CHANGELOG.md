@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed the desktop assistant with light/dark palettes, visible setup progress, a
+  compact reading column, status cards and a dedicated application icon. Navigation stays
+  visible while content scrolls at 200% scaling; the Bridge port and aliases move into
+  keyboard-accessible advanced options. Shorter action labels retain the target client in
+  their accessible names and in the activation summary.
+
 ### Added
 
 - A native **desktop setup assistant** for Ubuntu (PySide6), packaged as a `.deb` that

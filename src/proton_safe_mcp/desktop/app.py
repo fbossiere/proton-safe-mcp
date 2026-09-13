@@ -18,18 +18,17 @@ from .. import __version__
 from ..onboarding.messages import OFFICIAL_LINKS, detect_language, explain, translate
 from ..onboarding.models import Check, ClientInstallation, Code, InstallState
 from ..onboarding.service import BridgeCandidate, SetupService, Snapshot
-from .widgets import CheckRow, DetailsBox, SecretField, status_text
+from .theme import app_icon, apply_theme
+from .widgets import CheckRow, DetailsBox, Disclosure, SecretField, WrappedLabel, status_text
 from .workers import TaskRunner
 
-WINDOW_MINIMUM = QtCore.QSize(880, 560)
+WINDOW_MINIMUM = QtCore.QSize(560, 300)
+STEPS = ("welcome", "prerequisites", "bridge", "client", "activate", "verify")
 
 
 def _heading(text: str) -> QtWidgets.QLabel:
-    label = QtWidgets.QLabel(text)
-    font = label.font()
-    font.setPointSizeF(font.pointSizeF() * 1.4)
-    font.setBold(True)
-    label.setFont(font)
+    label = WrappedLabel(text)
+    label.setObjectName("heading")
     label.setWordWrap(True)
     # Headings are announced as headings rather than as decorative text.
     label.setAccessibleName(text)
@@ -37,7 +36,7 @@ def _heading(text: str) -> QtWidgets.QLabel:
 
 
 def _body(text: str) -> QtWidgets.QLabel:
-    label = QtWidgets.QLabel(text)
+    label = WrappedLabel(text)
     label.setWordWrap(True)
     label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
     return label
@@ -50,33 +49,65 @@ class Screen(QtWidgets.QWidget):
         super().__init__(window)
         self.window_ref = window
         self.language = window.language
+        self.setObjectName("screen")
         outer = QtWidgets.QVBoxLayout(self)
-        outer.addWidget(_heading(translate(title_key, self.language)))
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self.content_scroll = QtWidgets.QScrollArea()
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setHorizontalScrollBarPolicy(
+            QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        page = QtWidgets.QWidget()
+        page.setObjectName("page")
+        centered = QtWidgets.QHBoxLayout(page)
+        centered.setContentsMargins(24, 12, 24, 20)
+        content = QtWidgets.QWidget()
+        content.setMaximumWidth(740)
+        column = QtWidgets.QVBoxLayout(content)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(18)
+        column.addWidget(_heading(translate(title_key, self.language)))
         self.body = QtWidgets.QVBoxLayout()
-        outer.addLayout(self.body)
-        outer.addStretch(1)
+        self.body.setSpacing(12)
+        column.addLayout(self.body)
+        column.addStretch(1)
+        centered.addWidget(content)
+        self.content_scroll.setWidget(page)
+        outer.addWidget(self.content_scroll, 1)
 
         self.status = _body("")
         self.status.setAccessibleName(translate("common.working", self.language))
-        outer.addWidget(self.status)
+        self.status.setObjectName("feedback")
+        self.status.setVisible(False)
+        column.insertWidget(1, self.status)
 
-        buttons = QtWidgets.QHBoxLayout()
+        footer = QtWidgets.QWidget()
+        footer.setObjectName("footer")
+        buttons = QtWidgets.QHBoxLayout(footer)
+        buttons.setContentsMargins(24, 14, 24, 14)
         self.back = QtWidgets.QPushButton(translate("common.back", self.language))
         self.cancel = QtWidgets.QPushButton(translate("common.cancel", self.language))
         self.primary = QtWidgets.QPushButton(translate("common.continue", self.language))
+        self.primary.setObjectName("primary")
         self.primary.setDefault(True)
         self.cancel.setVisible(False)
         buttons.addWidget(self.back)
         buttons.addStretch(1)
         buttons.addWidget(self.cancel)
         buttons.addWidget(self.primary)
-        outer.addLayout(buttons)
+        outer.addWidget(footer)
 
         self.back.clicked.connect(window.go_back)
         self.cancel.clicked.connect(window.cancel_current)
 
     def set_status(self, text: str) -> None:
         self.status.setText(text)
+        self.status.setVisible(bool(text))
+        if text:
+            QtCore.QTimer.singleShot(
+                0, lambda: self.content_scroll.ensureWidgetVisible(self.status)
+            )
 
     def show_code(self, code: str) -> None:
         message, action = explain(code, self.language)
@@ -91,10 +122,30 @@ class WelcomeScreen(Screen):
         super().__init__(window, "app.title")
         self.back.setVisible(False)
         self.body.addWidget(_body(translate("welcome.intro", self.language)))
-        for key in ("welcome.point.bridge", "welcome.point.local", "welcome.point.cloud"):
-            self.body.addWidget(_body(f"• {translate(key, self.language)}"))
-        note = _body(translate("app.independent", self.language))
+        for number, key in enumerate(("find", "summarise", "draft"), 1):
+            card = QtWidgets.QWidget()
+            card.setObjectName("checkRow")
+            row = QtWidgets.QHBoxLayout(card)
+            row.setContentsMargins(16, 12, 16, 12)
+            mark = _body(f"{number:02}")
+            mark.setObjectName("muted")
+            mark.setFixedWidth(36)
+            row.addWidget(mark)
+            text = _body(translate(f"welcome.feature.{key}", self.language))
+            text.setObjectName("fieldLabel")
+            row.addWidget(text, 1)
+            self.body.addWidget(card)
+        note = _body(
+            "\n".join(
+                translate(key, self.language)
+                for key in ("welcome.point.bridge", "welcome.point.local", "welcome.point.cloud")
+            )
+        )
+        note.setObjectName("note")
         self.body.addWidget(note)
+        independent = _body(translate("app.independent", self.language))
+        independent.setObjectName("muted")
+        self.body.addWidget(independent)
         self.primary.setText(translate("welcome.start", self.language))
         self.primary.clicked.connect(lambda: window.show_screen("prerequisites"))
 
@@ -102,6 +153,7 @@ class WelcomeScreen(Screen):
 class PrerequisitesScreen(Screen):
     def __init__(self, window: MainWindow) -> None:
         super().__init__(window, "prereq.title")
+        self.body.addWidget(_body(translate("prereq.intro", self.language)))
         self.rows: dict[str, CheckRow] = {}
         for check_id, key in (
             ("system", "prereq.system"),
@@ -115,7 +167,7 @@ class PrerequisitesScreen(Screen):
             self.body.addWidget(row)
 
         links = QtWidgets.QHBoxLayout()
-        self.bridge_link = QtWidgets.QPushButton("proton.me/mail/bridge")
+        self.bridge_link = QtWidgets.QPushButton(translate("prereq.bridge_help", self.language))
         self.bridge_link.setAccessibleName("proton.me/mail/bridge")
         self.bridge_link.clicked.connect(lambda: window.open_official("bridge"))
         self.recheck = QtWidgets.QPushButton(translate("prereq.recheck", self.language))
@@ -157,11 +209,12 @@ class BridgeScreen(Screen):
     def __init__(self, window: MainWindow) -> None:
         super().__init__(window, "bridge.title")
         self.body.addWidget(_body(translate("bridge.guide", self.language)))
-        form = QtWidgets.QFormLayout()
-        form.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form = QtWidgets.QVBoxLayout()
+        form.setSpacing(9)
         self.user = QtWidgets.QLineEdit()
         self.user.setAccessibleName(translate("bridge.user", self.language))
         self.user.setMaxLength(320)
+        self.user.setPlaceholderText("name@proton.me")
         self.port = QtWidgets.QSpinBox()
         self.port.setRange(1, 65535)
         self.port.setValue(1143)
@@ -170,13 +223,29 @@ class BridgeScreen(Screen):
         self.aliases.setAccessibleName(translate("bridge.aliases", self.language))
         self.secret = SecretField(self.language)
 
-        form.addRow(translate("bridge.user", self.language), self.user)
-        form.addRow(translate("bridge.port", self.language), self.port)
-        form.addRow(translate("bridge.aliases", self.language), self.aliases)
-        form.addRow(translate("bridge.password", self.language), self.secret)
+        for key, field in (("bridge.user", self.user), ("bridge.password", self.secret)):
+            label = _body(translate(key, self.language))
+            label.setObjectName("fieldLabel")
+            label.setBuddy(field.field() if isinstance(field, SecretField) else field)
+            form.addWidget(label)
+            form.addWidget(field)
         self.body.addLayout(form)
-        self.body.addWidget(_body(translate("bridge.password.help", self.language)))
-        self.body.addWidget(_body(translate("bridge.host_fixed", self.language)))
+        help_text = _body(translate("bridge.password.help", self.language))
+        help_text.setObjectName("muted")
+        self.body.addWidget(help_text)
+
+        self.advanced = Disclosure(translate("bridge.advanced", self.language))
+        extra = QtWidgets.QVBoxLayout(self.advanced.content)
+        extra.setContentsMargins(0, 0, 0, 0)
+        extra.setSpacing(9)
+        self.port.setMaximumWidth(160)
+        for key, extra_field in (("bridge.port", self.port), ("bridge.aliases", self.aliases)):
+            label = _body(translate(key, self.language))
+            label.setBuddy(extra_field)
+            extra.addWidget(label)
+            extra.addWidget(extra_field)
+        extra.addWidget(_body(translate("bridge.host_fixed", self.language)))
+        self.body.addWidget(self.advanced)
 
         self.existing = _body(translate("bridge.existing", self.language))
         self.existing.setVisible(False)
@@ -256,7 +325,9 @@ class BridgeScreen(Screen):
 class ClientScreen(Screen):
     def __init__(self, window: MainWindow) -> None:
         super().__init__(window, "client.title")
+        self.body.addWidget(_body(translate("client.intro", self.language)))
         self.list = QtWidgets.QListWidget()
+        self.list.setMaximumHeight(190)
         self.list.setAccessibleName(translate("client.title", self.language))
         self.body.addWidget(self.list)
         self.details = DetailsBox(self.language)
@@ -286,6 +357,7 @@ class ClientScreen(Screen):
             self.list.addItem(item)
         if self.installations:
             self.list.setCurrentRow(0)
+        self.list.setFixedHeight(min(190, max(80, len(self.installations) * 60 + 20)))
         self.primary.setEnabled(bool(self.installations))
         self.set_status(
             "" if self.installations else explain(str(Code.CLIENT_NOT_FOUND), self.language)[0]
@@ -314,12 +386,16 @@ class ActivateScreen(Screen):
     def __init__(self, window: MainWindow) -> None:
         super().__init__(window, "activate.title")
         self.summary = _body("")
+        self.summary.setObjectName("note")
         self.body.addWidget(self.summary)
         self.body.addWidget(_body(translate("activate.uses", self.language)))
-        self.body.addWidget(_body(translate("activate.limits", self.language)))
+        limits = _body(translate("activate.limits", self.language))
+        limits.setObjectName("muted")
+        self.body.addWidget(limits)
         # The take-over choice: hidden unless an earlier Proton Safe installation was
         # found, unticked by default, and the only thing that authorises replacing it.
         self.migrate_notice = _body("")
+        self.migrate_notice.setObjectName("note")
         self.migrate_notice.setVisible(False)
         self.body.addWidget(self.migrate_notice)
         self.migrate = QtWidgets.QCheckBox(translate("activate.migrate.label", self.language))
@@ -342,7 +418,8 @@ class ActivateScreen(Screen):
         if installation is None:
             self.window_ref.show_screen("client")
             return
-        self.primary.setText(
+        self.primary.setText(translate("activate.start", self.language))
+        self.primary.setAccessibleName(
             translate("activate.button", self.language, client=installation.display_name)
         )
         snapshot = self.window_ref.service.snapshot()
@@ -376,10 +453,12 @@ class ActivateScreen(Screen):
                 f"{step.action} {step.target} {step.detail}" for step in self._plan.migrations
             ]
             label = translate("activate.migrate", self.language, entries=entries)
-            self.migrate.setText(label)
+            self.migrate.setText(translate("activate.migrate.label", self.language))
             self.migrate.setAccessibleName(label)
             self.migrate.setVisible(True)
-            self.migrate_notice.setText(translate("activate.migrate.explain", self.language))
+            self.migrate_notice.setText(
+                label + "\n\n" + translate("activate.migrate.explain", self.language)
+            )
             self.migrate_notice.setVisible(True)
         self.plan_details.set_text("\n".join(lines))
         if self._plan.has_conflicts:
@@ -444,7 +523,7 @@ class VerifyScreen(Screen):
         self.confirm.clicked.connect(self._confirm)
         self.body.addWidget(self.confirm)
 
-        self.primary.setText(translate("common.close", self.language))
+        self.primary.setText(translate("verify.dashboard", self.language))
         self.primary.clicked.connect(lambda: window.show_screen("dashboard"))
 
     def _copyable(self, key: str, window: MainWindow) -> QtWidgets.QPlainTextEdit:
@@ -453,11 +532,13 @@ class VerifyScreen(Screen):
         view.setReadOnly(True)
         view.setMaximumHeight(70)
         view.setAccessibleName(text)
-        self.body.addWidget(view)
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(view, 1)
         copy = QtWidgets.QPushButton(translate("verify.copy", self.language))
         copy.setAccessibleName(f"{translate('verify.copy', self.language)} — {text[:40]}")
         copy.clicked.connect(lambda: window.copy_text(view.toPlainText()))
-        self.body.addWidget(copy)
+        row.addWidget(copy)
+        self.body.addLayout(row)
         return view
 
     def on_enter(self) -> None:
@@ -502,6 +583,8 @@ class DashboardScreen(Screen):
         super().__init__(window, "dashboard.title")
         self.back.setVisible(False)
         self.table = QtWidgets.QFormLayout()
+        self.table.setRowWrapPolicy(QtWidgets.QFormLayout.RowWrapPolicy.WrapLongRows)
+        self.table.setVerticalSpacing(12)
         self.account = _body("")
         self.version = _body(__version__)
         self.levels = {
@@ -532,13 +615,14 @@ class DashboardScreen(Screen):
         self.disconnect_button = QtWidgets.QPushButton(
             translate("dashboard.disconnect", self.language)
         )
-        self.erase = QtWidgets.QCheckBox(translate("dashboard.erase", self.language))
+        self.erase = QtWidgets.QCheckBox(translate("dashboard.erase.short", self.language))
+        self.erase.setAccessibleName(translate("dashboard.erase", self.language))
         self.erase.setChecked(False)
         for index, widget in enumerate(
             (self.check, self.repair, self.edit, self.copy_diagnostic, self.disconnect_button)
         ):
-            actions.addWidget(widget, index // 2, index % 2)
-        actions.addWidget(self.erase, 3, 0, 1, 2)
+            actions.addWidget(widget, index, 0)
+        actions.addWidget(self.erase, 5, 0)
         self.body.addLayout(actions)
 
         self.diagnostic = DetailsBox(self.language)
@@ -574,7 +658,7 @@ class DashboardScreen(Screen):
         if snapshot.state is InstallState.READY:
             self.set_status("")
         else:
-            self.set_status(f"{status_text('action_required', self.language)} ({snapshot.state})")
+            self.set_status(status_text("action_required", self.language))
 
     def _copy_diagnostic(self) -> None:
         self.window_ref.run(
@@ -626,14 +710,46 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setWindowTitle(translate("app.title", self.language))
         self.setMinimumSize(WINDOW_MINIMUM)
-        self.resize(960, 640)
+        self.resize(900, 700)
+        self.setWindowIcon(app_icon())
+        apply_theme(self)
 
         self.runner = TaskRunner(self)
         self.stack = QtWidgets.QStackedWidget()
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(self.stack)
-        self.setCentralWidget(scroll)
+        shell = QtWidgets.QWidget()
+        shell.setObjectName("shell")
+        layout = QtWidgets.QVBoxLayout(shell)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        header = QtWidgets.QWidget()
+        header_layout = QtWidgets.QVBoxLayout(header)
+        header_layout.setContentsMargins(24, 18, 24, 16)
+        header_layout.setSpacing(12)
+        brand_row = QtWidgets.QHBoxLayout()
+        logo = QtWidgets.QLabel()
+        logo.setPixmap(self.windowIcon().pixmap(36, 36))
+        brand_row.addWidget(logo)
+        brand = _body(translate("app.name", self.language))
+        brand.setObjectName("brand")
+        brand_row.addWidget(brand)
+        brand_row.addStretch(1)
+        self.step_label = _body("")
+        self.step_label.setObjectName("eyebrow")
+        brand_row.addWidget(self.step_label)
+        header_layout.addLayout(brand_row)
+        progress = QtWidgets.QHBoxLayout()
+        progress.setSpacing(6)
+        self.segments: list[QtWidgets.QFrame] = []
+        for _ in STEPS:
+            segment = QtWidgets.QFrame()
+            segment.setObjectName("segment")
+            segment.setFixedHeight(4)
+            progress.addWidget(segment)
+            self.segments.append(segment)
+        header_layout.addLayout(progress)
+        layout.addWidget(header)
+        layout.addWidget(self.stack, 1)
+        self.setCentralWidget(shell)
 
         self.screens: dict[str, Screen] = {
             "welcome": WelcomeScreen(self),
@@ -647,6 +763,22 @@ class MainWindow(QtWidgets.QMainWindow):
         for screen in self.screens.values():
             self.stack.addWidget(screen)
         self.runner.busy_changed.connect(self._on_busy)
+        self.stack.currentChanged.connect(self._update_progress)
+        self._update_progress()
+
+    def _update_progress(self) -> None:
+        name = self._name_of(self.stack.currentWidget())
+        index = STEPS.index(name) if name in STEPS else len(STEPS) - 1
+        self.step_label.setText(
+            translate("progress.step", self.language, current=str(index + 1), total=str(len(STEPS)))
+            if name != "dashboard"
+            else translate("progress.dashboard", self.language)
+        )
+        for position, segment in enumerate(self.segments):
+            segment.setProperty("reached", position <= index)
+            segment.setVisible(name != "dashboard")
+            segment.style().unpolish(segment)
+            segment.style().polish(segment)
 
     def start(self) -> None:
         """Open on the dashboard when an installation already exists."""
@@ -664,7 +796,7 @@ class MainWindow(QtWidgets.QMainWindow):
         screen.on_enter()
         screen.primary.setFocus()
 
-    def _name_of(self, screen: QtWidgets.QWidget) -> str:
+    def _name_of(self, screen: QtWidgets.QWidget | None) -> str:
         for name, candidate in self.screens.items():
             if candidate is screen:
                 return name

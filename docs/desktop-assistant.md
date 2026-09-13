@@ -14,6 +14,21 @@ stays supported. Nothing in the assistant modifies an existing CLI installation.
     Proton Mail Bridge or a real ChatGPT desktop / Codex installation.** See
     [Desktop validation](desktop-testing.md) for what remains to be confirmed by hand.
 
+## Interface preview
+
+The native window follows the system's light or dark palette. A six-step progress indicator,
+a bounded reading column and persistent navigation keep the flow readable. On smaller
+screens, the content scrolls while **Back**, **Cancel** and the main action stay in view.
+The Bridge form starts with the address and password; expand **Advanced options** to
+change the IMAP port or add sending addresses.
+
+These are real Qt widget renders with synthetic data, not evidence of a working Bridge or
+client connection. The interface follows the session's French or English locale.
+
+![French welcome screen in the dark palette](assets/desktop/welcome.png)
+
+![Bridge form with address, masked password and collapsed advanced options](assets/desktop/bridge.png)
+
 ## What it is for
 
 | Goal | How the assistant does it |
@@ -64,8 +79,8 @@ Then open **Proton Safe** from the applications menu.
    sends the messages it reads to its provider.
 2. **Check this computer** — system, session, keyring, Bridge and client. A blocking line
    explains what to do; nothing is installed silently.
-3. **Connect Bridge** — the address shown in Bridge, the IMAP port (`1143` by default) and
-   the Bridge-generated password. The server is always `127.0.0.1` and is not configurable.
+3. **Connect Bridge** — the address shown in Bridge and the Bridge-generated password.
+   **Advanced options** contains the IMAP port (`1143` by default) and other sending addresses. The server is always `127.0.0.1` and is not configurable.
 4. **Choose your assistant** — detected installations. ChatGPT desktop and Codex sharing a
    host appear as one shared connection, so no duplicate server is registered.
 5. **Turn the connection on** — a summary of exactly what will change, then one action.

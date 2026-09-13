@@ -194,6 +194,31 @@ time and the outcome. Never collect mail content or an identifier.
 - The build machine used for validation lacked the Qt xcb system libraries. They are
   declared in the package's `Depends`, and CI installs them on `ubuntu-24.04`, but the xcb
   platform plugin has not been exercised in a real X11 session.
-- The application icon is the project's banner artwork placed in `/usr/share/pixmaps`. A
-  dedicated square icon is still to be produced.
-- Only French and English strings exist, and only French has been reviewed in context.
+- Only French and English strings exist. Both are rendered during the UI preview checks.
+
+
+## UI refresh verification
+
+The visual refresh is checked separately from the initial implementation report above.
+The native widgets are rendered on Ubuntu 24.04 with Qt's `offscreen` platform and a
+synthetic service. No real mailbox, credential store or client registration is accessed.
+The package uses a dedicated square icon in the standard scalable `hicolor` icon directory.
+
+To reproduce the previews from a development checkout with the `dev` and `desktop` extras:
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python tests/render_desktop_previews.py /tmp/proton-ui-dark
+QT_QPA_PLATFORM=offscreen .venv/bin/python tests/render_desktop_previews.py /tmp/proton-ui-light --light --language en
+QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=2 .venv/bin/python tests/render_desktop_previews.py /tmp/proton-ui-small --compact
+```
+
+The script captures all seven screens, expanded Bridge options and a blocking keyring
+error. The compact run creates 1280 × 660 pixel images from a 640 × 330 logical window,
+leaving room for window decorations on a 1280 × 720 display at 200% scaling.
+
+The tests check the footer geometry on every screen in both languages, reach each Bridge
+field in the small viewport, expand advanced options with the keyboard, retain their values
+across Back, and verify step progress. The existing secret clearing, migration opt-in and
+partial disconnection tests continue to run. These checks do **not** establish rendering
+or accessibility under an actual Wayland compositor, X11 desktop or screen reader; the
+manual acceptance sheet remains to be completed.
