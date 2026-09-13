@@ -59,7 +59,9 @@ def test_imap_byte_capabilities_are_normalized(monkeypatch, settings):
         def logout(self):
             return "BYE", [b"Logged out"]
 
-    monkeypatch.setattr("proton_safe_mcp.mail.get_bridge_password", lambda _user: "password")
+    monkeypatch.setattr(
+        "proton_safe_mcp.mail.get_bridge_password", lambda _user, **_kwargs: "password"
+    )
     monkeypatch.setattr("proton_safe_mcp.mail.imaplib.IMAP4", FakeIMAP)
 
     with ProtonBridgeClient(settings).connection():
@@ -334,7 +336,9 @@ def test_transient_disconnect_is_private_and_next_call_reconnects(monkeypatch, s
         def logout(self):
             return "BYE", [b"Logged out"]
 
-    monkeypatch.setattr("proton_safe_mcp.mail.get_bridge_password", lambda _user: "bridge-secret")
+    monkeypatch.setattr(
+        "proton_safe_mcp.mail.get_bridge_password", lambda _user, **_kwargs: "bridge-secret"
+    )
     monkeypatch.setattr("proton_safe_mcp.mail.imaplib.IMAP4", FakeIMAP)
     client = ProtonBridgeClient(settings)
 
@@ -352,7 +356,9 @@ def test_reconnect_failure_is_bounded_and_private(monkeypatch, settings):
     def fail_to_connect(*_args, **_kwargs):
         raise OSError("bridge-secret at /home/private/socket")
 
-    monkeypatch.setattr("proton_safe_mcp.mail.get_bridge_password", lambda _user: "bridge-secret")
+    monkeypatch.setattr(
+        "proton_safe_mcp.mail.get_bridge_password", lambda _user, **_kwargs: "bridge-secret"
+    )
     monkeypatch.setattr("proton_safe_mcp.mail.imaplib.IMAP4", fail_to_connect)
 
     with pytest.raises(BridgeError) as caught:
@@ -738,7 +744,9 @@ def test_handshake_failures_never_echo_the_bridge_password(
         def logout(self):
             return "BYE", [b"Logged out"]
 
-    monkeypatch.setattr("proton_safe_mcp.mail.get_bridge_password", lambda _user: "bridge-secret")
+    monkeypatch.setattr(
+        "proton_safe_mcp.mail.get_bridge_password", lambda _user, **_kwargs: "bridge-secret"
+    )
     monkeypatch.setattr("proton_safe_mcp.mail.imaplib.IMAP4", FakeIMAP)
 
     with pytest.raises(BridgeError) as caught:
@@ -764,7 +772,9 @@ def test_tls_failure_is_reported_as_a_bounded_bridge_error(monkeypatch, settings
         def logout(self):
             return "BYE", [b"Logged out"]
 
-    monkeypatch.setattr("proton_safe_mcp.mail.get_bridge_password", lambda _user: "bridge-secret")
+    monkeypatch.setattr(
+        "proton_safe_mcp.mail.get_bridge_password", lambda _user, **_kwargs: "bridge-secret"
+    )
     monkeypatch.setattr("proton_safe_mcp.mail.imaplib.IMAP4", FakeIMAP)
 
     with pytest.raises(BridgeError) as caught:
@@ -796,7 +806,9 @@ def test_imap_protocol_error_is_reported_as_a_bounded_bridge_error(monkeypatch, 
         def logout(self):
             return "BYE", [b"Logged out"]
 
-    monkeypatch.setattr("proton_safe_mcp.mail.get_bridge_password", lambda _user: "bridge-secret")
+    monkeypatch.setattr(
+        "proton_safe_mcp.mail.get_bridge_password", lambda _user, **_kwargs: "bridge-secret"
+    )
     monkeypatch.setattr("proton_safe_mcp.mail.imaplib.IMAP4", FakeIMAP)
 
     with pytest.raises(BridgeError) as caught:
@@ -829,7 +841,9 @@ def test_logout_failure_does_not_mask_the_operation_result(monkeypatch, settings
         def logout(self):
             raise OSError("socket already closed")
 
-    monkeypatch.setattr("proton_safe_mcp.mail.get_bridge_password", lambda _user: "password")
+    monkeypatch.setattr(
+        "proton_safe_mcp.mail.get_bridge_password", lambda _user, **_kwargs: "password"
+    )
     monkeypatch.setattr("proton_safe_mcp.mail.imaplib.IMAP4", FakeIMAP)
 
     assert ProtonBridgeClient(settings).status()["inbox_unread"] == 1
