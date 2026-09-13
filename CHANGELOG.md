@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-09-13
+
+### Fixed
+
+- Restore `replied_to` as a deprecated alias of `reply_target` so clients that read the older
+  result field remain compatible. Both fields describe the requested parent, never verified
+  Proton conversation membership. The default refusal, explicit separate-draft acceptance,
+  `threading_verified: false`, and threading notice introduced in 2.1.1 remain in force.
+- Use a release-based plugin cache version instead of a timestamp. This changes the cache key
+  without implying a future build time.
+
 ## [2.1.1] - 2026-09-13
 
 ### Fixed
@@ -342,7 +353,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.3...v2.1.0
 [2.0.3]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.2...v2.0.3

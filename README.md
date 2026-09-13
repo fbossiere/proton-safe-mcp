@@ -84,7 +84,7 @@ the [release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.1).
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==2.1.1
+uv tool install proton-safe-mcp==2.1.2
 ```
 
 For development from source instead:

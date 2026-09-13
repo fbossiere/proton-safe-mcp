@@ -506,6 +506,8 @@ class ProtonBridgeClient:
             result["in_reply_to"] = reply_to_message_id
             result["references_count"] = len(references)
             result["reply_target"] = {"uid": reply_to_uid, "folder": reply_to_folder or "INBOX"}
+            # Legacy alias describes the requested parent, never verified membership.
+            result["replied_to"] = dict(result["reply_target"])
             result["threading_verified"] = False
             result["threading_notice"] = REPLY_THREADING_NOTICE
         return result
