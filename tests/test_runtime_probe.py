@@ -11,6 +11,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -208,3 +209,46 @@ def test_locate_runtime_prefers_the_executable_beside_this_interpreter():
         assert runtime.packaged
     else:  # pragma: no cover - depends on the installation layout
         assert runtime.command[0] == str(Path(shutil.which("proton-safe-mcp")).resolve())
+
+
+@pytest.mark.parametrize("output", ["", "partial frame without a newline", "x" * (512 * 1024 + 1)])
+def test_silent_partial_and_oversized_responses_return_promptly(tmp_path, managed_config, output):
+    """A finite two-second impostor proves the probe returns before the child does."""
+    payload = tmp_path / "payload"
+    payload.write_text(output)
+    impostor = tmp_path / "blocked.py"
+    impostor.write_text(
+        "import pathlib, sys, time\n"
+        f"sys.stdout.write(pathlib.Path({str(payload)!r}).read_text())\n"
+        "sys.stdout.flush()\n"
+        "time.sleep(2)\n"
+    )
+    started = time.monotonic()
+    outcome = probe_runtime(
+        RuntimeLocation((sys.executable, str(impostor)), packaged=False),
+        managed_config,
+        timeout=0.4,
+    )
+    assert time.monotonic() - started < 1.8
+    assert not outcome.ok
+    assert outcome.details["stage"] == ("transport" if len(output) > 512 * 1024 else "timeout")
+
+
+@pytest.mark.parametrize("result", [None, [], {"tools": None}, {"tools": [{"name": []}]}])
+def test_malformed_tool_response_is_reported_without_raising(tmp_path, managed_config, result):
+    impostor = tmp_path / "malformed.py"
+    # Both frames in one write also exercise retention of bytes after the first newline.
+    frames = (
+        json.dumps({"id": 1, "result": {"serverInfo": {"name": "impostor"}}})
+        + "\n"
+        + json.dumps({"id": 2, "result": result})
+        + "\n"
+    )
+    impostor.write_text(
+        f"import sys, time\nsys.stdout.write({frames!r})\nsys.stdout.flush()\ntime.sleep(2)\n"
+    )
+    outcome = probe_runtime(
+        RuntimeLocation((sys.executable, str(impostor)), packaged=False), managed_config
+    )
+    assert not outcome.ok
+    assert outcome.details["stage"] == "tools_list"

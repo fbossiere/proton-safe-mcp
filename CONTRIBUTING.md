@@ -25,7 +25,7 @@ Pull requests that violate these will be declined regardless of code quality:
 ```bash
 git clone https://github.com/fbossiere/proton-safe-mcp.git
 cd proton-safe-mcp
-uv sync --extra dev --extra desktop
+uv sync --extra dev --extra docs --extra desktop
 ```
 
 The `desktop` extra installs Qt for the setup assistant. It is optional for *using* the
@@ -38,8 +38,9 @@ You do not need Proton Bridge to develop: the test suite fakes the IMAP layer.
 
 A [dev container](.devcontainer/devcontainer.json) is provided for a zero-setup,
 CI-matching environment (Python 3.12 + [uv](https://docs.astral.sh/uv/)). It runs
-`uv sync --frozen --extra dev --extra docs` on create, so ruff, mypy, pytest,
-pip-audit and mkdocs are all ready. The GitHub CLI (`gh`) is included so you can
+`uv sync --frozen --extra dev --extra docs --extra desktop` on create, so ruff, mypy, pytest,
+pip-audit and mkdocs are all ready. Qt system libraries are installed too, and tests
+use the offscreen platform. The GitHub CLI (`gh`) is included so you can
 open a pull request without leaving the container — see
 [Opening the pull request](#opening-the-pull-request) for the one-time
 authentication it needs.
@@ -58,14 +59,16 @@ directly on the host. The Bridge host deliberately remains non-configurable.
 
 ## Before opening a PR
 
-Run the full local gate — it matches CI exactly:
+Run the local code and documentation checks used by CI:
 
 ```bash
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
 QT_QPA_PLATFORM=offscreen uv run pytest --cov
+uv run pip-audit
 uv run mkdocs build --strict
+uv build --no-sources
 ```
 
 The interface tests drive real widgets on Qt's `offscreen` platform, so they need no

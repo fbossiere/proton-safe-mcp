@@ -11,9 +11,11 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import select
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -102,22 +104,36 @@ def _frame(message: dict[str, Any]) -> bytes:
     return (json.dumps(message) + "\n").encode("utf-8")
 
 
-def _read_result(stream: Any, request_id: int, budget: list[int]) -> dict[str, Any] | None:
-    """Read newline-delimited JSON-RPC until the matching response, within a byte budget."""
+def _read_result(
+    stream: Any, request_id: int, budget: list[int], pending: bytearray, deadline: float
+) -> dict[str, Any] | None:
+    """Read bounded JSON-RPC frames with one deadline shared by the whole handshake.
+
+    A buffered readline can wait forever for a newline. Read ready pipe bytes directly
+    instead, retaining any following frame for the next request (Linux desktop runtime).
+    """
     while True:
-        line = stream.readline()
-        if not line:
-            return None
-        budget[0] -= len(line)
-        if budget[0] < 0:
-            raise ValueError("runtime produced more output than a handshake needs")
-        text = line.decode("utf-8", errors="replace").strip()
-        if not text:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("runtime handshake deadline reached")
+        newline = pending.find(b"\n")
+        if newline < 0:
+            if not select.select([stream], [], [], remaining)[0]:
+                raise TimeoutError("runtime handshake deadline reached")
+            chunk = os.read(stream.fileno(), min(65536, budget[0] + 1))
+            if not chunk:
+                return None
+            budget[0] -= len(chunk)
+            if budget[0] < 0:
+                raise ValueError("runtime produced more output than a handshake needs")
+            pending.extend(chunk)
             continue
+        line = bytes(pending[:newline])
+        del pending[: newline + 1]
         try:
-            message = json.loads(text)
-        except json.JSONDecodeError:
-            # FastMCP writes diagnostics on stderr, but a stray line here is not fatal.
+            message = json.loads(line)
+        except (ValueError, UnicodeError):
+            # Diagnostics belong on stderr, but a stray line here is not fatal.
             continue
         if isinstance(message, dict) and message.get("id") == request_id:
             return message
@@ -174,7 +190,8 @@ def _managed_environment() -> dict[str, str]:
 def _handshake(process: subprocess.Popen[bytes], *, timeout: float) -> Outcome:
     assert process.stdin is not None and process.stdout is not None
     budget = [MAX_HANDSHAKE_BYTES]
-    deadline = _Deadline(timeout)
+    deadline = time.monotonic() + timeout
+    pending = bytearray()
     try:
         process.stdin.write(
             _frame(
@@ -191,24 +208,29 @@ def _handshake(process: subprocess.Popen[bytes], *, timeout: float) -> Outcome:
             )
         )
         process.stdin.flush()
-        initialized = _read_result(process.stdout, 1, budget)
-        if initialized is None or "result" not in initialized:
+        initialized = _read_result(process.stdout, 1, budget, pending, deadline)
+        if initialized is None or not isinstance(initialized.get("result"), dict):
             return Outcome.failure(Code.RUNTIME_START_FAILED, stage="initialize")
 
         process.stdin.write(_frame({"jsonrpc": "2.0", "method": "notifications/initialized"}))
         process.stdin.write(_frame({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}))
         process.stdin.flush()
-        listed = _read_result(process.stdout, 2, budget)
+        listed = _read_result(process.stdout, 2, budget, pending, deadline)
+    except TimeoutError:
+        return Outcome.failure(Code.RUNTIME_START_FAILED, stage="timeout")
     except (OSError, ValueError):
         return Outcome.failure(Code.RUNTIME_START_FAILED, stage="transport")
-    if deadline.expired:
-        return Outcome.failure(Code.RUNTIME_START_FAILED, stage="timeout")
-    if listed is None or "result" not in listed:
+    if listed is None or not isinstance(listed.get("result"), dict):
         return Outcome.failure(Code.RUNTIME_START_FAILED, stage="tools_list")
 
     tools = listed["result"].get("tools", [])
-    names = {tool.get("name", "") for tool in tools if isinstance(tool, dict)}
-    server_name = initialized["result"].get("serverInfo", {}).get("name", "")
+    if not isinstance(tools, list) or any(
+        not isinstance(tool, dict) or not isinstance(tool.get("name"), str) for tool in tools
+    ):
+        return Outcome.failure(Code.RUNTIME_START_FAILED, stage="tools_list")
+    names = {tool["name"] for tool in tools}
+    server_info = initialized["result"].get("serverInfo", {})
+    server_name = server_info.get("name", "") if isinstance(server_info, dict) else ""
 
     unexpected = sorted(names - EXPECTED_TOOLS)
     missing = sorted(EXPECTED_TOOLS - names)
@@ -225,24 +247,6 @@ def _handshake(process: subprocess.Popen[bytes], *, timeout: float) -> Outcome:
     return Outcome.success(
         Code.RUNTIME_READY, tool_count=len(names), server_name=str(server_name)[:80]
     )
-
-
-class _Deadline:
-    def __init__(self, seconds: float) -> None:
-        import threading
-
-        self._expired = False
-        self._timer = threading.Timer(seconds, self._fire)
-        self._timer.daemon = True
-        self._timer.start()
-
-    def _fire(self) -> None:
-        self._expired = True
-
-    @property
-    def expired(self) -> bool:
-        self._timer.cancel()
-        return self._expired
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:

@@ -42,6 +42,13 @@ on another machine; it does not change the loopback-only Bridge boundary.
 
 ## Start here
 
+**Ubuntu 24.04 with local ChatGPT desktop or Codex:** use the
+[desktop setup assistant](desktop-assistant.md). Download one `.deb`, open it and follow
+the guided setup. Python and `uv` are bundled; Bridge and a compatible Proton plan are
+still required.
+
+For command-line setup and other MCP clients:
+
 1. Follow [Getting started](getting-started.md) to install the server and connect Proton Bridge.
 2. Use the [client setup guides](clients.md) for Claude Code, Cursor, or VS Code.
 3. Review the [security model](security-model.md) before combining the server with other tools.
@@ -58,4 +65,4 @@ Linux and Proton Mail Bridge users can also run the
 [10-minute external test](external-testing.md) and report installation friction without sharing
 private mail content.
 
-The current stable version is [v2.0.3](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.0.3).
+The current stable version is [v2.1.0](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.0).
