@@ -1047,7 +1047,7 @@ def test_an_accepted_separate_reply_submits_headers_without_claiming_thread_memb
     assert result["reply_target"] == {"uid": "42", "folder": "INBOX"}
     assert result["threading_verified"] is False
     assert "does not preserve reply threading" in result["threading_notice"]
-    assert "replied_to" not in result
+    assert result["replied_to"] == result["reply_target"]
     assert result["sent"] is False
 
 
@@ -1084,7 +1084,7 @@ def test_successful_append_that_discards_reply_headers_does_not_report_a_threade
     assert result["created"] is True
     assert result["sent"] is False
     assert result["threading_verified"] is False
-    assert "replied_to" not in result
+    assert result["replied_to"] == result["reply_target"]
     assert "Reply or Reply all" in result["threading_notice"]
 
 

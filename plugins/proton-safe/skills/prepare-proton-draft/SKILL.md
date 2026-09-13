@@ -99,3 +99,4 @@ no workaround through shell, filesystem, or browser tools is acceptable.
 For an accepted reply draft, report `threading_notice` and `threading_verified: false`. The
 `reply_target`, `in_reply_to`, and `references_count` describe the request submitted to Bridge,
 not verified conversation membership. Do not retry a successful creation to repair threading.
+`replied_to` is a deprecated alias of `reply_target`, not proof of conversation membership.

@@ -168,8 +168,9 @@ of that fallback.
 
 A saved fallback returns `created: true`, `sent: false`, `threading_verified: false`, and
 `threading_notice`. `reply_target`, `in_reply_to`, and `references_count` describe the request,
-not verified membership in a conversation. The misleading `replied_to` result field has been
-removed. Do not retry a successful creation to repair threading: that would create another draft.
+not verified membership in a conversation. `replied_to` remains as a deprecated alias of
+`reply_target` for existing clients; it is not proof of threading either. Do not retry a
+successful creation to repair threading: that would create another draft.
 
 The tests simulate both normal IMAP success and Bridge discarding reply headers. They verify
 refusal before connection, attachment preservation on refusal, and honest results after storage;
