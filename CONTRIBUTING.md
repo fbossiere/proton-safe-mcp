@@ -25,8 +25,12 @@ Pull requests that violate these will be declined regardless of code quality:
 ```bash
 git clone https://github.com/fbossiere/proton-safe-mcp.git
 cd proton-safe-mcp
-uv sync --extra dev
+uv sync --extra dev --extra desktop
 ```
+
+The `desktop` extra installs Qt for the setup assistant. It is optional for *using* the
+server, but the full local gate needs it: mypy type-checks the desktop package, and the
+interface tests skip without it. Add `--extra packaging` as well to build the `.deb`.
 
 You do not need Proton Bridge to develop: the test suite fakes the IMAP layer.
 
@@ -60,9 +64,15 @@ Run the full local gate — it matches CI exactly:
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
-uv run pytest --cov
+QT_QPA_PLATFORM=offscreen uv run pytest --cov
 uv run mkdocs build --strict
 ```
+
+The interface tests drive real widgets on Qt's `offscreen` platform, so they need no
+display — but they do need Qt's system libraries (`libegl1` and `libglib2.0-0t64` on
+Ubuntu). Without them the module skips with a stated reason rather than failing, which
+keeps a server-only installation green; check the summary for a skip before trusting a
+pass.
 
 Guidelines:
 

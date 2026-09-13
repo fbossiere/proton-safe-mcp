@@ -13,8 +13,13 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-QtCore = pytest.importorskip("PySide6.QtCore", reason="the desktop assistant needs PySide6")
-QtWidgets = pytest.importorskip("PySide6.QtWidgets")
+# exc_type=ImportError, not the ModuleNotFoundError pytest defaults to: Qt can be
+# installed and still fail to load because a system library such as libEGL is absent.
+# Both are supported states for a server-only installation, so both must skip rather
+# than break collection.
+_QT = "the desktop assistant needs PySide6 and its Qt system libraries"
+QtCore = pytest.importorskip("PySide6.QtCore", reason=_QT, exc_type=ImportError)
+QtWidgets = pytest.importorskip("PySide6.QtWidgets", reason=_QT, exc_type=ImportError)
 
 from proton_safe_mcp.desktop.app import MainWindow  # noqa: E402
 from proton_safe_mcp.desktop.widgets import STATUS_MARKS, CheckRow, SecretField  # noqa: E402

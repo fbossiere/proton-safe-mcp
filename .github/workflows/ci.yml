@@ -39,7 +39,8 @@ jobs:
         with:
           python-version: "3.12"
           version: "latest-known"
-      - run: uv sync --frozen --extra dev
+      # The desktop package is type-checked too, so Qt must be installed here.
+      - run: uv sync --frozen --extra dev --extra desktop
       - run: uv run mypy
 
   test:
@@ -57,9 +58,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           version: "latest-known"
+      # Qt's offscreen platform needs no display but still loads these system libraries.
+      # Without them the interface tests would skip, and a green run would prove nothing.
+      - name: Install the Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libegl1 libglib2.0-0t64
       - run: uv sync --frozen --extra dev --extra desktop
-      # The assistant's screens run on Qt's offscreen platform, so no display is needed.
       - run: QT_QPA_PLATFORM=offscreen uv run pytest --cov --cov-report=term-missing
+      # A module-level skip still exits 0, so assert directly that Qt was usable here.
+      # Without this, losing a system library would turn the interface tests into a
+      # silent skip and the run would stay green while proving nothing.
+      - name: Fail if Qt was not usable for the interface tests
+        run: QT_QPA_PLATFORM=offscreen uv run python -c "import PySide6.QtWidgets"
 
   audit:
     name: Dependency audit
