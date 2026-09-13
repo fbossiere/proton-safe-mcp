@@ -12,7 +12,7 @@ This guide installs Proton Safe MCP from a reviewed release and registers its lo
 
 - Linux with the official Proton Mail Bridge installed, signed in, and running.
 - A Proton plan that supports Bridge.
-- Python 3.11 or newer.
+- Python 3.11 or newer; CI tests every stable minor from 3.11 through 3.14.
 - [`uv`](https://docs.astral.sh/uv/).
 - A working Secret Service keyring such as `gnome-keyring`.
 
