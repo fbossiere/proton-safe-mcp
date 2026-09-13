@@ -165,6 +165,7 @@ def test_the_package_ships_both_executables_and_one_launcher(package_contents):
     assert "./opt/proton-safe-assistant/proton-safe-assistant" in package_contents
     assert "./opt/proton-safe-assistant/proton-safe-mcp" in package_contents
     assert "./usr/share/applications/proton-safe-assistant.desktop" in package_contents
+    assert "./usr/share/icons/hicolor/scalable/apps/proton-safe-assistant.svg" in package_contents
 
 
 def test_the_package_never_shadows_a_historic_cli_installation(package_contents):

@@ -23,17 +23,16 @@ mkdir -p "$STAGE/DEBIAN" \
          "$STAGE/opt/proton-safe-assistant" \
          "$STAGE/usr/bin" \
          "$STAGE/usr/share/applications" \
-         "$STAGE/usr/share/pixmaps" \
+         "$STAGE/usr/share/icons/hicolor/scalable/apps" \
          "$STAGE/usr/share/doc/proton-safe-assistant"
 
 cp -a "$BUNDLE/." "$STAGE/opt/proton-safe-assistant/"
 install -m 0644 packaging/proton-safe-assistant.desktop \
   "$STAGE/usr/share/applications/proton-safe-assistant.desktop"
 install -m 0644 LICENSE "$STAGE/usr/share/doc/proton-safe-assistant/copyright"
-# The available artwork is a banner, not a square app icon, so it goes to the
-# size-agnostic pixmaps fallback rather than claiming a hicolor size it does not have.
-install -m 0644 docs/assets/proton-mcp-safe.png \
-  "$STAGE/usr/share/pixmaps/proton-safe-assistant.png"
+# An original square vector mark, matching the icon drawn by the desktop UI.
+install -m 0644 packaging/proton-safe-assistant.svg \
+  "$STAGE/usr/share/icons/hicolor/scalable/apps/proton-safe-assistant.svg"
 
 # Only the graphical entry point is exposed on PATH. The runtime deliberately stays in
 # /opt so it cannot shadow an existing `proton-safe-mcp` in ~/.local/bin.

@@ -27,6 +27,39 @@ def detect_language() -> str:
 
 #: message key -> language -> text.
 CATALOGUE: Final[dict[str, dict[str, str]]] = {
+    "progress.dashboard": {"fr": "Votre connexion", "en": "Your connection"},
+    "client.intro": {
+        "fr": "Choisissez l'application dans laquelle retrouver vos outils Proton Safe.",
+        "en": "Choose the application where you want to use your Proton Safe tools.",
+    },
+    "activate.start": {"fr": "Activer la connexion", "en": "Activate connection"},
+    "verify.dashboard": {"fr": "Voir ma connexion", "en": "View my connection"},
+    "dashboard.erase.short": {
+        "fr": "Effacer aussi les données de connexion",
+        "en": "Also erase saved connection details",
+    },
+    "progress.step": {"fr": "Étape {current} sur {total}", "en": "Step {current} of {total}"},
+    "welcome.feature.find": {
+        "fr": "Retrouvez le bon échange",
+        "en": "Find the conversation you need",
+    },
+    "welcome.feature.summarise": {
+        "fr": "Faites le point en quelques mots",
+        "en": "Get a concise summary",
+    },
+    "welcome.feature.draft": {
+        "fr": "Préparez une réponse, gardez le dernier mot",
+        "en": "Prepare a reply. Keep the final say.",
+    },
+    "prereq.intro": {
+        "fr": "Vérifions que tout est prêt pour connecter votre messagerie.",
+        "en": "Let's make sure everything is ready to connect your mail.",
+    },
+    "prereq.bridge_help": {"fr": "Obtenir Proton Mail Bridge", "en": "Get Proton Mail Bridge"},
+    "bridge.advanced": {
+        "fr": "Options avancées · port et autres adresses",
+        "en": "Advanced options · port and other addresses",
+    },
     # -- application ---------------------------------------------------------
     "app.title": {
         "fr": "Connecter Proton Mail à votre assistant",
