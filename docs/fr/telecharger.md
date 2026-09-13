@@ -32,15 +32,15 @@ Python et `uv` sont inclus. Pas besoin de les installer ni de modifier un fichie
 
 ## Obtenir le fichier
 
-[Télécharger pour Ubuntu — v2.1.0 (.deb)](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.0/proton-safe-assistant_2.1.0_amd64.deb){ .md-button .md-button--primary }
+[Télécharger pour Ubuntu — v2.1.1 (.deb)](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/proton-safe-assistant_2.1.1_amd64.deb){ .md-button .md-button--primary }
 
 Gratuit, sous licence MIT, hébergé dans la **version officielle du projet sur GitHub**.
 Aucun compte GitHub n’est nécessaire pour le télécharger. Projet indépendant, non affilié à Proton
 et sans approbation de sa part.
 
-[Notes de version et tous les fichiers](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.0)
-· [Empreinte de contrôle](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.0/proton-safe-assistant_2.1.0_amd64.deb.sha256)
-· [Provenance du paquet](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.0/BUILD-PROVENANCE.txt)
+[Notes de version et tous les fichiers](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.1)
+· [Empreinte de contrôle](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/proton-safe-assistant_2.1.1_amd64.deb.sha256)
+· [Provenance du paquet](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/BUILD-PROVENANCE.txt)
 
 ## Installer, connecter, essayer
 
@@ -64,7 +64,7 @@ et sans approbation de sa part.
     un terminal dans le dossier contenant le fichier et à exécuter :
 
     ```bash
-    sudo apt install ./proton-safe-assistant_2.1.0_amd64.deb
+    sudo apt install ./proton-safe-assistant_2.1.1_amd64.deb
     ```
 
     Lancez ensuite **Proton Safe** normalement, jamais avec `sudo`.
@@ -74,13 +74,13 @@ et sans approbation de sa part.
     ouvert dans ce dossier :
 
     ```bash
-    sha256sum -c proton-safe-assistant_2.1.0_amd64.deb.sha256
+    sha256sum -c proton-safe-assistant_2.1.1_amd64.deb.sha256
     ```
 
-    L’empreinte SHA-256 du paquet publié en v2.1.0 est :
+    L’empreinte SHA-256 du paquet publié en v2.1.1 est :
 
     ```text
-    4ceebbfd0a12fe77ee46470397c9a6543a68ab85079aaa9ebc7eec72ad044dad
+    bf9612173d6dae36135ee11605f3cab44125b06a7be3a9f1179cce9334204512
     ```
 
     Elle permet de détecter un fichier endommagé ou différent. Téléchargez les deux fichiers
