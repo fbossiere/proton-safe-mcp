@@ -57,13 +57,13 @@ class Page(HTMLParser):
 
 def main() -> None:
     """Check local destinations and the six public onboarding pages."""
-    config = yaml.safe_load(Path("mkdocs.yml").read_text())
+    config = yaml.safe_load(Path("mkdocs.yml").read_text(encoding="utf-8"))
     root = Path("site").resolve()
     prefix = urlsplit(config["site_url"]).path
     pages: dict[Path, Page] = {}
     for path in root.rglob("*.html"):
         page = Page()
-        page.feed(path.read_text())
+        page.feed(path.read_text(encoding="utf-8"))
         pages[path] = page
     if not pages:
         raise SystemExit("No HTML pages found: build the site before checking it")
@@ -84,6 +84,9 @@ def main() -> None:
             else:
                 target = path.parent / local if local else path
             target = target.resolve()
+            if not target.is_relative_to(root):
+                errors.append(f"{path.relative_to(root)} -> {uri}: outside built site")
+                continue
             if target.is_dir():
                 target /= "index.html"
             link_count += 1
