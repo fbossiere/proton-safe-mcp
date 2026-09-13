@@ -1,0 +1,67 @@
+{% set fr = page.meta.locale == 'fr' %}
+{% macro t(en, french) %}{{ french if fr else en }}{% endmacro %}
+{% set download = 'fr/telecharger/' if fr else 'download/' %}
+{% set trial = 'fr/essayer/' if fr else 'try-it/' %}
+<!doctype html>
+<html lang="{{ 'fr' if fr else 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.meta.title }}</title>
+  <meta name="description" content="{{ page.meta.description }}">
+  <link rel="canonical" href="{{ page.canonical_url }}">
+  <link rel="alternate" hreflang="en" href="{{ config.site_url }}">
+  <link rel="alternate" hreflang="fr" href="{{ config.site_url }}fr/">
+  <link rel="alternate" hreflang="x-default" href="{{ config.site_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ page.meta.title }}">
+  <meta property="og:description" content="{{ page.meta.description }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:image" content="{{ config.site_url }}assets/proton-mcp-safe.png">
+  <link rel="icon" href="{{ 'assets/proton-safe.svg' | url }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ 'assets/stylesheets/landing.css' | url }}">
+</head>
+<body>
+<a class="skip" href="#main">{{ t('Skip to content', 'Aller au contenu') }}</a>
+<header class="header wrap">
+  <a class="brand" href="{{ ('fr/' if fr else '.') | url }}" aria-label="{{ t('Proton Safe home', 'Accueil Proton Safe') }}"><img src="{{ 'assets/proton-safe.svg' | url }}" width="36" height="36" alt="">Proton Safe</a>
+  <nav aria-label="{{ t('Main navigation', 'Navigation principale') }}">
+    <a href="{{ 'desktop-assistant/' | url }}">{{ t('Guide', 'Guide (EN)') }}</a>
+    <a href="https://github.com/fbossiere/proton-safe-mcp">GitHub <span aria-hidden="true">↗</span></a>
+    <a class="language" href="{{ ('.' if fr else 'fr/') | url }}" lang="{{ 'en' if fr else 'fr' }}" aria-label="{{ t('Lire en français', 'Read in English') }}">{{ 'EN' if fr else 'FR' }}</a>
+  </nav>
+</header>
+<main id="main">
+  <section class="hero wrap" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow">{{ t('PROTON MAIL × YOUR AI ASSISTANT', 'PROTON MAIL × VOTRE ASSISTANT IA') }}</p>
+      <h1 id="hero-title">{{ t('Find the email.', 'Retrouvez l’échange.') }}<br>{{ t('Prepare the reply.', 'Préparez la réponse.') }}<br><span>{{ t('You press send.', 'À vous d’envoyer.') }}</span></h1>
+      <p class="intro">{{ t('Connect Proton Mail to your assistant to find conversations, summarise what matters and prepare drafts. Set it up with a guided desktop app.', 'Connectez Proton Mail à votre assistant pour retrouver vos échanges, résumer l’essentiel et préparer des brouillons. Une application vous guide pour l’installation.') }}</p>
+      <p class="compatibility"><strong>Ubuntu 24.04 · Intel / AMD {{ t("64-bit", "64 bits") }}</strong><br>{{ t('Requires Proton Mail Bridge, a compatible paid Proton plan and local ChatGPT desktop / Codex.', 'Nécessite Proton Mail Bridge, un forfait Proton payant compatible et ChatGPT desktop / Codex en local.') }}</p>
+      <div class="actions"><a class="button primary" href="{{ config.extra.desktop_release.url }}">{{ t('Download for Ubuntu', 'Télécharger pour Ubuntu') }} <span aria-hidden="true">↓</span></a><a class="text-link" href="{{ download | url }}">{{ t('Check requirements', 'Vérifier les prérequis') }} <span aria-hidden="true">→</span></a></div>
+      <p class="micro">v{{ config.extra.desktop_release.version }} · .deb · {{ t('Free & open source · Hosted on GitHub', 'Gratuit et open source · Hébergé sur GitHub') }}</p>
+    </div>
+    <figure class="product-preview">
+      <div class="preview-label"><span class="dot" aria-hidden="true"></span>{{ t('YOUR CONNECTION, STEP BY STEP', 'VOTRE CONNEXION, PAS À PAS') }}</div>
+      <img src="{{ ('assets/desktop/welcome.png' if fr else 'assets/desktop/welcome-en.png') | url }}" width="980" height="700" alt="{{ t('Proton Safe setup app: welcome screen, six installation steps and a Get started button.', 'Application Proton Safe : écran d’accueil, six étapes d’installation et bouton Commencer.') }}">
+      <figcaption>{{ t('Actual interface render with demo data.', 'Rendu de l’interface réelle avec des données de démonstration.') }}</figcaption>
+    </figure>
+  </section>
+  <div class="principles wrap" aria-label="{{ t('At a glance', 'En quelques mots') }}"><span>{{ t('No terminal for setup', 'Installation sans terminal') }}</span><span>{{ t('Drafts you review', 'Des brouillons à relire') }}</span><span>{{ t('No send, delete or move tools', 'Aucun outil d’envoi, de suppression ou de déplacement') }}</span></div>
+  <section class="section wrap" id="how-it-fits-together" aria-labelledby="how-title">
+    <div class="section-heading"><p class="eyebrow">{{ t('FROM INSTALLATION TO FIRST USE', 'DE L’INSTALLATION AU PREMIER ESSAI') }}</p><h2 id="how-title">{{ t('A little setup. A useful connection.', 'Quelques étapes. Une connexion utile.') }}</h2><p>{{ t('Bridge and your assistant run on the same computer. Proton Safe connects them.', 'Bridge et votre assistant tournent sur le même ordinateur. Proton Safe fait le lien.') }}</p></div>
+    <ol class="steps">
+      <li><span class="step-number" aria-hidden="true">01</span><h3>{{ t('Install the app', 'Installez l’application') }}</h3><p>{{ t('Open the downloaded installer, then launch Proton Safe from your applications. Python is already bundled.', 'Ouvrez le fichier téléchargé, puis lancez Proton Safe depuis vos applications. Python est déjà inclus.') }}</p><a href="{{ download | url }}">{{ t('Installation guide', 'Guide d’installation') }} <span aria-hidden="true">→</span></a></li>
+      <li><span class="step-number" aria-hidden="true">02</span><h3>{{ t('Connect with Bridge', 'Connectez Bridge') }}</h3><p>{{ t('Use the address and password generated by Bridge. Review the proposed changes before activating your assistant.', 'Utilisez l’adresse et le mot de passe générés par Bridge. Vérifiez les changements proposés avant d’activer votre assistant.') }}</p><a href="{{ 'desktop-assistant/#the-flow' | url }}">{{ t('See the setup steps', 'Voir les étapes (EN)') }} <span aria-hidden="true">→</span></a></li>
+      <li><span class="step-number" aria-hidden="true">03</span><h3>{{ t('Try a real question', 'Posez une vraie question') }}</h3><p>{{ t('Find an exchange, ask for a summary, then prepare a reply. You confirm the draft and send it yourself in Proton Mail.', 'Retrouvez un échange, demandez un résumé, puis préparez une réponse. Vous confirmez le brouillon et l’envoyez vous-même dans Proton Mail.') }}</p><a href="{{ trial | url }}">{{ t('Your first three requests', 'Vos trois premières demandes') }} <span aria-hidden="true">→</span></a></li>
+    </ol>
+  </section>
+  <section class="privacy" id="safety-boundary" aria-labelledby="privacy-title"><div class="wrap privacy-grid">
+    <div><p class="eyebrow">{{ t('BEFORE YOU CONNECT', 'AVANT DE VOUS CONNECTER') }}</p><h2 id="privacy-title">{{ t('Clear about your mail.', 'Au clair sur vos messages.') }}</h2><p class="privacy-intro">{{ t('A local connection does not mean your AI runs locally.', 'Une connexion locale ne signifie pas que votre IA fonctionne en local.') }}</p><a href="{{ 'security-model/' | url }}">{{ t('Read the security model', 'Lire le modèle de sécurité (EN)') }} <span aria-hidden="true">→</span></a></div>
+    <div class="privacy-points"><div><h3>{{ t('Your credentials stay in your keyring', 'Vos identifiants restent dans votre trousseau') }}</h3><p>{{ t('The setup app stores the Bridge password in your computer’s session keyring. Use the password generated by Bridge, not your Proton account password.', 'L’application conserve le mot de passe Bridge dans le trousseau de session de votre ordinateur. Utilisez celui généré par Bridge, pas le mot de passe de votre compte Proton.') }}</p></div><div><h3>{{ t('Read messages can reach your AI provider', 'Les messages lus peuvent être transmis au fournisseur d’IA') }}</h3><p>{{ t('When your assistant uses a cloud model, the mail content it reads is sent to that provider. Choose what you ask it to read accordingly.', 'Lorsque votre assistant utilise un modèle dans le cloud, le contenu des messages qu’il lit est envoyé à ce fournisseur. Choisissez les messages que vous lui confiez en conséquence.') }}</p></div><div><h3>{{ t('Sending stays with you', 'L’envoi reste entre vos mains') }}</h3><p>{{ t('Proton Safe can create confirmed drafts. It has no tools to send, delete or move messages. Email is still untrusted input; these limits do not eliminate all AI risks.', 'Proton Safe peut créer des brouillons confirmés. Il ne dispose d’aucun outil pour envoyer, supprimer ou déplacer des messages. Les courriels restent des données non fiables : ces limites n’éliminent pas tous les risques liés à l’IA.') }}</p></div></div>
+  </div></section>
+  <section class="section wrap finish" id="start-here" aria-labelledby="try-title"><div><p class="eyebrow">{{ t('HELP SHAPE THE NEXT VERSION', 'AIDEZ À AMÉLIORER LA SUITE') }}</p><h2 id="try-title">{{ t('Try it on one useful task.', 'Essayez sur un besoin concret.') }}</h2><p>{{ t('Can you install it, find an exchange and prepare a useful draft? Tell us what helped and where you got stuck, without sharing your mail.', 'Arrivez-vous à l’installer, à retrouver un échange et à préparer un brouillon utile ? Dites-nous ce qui vous aide et ce qui vous bloque, sans partager vos messages.') }}</p></div><a class="button primary" href="{{ trial | url }}">{{ t('Try it & give feedback', 'Essayer et donner mon avis') }} <span aria-hidden="true">→</span></a></section>
+</main>
+<footer class="footer wrap"><div class="footer-brand"><strong>Proton Safe</strong><p>{{ t('Independent project by François Bossière.', 'Projet indépendant de François Bossière.') }}<br>{{ t('Not affiliated with or endorsed by Proton.', 'Non affilié à Proton et sans approbation de sa part.') }}</p></div><div class="footer-links"><a href="{{ 'overview/' | url }}">Documentation</a><a href="{{ download | url }}">{{ t('Download & updates', 'Téléchargement et mises à jour') }}</a><a href="https://github.com/fbossiere/proton-safe-mcp/blob/main/LICENSE">{{ t('MIT licence', 'Licence MIT') }}</a><a href="https://github.com/fbossiere/proton-safe-mcp/security/policy">{{ t('Report a vulnerability', 'Signaler une vulnérabilité') }}</a></div><p class="micro">{{ t('No analytics or third-party fonts added by this site.', 'Ce site n’ajoute ni outil de mesure d’audience ni police distante.') }}</p></footer>
+</body>
+</html>

@@ -57,6 +57,9 @@ password, second factor and session stay entirely inside Bridge.
 
 ## Install
 
+For a short walkthrough, use the [download and installation page](download.md)
+or [le guide en français](fr/telecharger.md).
+
 Download [the Ubuntu 24.04 x86_64 installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.0/proton-safe-assistant_2.1.0_amd64.deb)
 from the [v2.1.0 release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.0).
 Open it with Ubuntu's graphical package installer, then launch **Proton Safe** from the

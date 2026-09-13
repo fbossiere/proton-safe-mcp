@@ -60,6 +60,10 @@ the **Release** workflow manually from `main` with the original release tag and
 `server.json` still match the requested tag and does not rebuild or re-upload the immutable PyPI
 distribution.
 
+After the new installer is publicly available, update the website download links and verified
+checksums using the [download maintenance checklist](launch.md#keep-downloads-coherent-at-every-release).
+The site may keep offering the previous verified installer until that follow-up is deployed.
+
 ## Verify publication
 
 - Confirm every Release workflow job succeeded, including **Attach Ubuntu installer to draft release**
