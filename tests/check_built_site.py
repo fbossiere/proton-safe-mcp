@@ -65,7 +65,8 @@ def main() -> None:
         page = Page()
         page.feed(path.read_text())
         pages[path] = page
-    assert pages, "Build the site before checking it"
+    if not pages:
+        raise SystemExit("No HTML pages found: build the site before checking it")
     errors: list[str] = []
     link_count = 0
     for path, page in pages.items():
@@ -108,9 +109,13 @@ def main() -> None:
         "https://github.com/fbossiere/proton-safe-mcp/releases/download/"
         f"v{version}/proton-safe-assistant_{version}_amd64.deb"
     )
-    assert release["url"] == expected_download, "Release version and installer URL disagree"
+    if release["url"] != expected_download:
+        errors.append("Release version and installer URL disagree")
     for relative, language in onboarding.items():
-        page = pages[root / relative]
+        page = pages.get(root / relative)
+        if page is None:
+            errors.append(f"{relative}: required onboarding page was not generated")
+            continue
         if page.language != language:
             errors.append(f"{relative}: incorrect HTML language {page.language}")
         if page.external_assets:
@@ -121,7 +126,8 @@ def main() -> None:
             errors.append(f"{relative}: inconsistent download {page.downloads}")
         if not page.title or page.title in ("Home", "Accueil"):
             errors.append(f"{relative}: missing descriptive title")
-    assert not errors, "\n".join(errors)
+    if errors:
+        raise SystemExit("\n".join(errors))
     print(f"{len(pages)} pages, {link_count} local links and six onboarding pages checked.")
     print("All four download buttons target the same official versioned release asset.")
 
