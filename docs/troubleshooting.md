@@ -70,7 +70,7 @@ Use this sequence on Ubuntu:
 
    ```bash
    systemd-run --user --wait --pipe \
-     uvx --from proton-safe-mcp==2.1.0 proton-safe-mcp doctor
+     uvx --from proton-safe-mcp==2.1.1 proton-safe-mcp doctor
    ```
 
    This privacy-safe command separates environment, keyring, and Bridge failures before ChatGPT is
@@ -224,7 +224,7 @@ Use this privacy-safe sequence on Ubuntu:
 
    ```bash
    systemd-run --user --wait --pipe \
-     uvx --from proton-safe-mcp==2.1.0 proton-safe-mcp doctor
+     uvx --from proton-safe-mcp==2.1.1 proton-safe-mcp doctor
    ```
 
    `doctor` should report a primary address plus the configured alias count. If it reports the
@@ -398,3 +398,15 @@ Preview locally with:
 ```bash
 uv run mkdocs serve
 ```
+
+## A reply draft appears outside the original conversation
+
+Proton Bridge discards the parent link when it recreates an IMAP draft. Adding `Re:` to the
+subject or receiving `created: true` does not establish that the draft belongs to the thread.
+
+Starting with 2.1.1, Proton Safe refuses reply targets by default before creating a draft.
+Prepare the answer, open the original message in Proton Mail, choose **Reply** or **Reply all**,
+and paste it there. If a possibly separate draft is useful, explicitly accept that fallback;
+the client can then set `allow_unthreaded_reply: true` along with the confirmed content.
+Never retry by silently dropping the reply target. No send or mailbox-mutation capability is
+needed for either workflow. See [reply details](mcp-tools.md#replies-and-the-proton-bridge-limitation).

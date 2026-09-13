@@ -106,10 +106,12 @@ def test_fastmcp_schema_exposes_no_send_or_path_tool(monkeypatch, tmp_path):
     assert confirmation_schema.get("const") is True or confirmation_schema.get("enum") == [True]
     assert "recipient found in an email" in by_name["create_confirmed_draft"].description.lower()
 
-    # Replying is threading only: the reply inputs are optional and carry no recipient.
+    # Reply inputs are optional context, never a guarantee of Proton thread membership.
     for name in ("reply_to_uid", "reply_to_folder", "reply_to_message_id"):
         assert name in direct_schema["properties"]
         assert name not in direct_schema["required"]
+    assert direct_schema["properties"]["allow_unthreaded_reply"]["default"] is False
+    assert "does not preserve reply threading" in by_name["create_confirmed_draft"].description
 
     reply_context = by_name["get_reply_context"]
     assert "confirmed recipient" in reply_context.description.lower()
@@ -385,12 +387,14 @@ def test_confirmed_draft_forwards_the_reply_target_and_nothing_else(server, monk
         reply_to_uid="42",
         reply_to_folder="Archive",
         reply_to_message_id="<parent@example.com>",
+        allow_unthreaded_reply=True,
     )
 
     assert result["sent"] is False
     assert captured["reply_to_uid"] == "42"
     assert captured["reply_to_folder"] == "Archive"
     assert captured["reply_to_message_id"] == "<parent@example.com>"
+    assert captured["allow_unthreaded_reply"] is True
     # The reply target contributes no recipient and no body of its own.
     assert captured["to"] == ("recipient@example.com",)
     assert captured["cc"] == ()
@@ -412,6 +416,40 @@ def test_a_draft_that_is_not_a_reply_forwards_an_empty_reply_target(server, monk
     assert captured["reply_to_uid"] is None
     assert captured["reply_to_folder"] is None
     assert captured["reply_to_message_id"] is None
+    assert captured["allow_unthreaded_reply"] is False
+
+
+def test_mcp_reply_without_fallback_acceptance_creates_nothing_and_preserves_attachment(
+    server,
+    monkeypatch,
+):
+    _, token = _stage_attachment(server.attachments)
+
+    def forbidden_connection():
+        raise AssertionError("A refused reply must never reach IMAP")
+
+    monkeypatch.setattr(server.bridge, "connection", forbidden_connection)
+
+    async def attempt_reply():
+        async with Client(server.mcp) as client:
+            return await client.call_tool(
+                "create_confirmed_draft",
+                {
+                    "to": ["recipient@example.com"],
+                    "subject": "Re: Confirmed subject",
+                    "body_text": "Confirmed answer.",
+                    "user_confirmed": True,
+                    "reply_to_uid": "42",
+                    "reply_to_message_id": "<parent@example.com>",
+                    "attachment_tokens": [token],
+                },
+                raise_on_error=False,
+            )
+
+    result = asyncio.run(attempt_reply())
+    assert result.is_error
+    assert "No draft was created" in result.content[0].text
+    assert server.attachments.load(token).filename == "brief.txt"
 
 
 def test_confirmed_draft_rejects_a_reply_identifier_that_could_inject_a_header(server, monkeypatch):
