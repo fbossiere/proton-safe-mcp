@@ -814,9 +814,14 @@ def test_bridge_fields_stay_inside_the_small_viewport(wizard, application):
     window.show()
     screen = window.screens["bridge"]
     screen.advanced.setChecked(True)
-    application.processEvents()
+    # Showing the disclosure queues several layout requests (wrapped labels can change
+    # the page height). Scroll only after that relayout, as a user's next Tab would.
+    for _ in range(10):
+        application.processEvents()
     for field in (screen.user, screen.secret.field(), screen.port, screen.aliases):
         field.setFocus()
+        for _ in range(10):
+            application.processEvents()
         screen.content_scroll.ensureWidgetVisible(field)
         application.processEvents()
         viewport = screen.content_scroll.viewport()
