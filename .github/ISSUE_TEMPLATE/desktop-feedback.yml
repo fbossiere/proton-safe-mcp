@@ -1,0 +1,73 @@
+name: Desktop setup feedback / Retour sur l’installation
+description: Tell us what worked or where you got stuck. Français ou anglais.
+title: "[Desktop feedback]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Proton Safe. This issue is **public**. French and English are welcome.
+        Merci pour votre essai. Ce retour est **public** ; vous pouvez répondre en français.
+
+        Do not share email content, account addresses, passwords, attachments or unredacted logs/screenshots.
+        Ne partagez aucun contenu de message, adresse de compte, mot de passe ou fichier privé.
+        For security issues / Pour une faille : https://github.com/fbossiere/proton-safe-mcp/security/advisories/new
+  - type: input
+    id: version
+    attributes:
+      label: Proton Safe version
+      description: Shown in the app / Affichée dans l’application.
+      placeholder: "2.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Ubuntu and assistant / Ubuntu et assistant
+      description: Versions only; no account details / Versions uniquement, sans identifiant de compte.
+      placeholder: "Ubuntu 24.04, Codex …"
+    validations:
+      required: true
+  - type: dropdown
+    id: progress
+    attributes:
+      label: Furthest step reached / Dernière étape atteinte
+      options:
+        - "Download only / Téléchargement seul"
+        - "App installed / Application installée"
+        - "Bridge connected / Bridge connecté"
+        - "Tools available in assistant / Outils disponibles"
+        - "Conversation found and summarised / Échange retrouvé et résumé"
+        - "Draft checked in Proton Mail / Brouillon vérifié dans Proton Mail"
+        - "Used again for another task / Réutilisé pour un autre besoin"
+    validations:
+      required: true
+  - type: dropdown
+    id: help
+    attributes:
+      label: Help needed / Aide nécessaire
+      options:
+        - "None / Aucune"
+        - "Written guide / Guide écrit"
+        - "Help from the maintainer / Aide du développeur"
+        - "Still blocked / Toujours bloqué"
+    validations:
+      required: true
+  - type: textarea
+    id: experience
+    attributes:
+      label: What helped or blocked you? / Qu’est-ce qui vous a aidé ou bloqué ?
+      description: Describe the step and expected result without private mail content. / Décrivez l’étape et le résultat attendu sans contenu privé.
+    validations:
+      required: true
+  - type: textarea
+    id: reuse
+    attributes:
+      label: Would you use it again? / Souhaitez-vous le réutiliser ?
+      description: Optional. Describe the kind of task, not its confidential details. / Facultatif. Décrivez le type de besoin, sans détail confidentiel.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before posting / Avant de publier
+      options:
+        - label: "I checked that this public report contains no private mail or credentials. / J’ai vérifié que ce retour public ne contient ni message privé ni identifiant."
+          required: true

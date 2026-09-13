@@ -1,5 +1,7 @@
 # Proton Safe MCP
 
+**[Website & download](https://fbossiere.github.io/proton-safe-mcp/) · [En français](https://fbossiere.github.io/proton-safe-mcp/fr/)**
+
 <!-- mcp-name: io.github.fbossiere/proton-safe-mcp -->
 
 [![CI](https://github.com/fbossiere/proton-safe-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/fbossiere/proton-safe-mcp/actions/workflows/ci.yml)

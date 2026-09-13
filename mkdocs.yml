@@ -8,6 +8,10 @@ copyright: Copyright &copy; 2026 Francois Bossiere
 
 theme:
   name: material
+  custom_dir: docs/overrides
+  font: false
+  logo: assets/proton-safe.svg
+  favicon: assets/proton-safe.svg
   language: en
   features:
     - content.code.copy
@@ -51,6 +55,13 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Download: download.md
+  - First try & feedback: try-it.md
+  - En français:
+      - Accueil: fr/index.md
+      - Télécharger: fr/telecharger.md
+      - Essayer et donner son avis: fr/essayer.md
+  - Project overview: overview.md
   - Getting started: getting-started.md
   - Desktop assistant: desktop-assistant.md
   - Client setup: clients.md
@@ -68,4 +79,13 @@ nav:
   - Troubleshooting: troubleshooting.md
   - Development: development.md
   - Releasing: releasing.md
+  - Launch checklist: launch.md
   - Changelog: https://github.com/fbossiere/proton-safe-mcp/blob/main/CHANGELOG.md
+
+# Keep templates out of generated pages. All public assets are self-hosted.
+exclude_docs: |
+  /overrides/
+extra:
+  desktop_release:
+    version: "2.1.0"
+    url: https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.0/proton-safe-assistant_2.1.0_amd64.deb

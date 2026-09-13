@@ -26,7 +26,9 @@ manually upload the same version first.
 ## Prepare a release
 
 1. Update `src/proton_safe_mcp/__init__.py`, `server.json`, the package version inside `server.json`,
-   the lockfile, plugin runtime pin and cache version, documentation links, and `CHANGELOG.md` to the same semantic version.
+   the lockfile, plugin runtime pin and cache version, runtime examples, and `CHANGELOG.md` to the same semantic version.
+   Keep the website installer buttons and checksums on the previous published version until the
+   new assets have been published and verified; update those in the follow-up described below.
 2. Run the complete quality gate from [Development](development.md).
 3. Merge the release changes to `main`.
 4. Create and push a signed tag at the merged release commit, exactly `v` followed by the
@@ -59,6 +61,10 @@ the **Release** workflow manually from `main` with the original release tag and
 **Republish only MCP Registry metadata** enabled. This recovery path checks that both versions in
 `server.json` still match the requested tag and does not rebuild or re-upload the immutable PyPI
 distribution.
+
+After the new installer is publicly available, update the website download links and verified
+checksums using the [download maintenance checklist](launch.md#keep-downloads-coherent-at-every-release).
+The site may keep offering the previous verified installer until that follow-up is deployed.
 
 ## Verify publication
 
