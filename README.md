@@ -69,7 +69,7 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 
 ### Desktop assistant — Ubuntu 24.04, x86_64
 
-[Download the installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/proton-safe-assistant_2.1.1_amd64.deb),
+[Download the installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb),
 open it with Ubuntu's package installer, then launch **Proton Safe**. The assistant guides
 you through Bridge connection and plugin activation in a compatible local ChatGPT desktop
 or Codex installation. Python and `uv` are included; no terminal setup is required.
@@ -77,7 +77,7 @@ or Codex installation. Python and `uv` are included; no terminal setup is requir
 You still need Proton Mail Bridge, a compatible Proton plan and a session keyring.
 See the [desktop guide](https://fbossiere.github.io/proton-safe-mcp/desktop-assistant/)
 for prerequisites, screenshots and repair options. Checksums and build provenance are in
-the [release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.1).
+the [release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2).
 
 ### Command-line installation — other MCP clients
 

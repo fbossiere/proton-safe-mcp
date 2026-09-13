@@ -87,5 +87,5 @@ exclude_docs: |
   /overrides/
 extra:
   desktop_release:
-    version: "2.1.1"
-    url: https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.1/proton-safe-assistant_2.1.1_amd64.deb
+    version: "2.1.2"
+    url: https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb
