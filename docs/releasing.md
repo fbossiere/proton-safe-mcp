@@ -26,7 +26,9 @@ manually upload the same version first.
 ## Prepare a release
 
 1. Update `src/proton_safe_mcp/__init__.py`, `server.json`, the package version inside `server.json`,
-   the lockfile, plugin runtime pin and cache version, documentation links, and `CHANGELOG.md` to the same semantic version.
+   the lockfile, plugin runtime pin and cache version, runtime examples, and `CHANGELOG.md` to the same semantic version.
+   Keep the website installer buttons and checksums on the previous published version until the
+   new assets have been published and verified; update those in the follow-up described below.
 2. Run the complete quality gate from [Development](development.md).
 3. Merge the release changes to `main`.
 4. Create and push a signed tag at the merged release commit, exactly `v` followed by the
