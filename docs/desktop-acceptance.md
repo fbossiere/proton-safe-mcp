@@ -1,0 +1,81 @@
+# Acceptance sheet — desktop assistant
+
+Short sheet to fill in on the target system. Every line starts at **Not tested** and stays
+there until someone has actually run it. Do not mark a line as passed because the automated
+suite covers something similar: this sheet is only about the real path on Ubuntu 24.04 with
+a real Proton Mail Bridge and a real ChatGPT desktop / Codex installation.
+
+**Status at the time of the pull request: every line below is Not tested.** No line has been
+exercised on the target system, because the implementation environment had no Ubuntu, no
+Secret Service daemon, no Bridge and no client. See [Desktop validation](desktop-testing.md)
+for what *was* proven, and how.
+
+## How to get the package
+
+The `.deb` is never committed. Take it from the `desktop-package` artefact of the CI run for
+this branch, which also carries `BUILD-PROVENANCE.txt` (package name, SHA-256, source commit
+and build host) and the `.sha256` file. Before installing:
+
+```bash
+sha256sum -c proton-safe-assistant_<version>_amd64.deb.sha256
+```
+
+Check that the source commit in `BUILD-PROVENANCE.txt` is the commit you meant to test.
+
+To build it yourself instead:
+
+```bash
+uv sync --frozen --extra dev --extra desktop --extra packaging
+PYINSTALLER="$(pwd)/.venv/bin/pyinstaller" bash packaging/build_bundle.sh
+bash packaging/build_deb.sh
+```
+
+## Test environment
+
+Fill in before starting.
+
+| | |
+|---|---|
+| Ubuntu version and architecture | |
+| Session type (Wayland / X11) | |
+| Display resolution and scaling | |
+| Proton Mail Bridge version | |
+| ChatGPT desktop / Codex version | |
+| Package SHA-256 | |
+| Source commit | |
+| Tester and date | |
+
+## Scenarios
+
+Mark exactly one box per line. Add the observed behaviour for anything that is not a clean
+pass.
+
+| # | Scenario | Passed | Failed | Not tested | Notes |
+|---|---|:---:|:---:|:---:|---|
+| 1 | **Fresh graphical installation** — the `.deb` opens and installs from the graphical package installer, with no terminal and no extra tool to install first; **Proton Safe** then appears in the applications menu and opens. | ☐ | ☐ | ☒ | |
+| 2 | **Keyring and Bridge connection** — the keyring line passes (system dialog appears and unlocking works if locked), the Bridge password is accepted, and the credential is stored. Bridge reports no message as read afterwards. | ☐ | ☐ | ☒ | |
+| 3 | **Activation in the real client** — the detected assistant is registered; ChatGPT desktop and Codex appear as one shared connection, not two. Record the exact `codex plugin` commands accepted or rejected. | ☐ | ☐ | ☒ | |
+| 4 | **The runtime actually launched** — the MCP server the client starts is `/opt/proton-safe-assistant/proton-safe-mcp` with `--config`, not `uvx` and not another installation. Confirm from the client's own MCP view or process list. | ☐ | ☐ | ☒ | |
+| 5 | **Search for a test message** — in the client, find a message sent to the test account. This is the first deliberate use, not a technical test. | ☐ | ☐ | ☒ | |
+| 6 | **Confirmed draft, nothing sent** — prepare a draft after explicit confirmation; it lands in `Drafts` in Proton Mail and is **not** sent. Confirm no message left the account. | ☐ | ☐ | ☒ | |
+| 7 | **Full restart** — restart the session or the machine, open Bridge and the client normally, and confirm the connection still works **with no `PROTON_*` variable exported anywhere**. | ☐ | ☐ | ☒ | |
+| 8 | **Repair** — change the Bridge password in Bridge, confirm the assistant reports an authentication failure specifically, then repair it. The previous credential must only be replaced after the new one is accepted. | ☐ | ☐ | ☒ | |
+| 9 | **Migration of an existing installation** — with the CLI or published plugin already set up, run the assistant: the plan is shown first, the working credential is reused without retyping, no duplicate server is created, other plugins survive, and `uv` / Python / `environment.d` are left alone. | ☐ | ☐ | ☒ | |
+| 10 | **Disconnection** — only the assistant's own entries are removed; other plugins, Bridge, mail, drafts and attachments are untouched. A still-running server is announced as needing a client restart rather than claimed revoked. | ☐ | ☐ | ☒ | |
+
+## Additional observations
+
+| Item | Result |
+|---|---|
+| Window usable at 1280 × 720 | ☐ passed ☐ failed ☒ not tested |
+| Window usable at 200 % scaling | ☐ passed ☐ failed ☒ not tested |
+| Full keyboard navigation on a real display | ☐ passed ☐ failed ☒ not tested |
+| Cancelling a slow step leaves nothing written | ☐ passed ☐ failed ☒ not tested |
+| Time from opening the installer to the first result | |
+| Time spent downloading prerequisites (counted separately) | |
+
+## Reporting
+
+Report only the operating system, the versions, the step that blocked, the elapsed time and
+the outcome. Never include mail content, an email address or a credential — and never share
+the Bridge password with anyone, including an AI assistant.

@@ -1,0 +1,636 @@
+"""Interface checks: accessibility, keyboard reach, honest wording, and no leaks.
+
+These run against the real widgets on Qt's offscreen platform, so they exercise the
+screens rather than asserting on source text. They skip when Qt is absent, which is the
+supported state for a PyPI install of the server.
+"""
+
+from __future__ import annotations
+
+import os
+
+import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+QtCore = pytest.importorskip("PySide6.QtCore", reason="the desktop assistant needs PySide6")
+QtWidgets = pytest.importorskip("PySide6.QtWidgets")
+
+from proton_safe_mcp.desktop.app import MainWindow  # noqa: E402
+from proton_safe_mcp.desktop.widgets import STATUS_MARKS, CheckRow, SecretField  # noqa: E402
+from proton_safe_mcp.onboarding.messages import OFFICIAL_LINKS, translate  # noqa: E402
+from proton_safe_mcp.onboarding.models import Check, Code, InstallState  # noqa: E402
+from proton_safe_mcp.onboarding.service import SetupService, Snapshot  # noqa: E402
+
+INTERACTIVE = (
+    QtWidgets.QPushButton,
+    QtWidgets.QToolButton,
+    QtWidgets.QLineEdit,
+    QtWidgets.QSpinBox,
+    QtWidgets.QCheckBox,
+    QtWidgets.QListWidget,
+)
+
+
+@pytest.fixture(scope="session")
+def application():
+    existing = QtWidgets.QApplication.instance()
+    yield existing or QtWidgets.QApplication([])
+
+
+@pytest.fixture
+def service(tmp_path, monkeypatch, fake_keyring):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    directory = tmp_path / "config" / "proton-safe-mcp"
+    directory.mkdir(mode=0o700, parents=True)
+    return SetupService(
+        config_path=directory / "config.toml",
+        journal_path=tmp_path / "state" / "install.json",
+        plugin_dir=tmp_path / "plugin",
+        adapters=(),
+    )
+
+
+@pytest.fixture
+def window(application, service):
+    built = MainWindow(service, language="fr")
+    yield built
+    built.runner.cancel()
+    built.runner.wait(10_000)
+    built.deleteLater()
+
+
+def _settle(window, application):
+    """Wait out every task, including ones a completed task starts in its handler."""
+    for _ in range(8):
+        window.runner.wait(20_000)
+        for _ in range(3):
+            application.processEvents()
+        if not window.runner.busy:
+            break
+
+
+def test_a_fresh_computer_opens_on_the_welcome_screen(window, application):
+    window.start()
+    _settle(window, application)
+
+    assert window.stack.currentWidget() is window.screens["welcome"]
+    assert translate("app.title", "fr") in window.windowTitle()
+
+
+def test_an_existing_installation_opens_on_the_dashboard(
+    window, application, service, write_managed_config
+):
+    write_managed_config(service.config_path)
+    window.start()
+    _settle(window, application)
+
+    assert window.stack.currentWidget() is window.screens["dashboard"]
+
+
+def test_the_window_fits_a_1280_by_720_screen_at_200_percent_scaling(window):
+    minimum = window.minimumSize()
+
+    # At 200% scaling a 1280x720 screen offers roughly 640x360 logical pixels of room
+    # for content; the window must still be usable by scrolling rather than clipping.
+    assert minimum.width() <= 1280
+    assert minimum.height() <= 720
+    assert isinstance(window.centralWidget(), QtWidgets.QScrollArea)
+    assert window.centralWidget().widgetResizable()
+
+
+def test_every_interactive_control_can_be_reached_with_the_keyboard(window):
+    unreachable = [
+        f"{name}:{type(child).__name__}"
+        for name, screen in window.screens.items()
+        for child in screen.findChildren(QtWidgets.QWidget)
+        if isinstance(child, INTERACTIVE) and child.focusPolicy() == QtCore.Qt.FocusPolicy.NoFocus
+    ]
+
+    assert unreachable == []
+
+
+def test_every_interactive_control_has_an_accessible_name(window):
+    unnamed = [
+        f"{name}:{type(child).__name__}"
+        for name, screen in window.screens.items()
+        for child in screen.findChildren(QtWidgets.QWidget)
+        if isinstance(child, INTERACTIVE)
+        and not (child.accessibleName() or getattr(child, "text", lambda: "")())
+    ]
+
+    assert unnamed == []
+
+
+def test_a_status_is_never_carried_by_colour_alone():
+    row = CheckRow("Trousseau", language="fr")
+    row.show_check(Check("keyring", "fail", Code.KEYRING_LOCKED))
+
+    description = row.accessibleDescription()
+    marks = row.findChildren(QtWidgets.QLabel)
+    assert translate("status.fail", "fr") in description
+    assert "verrouillé" in description
+    assert marks[0].text() == STATUS_MARKS["fail"]
+    # Distinct statuses produce distinct text and a distinct mark, not just a colour.
+    row.show_check(Check("keyring", "pass", Code.KEYRING_AVAILABLE))
+    assert translate("status.pass", "fr") in row.accessibleDescription()
+    assert marks[0].text() == STATUS_MARKS["pass"]
+    assert STATUS_MARKS["pass"] != STATUS_MARKS["fail"]
+
+
+def test_the_secret_field_is_masked_and_only_reveals_on_an_explicit_action(application):
+    field = SecretField("fr")
+    field.field().setText("candidate")
+
+    assert field.field().echoMode() == QtWidgets.QLineEdit.EchoMode.Password
+    reveal = field.findChild(QtWidgets.QToolButton)
+    reveal.setChecked(True)
+    assert field.field().echoMode() == QtWidgets.QLineEdit.EchoMode.Normal
+    reveal.setChecked(False)
+    assert field.field().echoMode() == QtWidgets.QLineEdit.EchoMode.Password
+
+
+def test_taking_the_secret_clears_the_widget(application):
+    field = SecretField("fr")
+    field.field().setText("candidate")
+
+    assert field.take() == "candidate"
+    assert field.field().text() == ""
+    assert not field.has_value
+    assert field.take() is None
+
+
+def test_pasting_into_the_secret_field_is_allowed(application):
+    field = SecretField("fr")
+
+    assert not field.field().isReadOnly()
+    assert field.field().maxLength() >= 64
+
+
+def test_returning_to_the_bridge_screen_preserves_the_non_secret_fields(
+    window, application, service
+):
+    window.show_screen("bridge")
+    screen = window.screens["bridge"]
+    screen.user.setText("typed@example.com")
+    screen.port.setValue(1188)
+    window.show_screen("client")
+    _settle(window, application)
+    window.go_back()
+
+    assert screen.user.text() == "typed@example.com"
+    assert screen.port.value() == 1188
+
+
+def test_technical_details_are_collapsed_by_default(window):
+    for screen in window.screens.values():
+        for box in screen.findChildren(QtWidgets.QGroupBox):
+            assert not box.isChecked()
+
+
+def test_a_pending_client_step_is_never_reported_as_finished(window, application, monkeypatch):
+    monkeypatch.setattr(
+        SetupService,
+        "verify",
+        lambda _self: [
+            Check("bridge", "pass", Code.BRIDGE_AUTHENTICATED),
+            Check("runtime", "pass", Code.RUNTIME_READY),
+            Check("client", "action_required", Code.CLIENT_RESTART_REQUIRED),
+        ],
+    )
+    window.show_screen("verify")
+    _settle(window, application)
+    screen = window.screens["verify"]
+
+    assert "vérification" in screen.status.text().lower()
+    assert "terminé" not in screen.status.text().lower()
+    assert translate("status.action_required", "fr") in (
+        screen.rows["client"].accessibleDescription()
+    )
+
+
+def test_the_verification_screen_offers_a_copyable_prompt_that_reads_nothing(window):
+    screen = window.screens["verify"]
+    text = screen.prompt.toPlainText()
+
+    assert "sans lire mes messages" in text
+    assert "brouillon" in text
+    assert screen.prompt.isReadOnly()
+
+
+def test_the_dashboard_shows_a_masked_account(window, application, monkeypatch):
+    monkeypatch.setattr(
+        SetupService,
+        "snapshot",
+        lambda _self: Snapshot(
+            state=InstallState.READY,
+            account_masked="p•••••@example.com",
+            configuration_present=True,
+        ),
+    )
+    window.show_screen("dashboard")
+    _settle(window, application)
+
+    assert window.screens["dashboard"].account.text() == "p•••••@example.com"
+
+
+def test_the_browser_only_ever_opens_a_fixed_official_link(window, monkeypatch):
+    opened: list[str] = []
+    monkeypatch.setattr(
+        "proton_safe_mcp.desktop.app.QtGui.QDesktopServices.openUrl",
+        lambda url: opened.append(url.toString()),
+    )
+
+    window.open_official("bridge")
+    window.open_official("not-a-known-key")
+
+    assert opened == [OFFICIAL_LINKS["bridge"]]
+    assert all(url.startswith("https://") for url in opened)
+
+
+def test_a_failed_operation_shows_a_translated_code_not_a_raw_message(
+    window, application, monkeypatch
+):
+    monkeypatch.setattr(
+        SetupService,
+        "prerequisites",
+        lambda _self: (_ for _ in ()).throw(
+            __import__("proton_safe_mcp.errors", fromlist=["ProtonMCPError"]).ProtonMCPError(
+                "/home/someone/private path and a secret", code=str(Code.KEYRING_LOCKED)
+            )
+        ),
+    )
+    window.show_screen("prerequisites")
+    _settle(window, application)
+    text = window.screens["prerequisites"].status.text()
+
+    assert "/home/someone/private" not in text
+    assert "verrouillé" in text
+
+
+def test_cancelling_a_running_operation_reports_it_as_cancelled(window, application):
+    import threading
+
+    release = threading.Event()
+
+    def slow(token):
+        release.wait(5)
+        token.checkpoint()
+        return None
+
+    screen = window.screens["bridge"]
+    window.run(slow, lambda _r: None, screen._failed)
+    window.cancel_current()
+    release.set()
+    _settle(window, application)
+
+    assert screen.status.text() == translate("common.cancelled", "fr")
+
+
+def test_the_runner_refuses_to_start_a_second_task_while_one_runs(window, application):
+    import threading
+
+    release = threading.Event()
+    started = threading.Event()
+
+    def slow(_token):
+        started.set()
+        release.wait(5)
+        return None
+
+    assert window.runner.start(slow)
+    started.wait(5)
+    assert not window.runner.start(lambda _token: None)
+    release.set()
+    _settle(window, application)
+
+
+def test_the_interface_imports_no_bridge_or_keyring_module_of_its_own():
+    """Screens must go through the service, never talk to Bridge or the keyring directly."""
+    import proton_safe_mcp.desktop.app as module
+
+    source = module.__dict__
+    assert "ProtonBridgeClient" not in source
+    assert "keyring" not in source
+    assert "store_bridge_password" not in source
+
+
+# -- the wizard, driven end to end against a fake service --------------------------
+
+
+class RecordingService:
+    """A service double that records what the screens asked it to do."""
+
+    def __init__(self, tmp_path):
+        from proton_safe_mcp.onboarding.models import (
+            ClientInstallation,
+            PlanStep,
+            RegistrationOutcome,
+            RegistrationPlan,
+        )
+        from proton_safe_mcp.onboarding.plugin_assets import ManagedPluginAssets
+
+        self.config_path = tmp_path / "config.toml"
+        self.plugin_dir = tmp_path / "plugin"
+        self.saved: list[object] = []
+        self.activated: list[object] = []
+        self.confirmed = 0
+        self.disconnected: list[bool] = []
+        self.installation = ClientInstallation(
+            id="fake:0",
+            adapter="fake",
+            display_name="ChatGPT desktop / Codex",
+            executable=tmp_path / "codex",
+            version="codex-cli 1.4.0",
+            capabilities=frozenset({"plugin"}),
+            shared_surfaces=("ChatGPT desktop", "Codex CLI"),
+        )
+        self.assets = ManagedPluginAssets(
+            marketplace_dir=tmp_path / "plugin",
+            plugin_dir=tmp_path / "plugin" / "plugins" / "proton-safe",
+            marketplace_name="proton-safe-desktop",
+            plugin_name="proton-safe",
+            plugin_version="0.1.0+codex.test",
+            engine_version="test",
+            resource_digest="d" * 64,
+        )
+        self.plan = RegistrationPlan(
+            installation=self.installation,
+            steps=(PlanStep("add", "plan.plugin", "proton-safe@proton-safe-desktop"),),
+        )
+        self._outcome = RegistrationOutcome(ok=True, code=Code.CLIENT_REGISTERED)
+
+    def prerequisites(self):
+        return [
+            Check("system", "pass", Code.SYSTEM_SUPPORTED, "Ubuntu 24.04"),
+            Check("session", "pass", Code.SESSION_OK, "Wayland"),
+            Check("keyring", "pass", Code.KEYRING_AVAILABLE),
+            Check("bridge", "pass", Code.BRIDGE_APP_DETECTED),
+            Check("client", "pass", Code.CLIENT_DETECTED, "codex-cli 1.4.0"),
+        ]
+
+    def discover(self):
+        return [self.installation]
+
+    def stored_configuration(self):
+        return None
+
+    def snapshot(self):
+        return Snapshot(state=InstallState.NEW)
+
+    def save_bridge(self, candidate, *, cancel=None):
+        from proton_safe_mcp.onboarding.models import Outcome
+
+        self.saved.append(candidate)
+        return Outcome.success(Code.CONFIG_SAVED)
+
+    def plan_client(self, installation):
+        return self.plan, self.assets
+
+    def activate(self, plan, assets):
+        self.activated.append((plan, assets))
+        return self._outcome
+
+    def verify(self):
+        return [
+            Check("bridge", "pass", Code.BRIDGE_AUTHENTICATED),
+            Check("runtime", "pass", Code.RUNTIME_READY),
+            Check("client", "action_required", Code.CLIENT_RESTART_REQUIRED),
+        ]
+
+    def confirm_client_manually(self):
+        from proton_safe_mcp.onboarding.models import Outcome
+
+        self.confirmed += 1
+        return Outcome.success(Code.CLIENT_VERIFIED_MANUALLY)
+
+    def disconnect(self, *, erase_local=False):
+        from proton_safe_mcp.onboarding.models import Outcome
+
+        self.disconnected.append(erase_local)
+        return Outcome.success(Code.CLIENT_REMOVED)
+
+    def diagnostic_report(self):
+        return {"schema_version": 1, "overall": "ok", "checks": []}
+
+
+@pytest.fixture
+def wizard(application, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "proton_safe_mcp.desktop.app.MainWindow.service_has_secret", lambda _self, _user: False
+    )
+    service = RecordingService(tmp_path)
+    window = MainWindow(service, language="fr")
+    yield window, service
+    window.runner.cancel()
+    window.runner.wait(10_000)
+    window.deleteLater()
+
+
+def test_the_whole_wizard_reaches_verification_without_touching_mail(wizard, application):
+    window, service = wizard
+    window.start()
+    _settle(window, application)
+    assert window.stack.currentWidget() is window.screens["welcome"]
+
+    window.screens["welcome"].primary.click()
+    _settle(window, application)
+    assert window.screens["prerequisites"].primary.isEnabled()
+
+    window.screens["prerequisites"].primary.click()
+    _settle(window, application)
+    bridge = window.screens["bridge"]
+    bridge.user.setText("person@example.com")
+    bridge.port.setValue(1143)
+    bridge.secret.field().setText("bridge-generated")
+    bridge.primary.click()
+    _settle(window, application)
+
+    assert len(service.saved) == 1
+    candidate = service.saved[0]
+    assert candidate.user == "person@example.com"
+    # The screen hands the secret over once and keeps nothing.
+    assert bridge.secret.field().text() == ""
+
+    assert window.stack.currentWidget() is window.screens["client"]
+    assert window.screens["client"].primary.isEnabled()
+    window.screens["client"].primary.click()
+    _settle(window, application)
+
+    activate = window.screens["activate"]
+    assert activate.primary.isEnabled()
+    assert "ChatGPT desktop / Codex" in activate.primary.text()
+    activate.primary.click()
+    _settle(window, application)
+
+    assert len(service.activated) == 1
+    assert window.stack.currentWidget() is window.screens["verify"]
+    # Registered is not ready: the client step is still outstanding.
+    assert "vérification" in window.screens["verify"].status.text().lower()
+
+
+def test_confirming_manually_is_an_explicit_user_action(wizard, application):
+    window, service = wizard
+    window.show_screen("verify")
+    _settle(window, application)
+    assert service.confirmed == 0
+
+    window.screens["verify"].confirm.click()
+    _settle(window, application)
+
+    assert service.confirmed == 1
+
+
+def test_a_conflicting_plan_blocks_activation(wizard, application, monkeypatch):
+    from dataclasses import replace as dataclass_replace
+
+    window, service = wizard
+    service.plan = dataclass_replace(service.plan, conflicts=("proton-safe",))
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+
+    assert not window.screens["activate"].primary.isEnabled()
+    assert "existe déjà" in window.screens["activate"].status.text()
+    assert service.activated == []
+
+
+def test_the_diagnostic_is_previewed_before_it_is_copied(wizard, application):
+    window, _service = wizard
+    window.show_screen("dashboard")
+    _settle(window, application)
+
+    window.screens["dashboard"].copy_diagnostic.click()
+    _settle(window, application)
+
+    details = window.screens["dashboard"].diagnostic
+    assert details.isChecked()
+    assert '"schema_version": 1' in details._text.toPlainText()
+
+
+def test_disconnecting_requires_a_confirmation_and_honours_the_erase_choice(
+    wizard, application, monkeypatch
+):
+    window, service = wizard
+    window.show_screen("dashboard")
+    _settle(window, application)
+    dashboard = window.screens["dashboard"]
+
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "question",
+        classmethod(lambda _cls, *_a, **_k: QtWidgets.QMessageBox.StandardButton.No),
+    )
+    dashboard.disconnect_button.click()
+    _settle(window, application)
+    assert service.disconnected == []
+
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "question",
+        classmethod(lambda _cls, *_a, **_k: QtWidgets.QMessageBox.StandardButton.Yes),
+    )
+    assert not dashboard.erase.isChecked()
+    dashboard.disconnect_button.click()
+    _settle(window, application)
+
+    assert service.disconnected == [False]
+
+
+def test_an_unsupported_client_outcome_is_explained_not_hidden(wizard, application):
+    from proton_safe_mcp.onboarding.models import RegistrationOutcome
+
+    window, service = wizard
+    service._outcome = RegistrationOutcome(
+        ok=False, code=Code.UNSUPPORTED_CLIENT, manual_step_required=True
+    )
+    window.selected_client = service.installation
+    window.show_screen("activate")
+    _settle(window, application)
+    window.screens["activate"].primary.click()
+    _settle(window, application)
+
+    status = window.screens["activate"].status.text()
+    assert "ne permet pas cette installation" in status
+    assert window.stack.currentWidget() is window.screens["activate"]
+
+
+# -- the status table and the two copyable prompts ---------------------------------
+
+
+def test_the_status_table_lists_the_three_levels_and_when_they_were_checked(
+    wizard, application, monkeypatch
+):
+    window, _service = wizard
+    monkeypatch.setattr(
+        type(window.service),
+        "snapshot",
+        lambda _self: Snapshot(
+            state=InstallState.CLIENT_VERIFICATION_PENDING,
+            account_masked="p•••••@example.com",
+            configuration_present=True,
+            last_verified_at="2026-09-13T09:30:00+00:00",
+            last_checks={
+                "bridge": "pass:BRIDGE_AUTHENTICATED",
+                "runtime": "pass:RUNTIME_READY",
+                "client": "action_required:CLIENT_RESTART_REQUIRED",
+            },
+        ),
+        raising=False,
+    )
+    window.show_screen("dashboard")
+    _settle(window, application)
+    dashboard = window.screens["dashboard"]
+
+    assert dashboard.account.text() == "p•••••@example.com"
+    assert translate("status.pass", "fr") in dashboard.levels["bridge"].text()
+    assert translate("status.pass", "fr") in dashboard.levels["runtime"].text()
+    assert translate("status.action_required", "fr") in dashboard.levels["client"].text()
+    assert dashboard.last_check.text() == "2026-09-13T09:30:00+00:00"
+    # A pending client step is never dressed up as finished.
+    assert translate("status.action_required", "fr") in dashboard.status.text()
+
+
+def test_a_never_checked_installation_says_so_rather_than_showing_a_stale_state(
+    wizard, application
+):
+    window, _service = wizard
+    window.show_screen("dashboard")
+    _settle(window, application)
+    dashboard = window.screens["dashboard"]
+
+    assert dashboard.last_check.text() == translate("dashboard.never", "fr")
+    assert all(label.text() == "—" for label in dashboard.levels.values())
+
+
+def test_both_prompts_are_offered_and_neither_is_sent_automatically(window):
+    screen = window.screens["verify"]
+
+    check = screen.prompt.toPlainText()
+    first_use = screen.first_use_prompt.toPlainText()
+
+    assert "sans lire mes messages" in check
+    assert "résume les points encore ouverts" in first_use
+    assert screen.prompt.isReadOnly() and screen.first_use_prompt.isReadOnly()
+    # The first-use text is framed as a choice, not as a technical step.
+    labels = [
+        label.text()
+        for label in screen.findChildren(QtWidgets.QLabel)
+        if "première utilisation" in label.text()
+    ]
+    assert labels
+
+
+def test_copying_a_prompt_puts_exactly_that_text_on_the_clipboard(window, application):
+    screen = window.screens["verify"]
+    buttons = [
+        child
+        for child in screen.findChildren(QtWidgets.QPushButton)
+        if child.text() == translate("verify.copy", "fr")
+    ]
+    assert len(buttons) == 2
+
+    buttons[1].click()
+    application.processEvents()
+
+    assert QtWidgets.QApplication.clipboard().text() == screen.first_use_prompt.toPlainText()

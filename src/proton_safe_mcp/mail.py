@@ -184,8 +184,18 @@ class ProtonBridgeClient:
         )
 
     @contextmanager
-    def connection(self) -> Iterator[imaplib.IMAP4]:
-        password = get_bridge_password(self.settings.bridge_user)
+    def connection(self, *, password: str | None = None) -> Iterator[imaplib.IMAP4]:
+        """Open an authenticated loopback IMAP session.
+
+        ``password`` lets the setup assistant try a candidate credential held in memory,
+        so a wrong new one never replaces a working stored one. It is passed to the IMAP
+        LOGIN command and nowhere else: never to a subprocess, a file or a log line.
+        """
+        if password is None:
+            password = get_bridge_password(
+                self.settings.bridge_user,
+                allow_environment=self.settings.allow_environment_secret,
+            )
         client: imaplib.IMAP4 | None = None
         try:
             client = imaplib.IMAP4(self.settings.bridge_host, self.settings.imap_port, timeout=30)
@@ -194,12 +204,28 @@ class ProtonBridgeClient:
             # hard-coded to 127.0.0.1 and cannot be changed by an MCP tool or environment value.
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
-            status, _ = client.starttls(ssl_context=context)
+            try:
+                status, _ = client.starttls(ssl_context=context)
+            except _IMAP_ERROR as exc:
+                # A failed handshake raises ssl.SSLError and is reported by the outer
+                # handler; this branch is Bridge refusing to negotiate at the IMAP level.
+                raise BridgeError(
+                    "Proton Bridge refused STARTTLS", code="BRIDGE_TLS_FAILED"
+                ) from exc
             if status != "OK":
-                raise BridgeError("Proton Bridge refused STARTTLS")
-            status, _ = client.login(self.settings.bridge_user, password)
+                raise BridgeError("Proton Bridge refused STARTTLS", code="BRIDGE_TLS_FAILED")
+            try:
+                status, _ = client.login(self.settings.bridge_user, password)
+            except _IMAP_ABORT:
+                # A dropped connection is not a rejected credential; let the outer handler
+                # report it as a connection problem rather than a wrong password.
+                raise
+            except _IMAP_ERROR as exc:
+                # imaplib raises rather than returning NO for a refused LOGIN. An error on
+                # this command specifically is Bridge rejecting the address or password.
+                raise BridgeError("Proton Bridge login failed", code="BRIDGE_AUTH_FAILED") from exc
             if status != "OK":
-                raise BridgeError("Proton Bridge login failed")
+                raise BridgeError("Proton Bridge login failed", code="BRIDGE_AUTH_FAILED")
             # CPython exposes IMAP capabilities as bytes. Normalize explicitly so the
             # UTF8=ACCEPT comparison works across Python versions and test doubles.
             capabilities = {_capability_name(item) for item in client.capabilities}
@@ -207,17 +233,35 @@ class ProtonBridgeClient:
                 client.enable("UTF8=ACCEPT")
             yield client
         except ssl.SSLError as exc:
-            raise BridgeError("Proton Bridge TLS error") from exc
+            raise BridgeError("Proton Bridge TLS error", code="BRIDGE_TLS_FAILED") from exc
         except _IMAP_ABORT as exc:
-            raise BridgeError("Proton Bridge connection closed unexpectedly") from exc
+            raise BridgeError(
+                "Proton Bridge connection closed unexpectedly", code="BRIDGE_CONNECTION_FAILED"
+            ) from exc
         except _IMAP_ERROR as exc:
-            raise BridgeError("Proton Bridge IMAP protocol error") from exc
+            raise BridgeError(
+                "Proton Bridge IMAP protocol error", code="BRIDGE_CONNECTION_FAILED"
+            ) from exc
         except (OSError, UnicodeError) as exc:
-            raise BridgeError("Proton Bridge connection failed") from exc
+            raise BridgeError("Proton Bridge connection failed", code="BRIDGE_UNREACHABLE") from exc
         finally:
             if client is not None:
                 with contextlib.suppress(OSError, _IMAP_ERROR):
                     client.logout()
+
+    def probe(self, *, password: str | None = None) -> None:
+        """Prove the credential works, without touching a single message.
+
+        LOGIN, NOOP, LOGOUT and nothing else: no mailbox is selected, no folder listed and
+        no counter read, so running the setup assistant cannot mark mail as seen or expose
+        mailbox contents.
+        """
+        with self.connection(password=password) as client:
+            status, _ = client.noop()
+            if status != "OK":
+                raise BridgeError(
+                    "Proton Bridge did not answer NOOP", code="BRIDGE_CONNECTION_FAILED"
+                )
 
     def status(self) -> dict[str, Any]:
         with self.connection() as client:

@@ -52,9 +52,12 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Desktop assistant: desktop-assistant.md
   - Client setup: clients.md
   - OpenAI plugin: openai-plugin.md
   - External testing: external-testing.md
+  - Desktop validation: desktop-testing.md
+  - Desktop acceptance sheet: desktop-acceptance.md
   - User guide:
       - Configuration: configuration.md
       - MCP tools: mcp-tools.md

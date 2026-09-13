@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Proton Safe
+Name[fr]=Proton Safe
+GenericName=Connect Proton Mail to your assistant
+GenericName[fr]=Connecter Proton Mail à votre assistant
+Comment=Set up a read-and-draft-only Proton Mail connection for your AI assistant
+Comment[fr]=Configurer une connexion Proton Mail en lecture et brouillons pour votre assistant
+Exec=/usr/bin/proton-safe-assistant
+Icon=proton-safe-assistant
+Terminal=false
+Categories=Network;Email;Utility;
+Keywords=Proton;Mail;MCP;assistant;
+StartupNotify=true
+StartupWMClass=proton-safe-assistant

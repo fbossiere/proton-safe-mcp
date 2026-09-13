@@ -76,6 +76,13 @@ model.
 
 ## Install the local plugin (recommended local path)
 
+!!! tip "A managed alternative"
+    The [desktop setup assistant](desktop-assistant.md) performs the steps below for you on
+    Ubuntu. It registers its own `proton-safe-desktop` marketplace, so it cannot collide
+    with the `personal` marketplace this manual procedure uses, and it launches an absolute
+    runtime path with `--config` instead of `uvx` plus environment variables. The manual
+    procedure below remains supported and unchanged.
+
 Complete [Getting started](getting-started.md) first. Proton Mail Bridge must be running and
 `proton-safe-mcp setup` must have stored the Bridge-generated IMAP password in the operating-system
 keyring.

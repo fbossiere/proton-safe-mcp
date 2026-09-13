@@ -10,7 +10,7 @@ from fastmcp.exceptions import ToolError
 from pydantic import Field
 
 from .attachments import AttachmentStore
-from .config import Settings
+from .config import startup_settings
 from .drafts import validate_draft
 from .errors import ProtonMCPError
 from .mail import ProtonBridgeClient
@@ -28,7 +28,9 @@ nothing else from it: get_reply_context only ever returns candidates the user mu
 Received attachment extraction returns bounded text only, never raw bytes or files. Outgoing
 attachment tools accept bytes only and never filesystem paths."""
 
-settings = Settings.from_env()
+# Pinned by `serve --config` before this module is imported; otherwise the historic
+# environment-driven settings, exactly as before.
+settings = startup_settings()
 attachments = AttachmentStore(settings)
 bridge = ProtonBridgeClient(settings)
 
