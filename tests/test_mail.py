@@ -1024,12 +1024,13 @@ def _reply_fields(settings, **overrides):
         "attachments": (),
         "reply_to_uid": "42",
         "reply_to_message_id": "<parent@example.com>",
+        "allow_unthreaded_reply": True,
     }
     fields.update(overrides)
     return fields
 
 
-def test_a_reply_threads_on_the_parent_and_extends_its_reference_chain(settings):
+def test_an_accepted_separate_reply_submits_headers_without_claiming_thread_membership(settings):
     fake = _ReplyIMAP(_parent_headers(references="<root@example.com> <mid@example.com>"))
 
     result = _client_with(settings, fake).append_draft(**_reply_fields(settings))
@@ -1043,8 +1044,57 @@ def test_a_reply_threads_on_the_parent_and_extends_its_reference_chain(settings)
     )
     assert result["in_reply_to"] == "<parent@example.com>"
     assert result["references_count"] == 3
-    assert result["replied_to"] == {"uid": "42", "folder": "INBOX"}
+    assert result["reply_target"] == {"uid": "42", "folder": "INBOX"}
+    assert result["threading_verified"] is False
+    assert "does not preserve reply threading" in result["threading_notice"]
+    assert "replied_to" not in result
     assert result["sent"] is False
+
+
+@pytest.mark.parametrize("acceptance", [None, False, 1, "true"])
+def test_reply_refusal_happens_before_a_connection_or_write(settings, monkeypatch, acceptance):
+    client = ProtonBridgeClient(settings)
+
+    def forbidden_connection():
+        raise AssertionError("A refused reply must not connect or create a draft")
+
+    monkeypatch.setattr(client, "connection", forbidden_connection)
+    fields = _reply_fields(settings)
+    if acceptance is None:
+        del fields["allow_unthreaded_reply"]
+    else:
+        fields["allow_unthreaded_reply"] = acceptance
+    with pytest.raises(BridgeError, match="No draft was created") as raised:
+        client.append_draft(**fields)
+    assert raised.value.code == "reply_threading_unsupported"
+
+
+def test_successful_append_that_discards_reply_headers_does_not_report_a_threaded_reply(settings):
+    class StrippingBridge(_ReplyIMAP):
+        def append(self, folder, flags, date_time, payload):
+            status = super().append(folder, flags, date_time, payload)
+            self.stored = BytesParser(policy=policy.default).parsebytes(payload)
+            del self.stored["In-Reply-To"]
+            del self.stored["References"]
+            return status
+
+    bridge = StrippingBridge(_parent_headers())
+    result = _client_with(settings, bridge).append_draft(**_reply_fields(settings))
+    assert bridge.stored["In-Reply-To"] is None
+    assert result["created"] is True
+    assert result["sent"] is False
+    assert result["threading_verified"] is False
+    assert "replied_to" not in result
+    assert "Reply or Reply all" in result["threading_notice"]
+
+
+def test_reply_context_discloses_the_bridge_limitation_before_draft_confirmation(settings):
+    message = EmailMessage()
+    message["Message-ID"] = "<parent@example.com>"
+    message.set_content("An ordinary email")
+    result = _reply_context(settings, message)
+    assert result["threading_supported"] is False
+    assert "does not preserve reply threading" in result["threading_notice"]
 
 
 def test_a_reply_reads_the_parent_headers_without_marking_it_read(settings):

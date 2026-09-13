@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-09-13
+
+### Fixed
+
+- Reply drafts no longer report successful conversation threading after IMAP storage alone.
+  Proton Bridge reconstructs drafts without forwarding the parent link. Reply targets now fail
+  before connection or writing unless the user explicitly accepts a possibly separate draft via
+  `allow_unthreaded_reply`. Refusal preserves staged attachments. Accepted fallback results carry
+  `threading_verified: false`, a clear notice, and `reply_target` instead of `replied_to`.
+- Reply context, the MCP schema, plugin workflow, and documentation explain the limitation before
+  draft confirmation and describe using Reply or Reply all in Proton Mail to preserve the thread.
+  This corrects the unsupported conversation-grouping promise in the 2.0.3 notes below; it does
+  not repair Proton Bridge or add send, delete, move, or Proton-account credential access.
+
 ### Added
 
 - Add English/French product pages, verified Ubuntu download guidance and a first-use feedback route.
@@ -121,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drafts can now be replies. `create_confirmed_draft` accepts `reply_to_uid`,
   `reply_to_folder`, and `reply_to_message_id`, and sets `In-Reply-To` plus a `References`
   chain built from the parent's own chain, so the draft waits in Proton Mail inside the
-  thread instead of as a standalone message.
+  thread instead of as a standalone message. **Correction in 2.1.1:** Bridge discards that
+  parent link; those headers alone did not establish conversation membership.
 
   Threading headers are the entire contribution. The message being replied to supplies no
   recipient, no subject, and no body: those stay explicit inputs the user confirmed. In
@@ -327,7 +342,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.3...v2.1.0
 [2.0.3]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.1...v2.0.2

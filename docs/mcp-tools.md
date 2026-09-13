@@ -79,15 +79,16 @@ extraction](received-attachments.md) for supported and rejected cases.
 Returns everything composing a reply needs, and returns all of it as *suggestions*:
 
 - `message_id` — the parent's identifier, to pass back as `reply_to_message_id`. It is validated
-  before being reported, and comes back empty when the message carries nothing a reply can thread
-  on, so a draft is never refused over it after the user already confirmed one;
+  before being reported, and comes back empty when the message has no usable identifier;
 - `suggested_subject` — the subject with one `Re: ` prefix, not stacked onto an existing one,
   whitespace collapsed, and bounded to what a draft accepts as a subject;
 - `candidate_recipients` — the bare addresses found in `Reply-To`, `From`, `To`, and `Cc`, each
   labelled with the header it came from and flagged `is_own_address` when it is one of the
   configured senders, so a client can offer a reply-all that excludes the user. Addresses that are
   not header-safe bare addresses are dropped rather than reported, and the list is capped at 25;
-- `quoted_body` — the parent body as bounded `> ` quoted plain text, plus `quote_truncated`.
+- `quoted_body` — the parent body as bounded `> ` quoted plain text, plus `quote_truncated`;
+- `threading_supported: false` and `threading_notice` — the Bridge limitation to explain before
+  confirming any reply draft.
 
 !!! warning
 
@@ -123,6 +124,7 @@ See [Attachments](attachments.md) for the complete protocol and accepted file ty
 | `reply_to_uid` | none | decimal digits only; requires `reply_to_message_id` |
 | `reply_to_folder` | `INBOX` | 1–255 characters; only with a reply target |
 | `reply_to_message_id` | none | bracketed Message-ID; requires `reply_to_uid` |
+| `allow_unthreaded_reply` | `false` | true only after explicit acceptance of a possibly separate reply draft |
 
 Every draft, reply or not, goes through this tool. Call it only after the user explicitly
 confirms the exact To, Cc, Bcc, subject, complete body, and attachment list in the
@@ -139,37 +141,39 @@ value is rejected before any IMAP write. The sender appears in the result as `fr
 conversation, so this flag is workflow discipline rather than an independent authorization
 boundary.
 
-### Replying in a thread
+### Replies and the Proton Bridge limitation
 
-Pass `reply_to_uid` and `reply_to_message_id`, both copied from the same `get_reply_context`
-result, to thread a draft onto the message being replied to. The server then sets `In-Reply-To`
-and a `References` chain built from the parent's own chain plus its Message-ID.
+**Saving a draft through Bridge does not guarantee a reply in the existing conversation.**
+Bridge reconstructs IMAP drafts without passing the parent link or reply headers to its draft
+creation API. A successful IMAP `APPEND` confirms storage only. See Proton's
+[`createDraftWithParser` implementation](https://github.com/ProtonMail/proton-bridge/blob/master/internal/services/imapservice/connector.go).
 
-Threading headers are the entire contribution. The reply target supplies **no recipient, no
-subject, and no body**: `to`, `cc`, `bcc`, `subject`, and `body_text` stay exactly the values the
-user confirmed. In particular, the quote from `get_reply_context` reaches the draft only by being
-part of the `body_text` the user confirmed — the server never appends anything to a body.
+To preserve the existing conversation, prepare the answer, then open the original message in
+Proton Mail, choose **Reply** or **Reply all**, and paste the prepared body there. Confirm the
+recipients and add any intended attachments in Proton Mail before sending.
 
-When `get_reply_context` reports an empty `message_id`, that message cannot be threaded onto.
-Create the draft without a reply target instead — everything else about it, including the quote,
-still works.
+`get_reply_context` reports this limitation before confirmation. A `create_confirmed_draft`
+request with a reply target is refused before any IMAP connection or write unless
+`allow_unthreaded_reply: true` accompanies the user's explicit acceptance of a possibly separate
+draft. The exact recipients, subject, body, and attachments still require confirmation.
+Never silently remove a reply target or set the flag to bypass a refusal.
 
-`reply_to_message_id` is a required assertion, not a convenience. At the IMAP write the server
-re-reads the headers of the message at `reply_to_uid` and refuses the draft unless it still
-carries exactly that Message-ID. A mailbox that changed between the user's confirmation and the
-write is therefore rejected rather than threaded onto a different message — the same
-reverification staged attachment tokens get.
+For that accepted fallback, pass `reply_to_uid` and `reply_to_message_id` from the same
+`get_reply_context` result, plus `reply_to_folder` when needed. The parent identifier is re-read
+and compared before writing. Invalid, missing, or changed identifiers cause refusal. The server
+submits validated `In-Reply-To` and a bounded `References` chain, but Bridge may discard them.
+These headers add **no recipient, subject, or body**. Quotes must be part of the confirmed body.
+If no usable parent identifier exists, create an untargeted draft only after explicit acceptance
+of that fallback.
 
-Both identifiers are validated as bracketed RFC 5322 message-ids restricted to printable US-ASCII
-with no whitespace, so neither can continue into a header of its own. The `References` chain is
-bounded in entry count and rendered length, and trimming drops from just after the thread root.
+A saved fallback returns `created: true`, `sent: false`, `threading_verified: false`, and
+`threading_notice`. `reply_target`, `in_reply_to`, and `references_count` describe the request,
+not verified membership in a conversation. The misleading `replied_to` result field has been
+removed. Do not retry a successful creation to repair threading: that would create another draft.
 
-On success the result adds `in_reply_to`, `references_count`, and `replied_to`. A reply is refused,
-before any write, when the parent cannot be read, carries no Message-ID, carries one that is not
-header-safe, or no longer matches `reply_to_message_id`.
-
-Replying does not change what the tool cannot do. The draft still waits in Proton Mail for you to
-review and send.
+The tests simulate both normal IMAP success and Bridge discarding reply headers. They verify
+refusal before connection, attachment preservation on refusal, and honest results after storage;
+they do not prove native Proton conversation grouping.
 
 ### Draft body format
 

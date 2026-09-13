@@ -28,6 +28,12 @@ from .secrets import get_bridge_password
 
 MAX_CANDIDATE_RECIPIENTS = 25
 MAX_SUBJECT_CHARS = 998
+REPLY_THREADING_NOTICE = (
+    "Proton Bridge does not preserve reply threading when saving drafts. "
+    "To reply in the existing conversation, open the original message in Proton Mail, "
+    "choose Reply or Reply all, and paste the prepared body. A draft saved through this "
+    "tool may appear separately; do not report it as attached to the conversation."
+)
 
 # Bound at import time so the handlers below keep catching the real protocol errors even
 # when imaplib.IMAP4 itself is replaced by a test double.
@@ -416,6 +422,8 @@ class ProtonBridgeClient:
                 "uid": uid,
                 "folder": folder,
                 "message_id": _threadable_message_id(message),
+                "threading_supported": False,
+                "threading_notice": REPLY_THREADING_NOTICE,
                 "subject": subject,
                 "suggested_subject": _reply_subject(subject),
                 "date": message.get("Date", ""),
@@ -442,6 +450,7 @@ class ProtonBridgeClient:
         reply_to_uid: str | None = None,
         reply_to_folder: str | None = None,
         reply_to_message_id: str | None = None,
+        allow_unthreaded_reply: bool = False,
     ) -> dict[str, Any]:
         # Re-check at the write boundary: only an address configured at startup may appear in
         # the From header, whatever an earlier layer resolved.
@@ -449,6 +458,15 @@ class ProtonBridgeClient:
             raise BridgeError("Sender address is not configured for this account")
         if (reply_to_uid is None) != (reply_to_message_id is None):
             raise BridgeError("Replying needs both reply_to_uid and reply_to_message_id")
+        if reply_to_uid is not None and allow_unthreaded_reply is not True:
+            # APPEND success confirms storage, never Proton's conversation membership.
+            # Reject before connecting so a normal reply request creates no stray draft.
+            raise BridgeError(
+                "No draft was created. " + REPLY_THREADING_NOTICE + " Set "
+                "allow_unthreaded_reply=true only after the user explicitly accepts a "
+                "separate draft. Never silently retry without the reply target.",
+                code="reply_threading_unsupported",
+            )
         with self.connection() as client:
             references: tuple[str, ...] = ()
             if reply_to_uid is not None and reply_to_message_id is not None:
@@ -487,7 +505,9 @@ class ProtonBridgeClient:
         if references:
             result["in_reply_to"] = reply_to_message_id
             result["references_count"] = len(references)
-            result["replied_to"] = {"uid": reply_to_uid, "folder": reply_to_folder or "INBOX"}
+            result["reply_target"] = {"uid": reply_to_uid, "folder": reply_to_folder or "INBOX"}
+            result["threading_verified"] = False
+            result["threading_notice"] = REPLY_THREADING_NOTICE
         return result
 
     @staticmethod

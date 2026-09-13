@@ -50,7 +50,8 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 - Draft bodies are stored as plain text plus a server-generated HTML alternative that
   HTML-escapes the confirmed body, so quoted markup can never be rendered. Nothing is ever
   appended to a body server-side, including a reply quote.
-- Replying adds threading headers only. Recipients are never derived from the message being
+- Proton Bridge does not preserve reply threading in saved drafts. Reply targets are refused
+  unless the user explicitly accepts a possibly separate draft. Accepted replies submit headers only. Recipients are never derived from the message being
   replied to, its Message-ID is reverified at the IMAP write, and both identifiers are validated
   so neither can continue into a header of its own.
 - Recipient, subject, and folder inputs are validated against header/criteria injection.
@@ -83,7 +84,7 @@ the [release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.0).
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==2.1.0
+uv tool install proton-safe-mcp==2.1.1
 ```
 
 For development from source instead:
@@ -195,7 +196,7 @@ ChatGPT desktop/Codex installation, direct MCP registration, and the optional re
 | | `upload_attachment_chunk` | Ordered base64 chunks |
 | | `finish_attachment_upload` | Verifies hash, returns single-use token |
 | | `discard_attachment` | |
-| Drafts | `create_confirmed_draft` | Requires exact conversational confirmation; optionally threads onto a reply target |
+| Drafts | `create_confirmed_draft` | Requires exact confirmation; reply targets also require acceptance of a possibly separate draft |
 
 There is deliberately no `send_message` tool.
 

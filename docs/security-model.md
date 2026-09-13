@@ -9,7 +9,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 - Malformed, oversized, encrypted, active, or prompt-injected received attachments.
 - Header, folder, or IMAP search injection, including through a Message-ID read out of a
   received message and written into a reply's `In-Reply-To` or `References`.
-- A reply threaded onto a different message than the one the user confirmed against.
+- Reply headers referencing a different message than the one the user confirmed against.
 - Client attempts to make the server read arbitrary local paths.
 - Oversized, reordered, truncated, substituted, or expired attachment uploads.
 - Draft changes after conversational confirmation.
@@ -29,7 +29,7 @@ Proton Safe MCP reduces the blast radius of prompt injection by restricting capa
 | Outgoing attachments | No paths; type, size, order, lifetime, and SHA-256 validation |
 | Drafts | Exact conversational confirmation assertion; validated recipients, headers, sizes, and attachment tokens |
 | Draft bodies | Plain text plus a server-generated HTML alternative; client markup is escaped, never rendered; nothing appended server-side |
-| Reply threading | Threading headers only; validated bracketed message-ids; bounded reference chain; parent Message-ID reverified at the IMAP write |
+| Reply requests | Refused by default because Bridge discards threading; separate-draft fallback requires explicit acceptance; validated identifiers, bounded references, and parent reverified before writing |
 | Sender identity | From header restricted to the startup allowlist, re-checked at the IMAP write |
 | Credentials | Bridge-generated IMAP password in the OS keyring |
 | State | `0700` directories, `0600` files, defensive no-follow behavior |
@@ -105,3 +105,10 @@ If local compromise is suspected:
 Do not open a public issue. Use [GitHub private vulnerability reporting](https://github.com/fbossiere/proton-safe-mcp/security/advisories/new) and include the affected version or commit, reproduction steps, and impact assessment.
 
 The canonical support policy is maintained in [`SECURITY.md`](https://github.com/fbossiere/proton-safe-mcp/blob/main/SECURITY.md).
+
+## Reply draft compatibility
+
+Proton Bridge does not preserve the parent link when saving an IMAP draft. Proton Safe cannot
+verify native conversation membership and never reports it as successful. See the
+[reply workflow](mcp-tools.md#replies-and-the-proton-bridge-limitation) for the native Proton Mail
+workflow and the explicitly accepted separate-draft fallback.
