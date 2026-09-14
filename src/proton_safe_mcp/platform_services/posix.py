@@ -9,7 +9,6 @@ platforms could satisfy.
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import os
 import platform
 import select
@@ -275,6 +274,12 @@ class PosixServices(PlatformServices):
 
     def try_lock(self, descriptor: int) -> bool:
         """``flock``, which the kernel drops when this process ends, however it ends."""
+        # Imported here, not at the top: Windows imports this module too — the client
+        # inventory reaches it, and so do the tests — and `fcntl` does not exist there.
+        # This mirrors how the Windows module reads its own Win32 names through getattr
+        # so that it stays importable, and type-checkable, on Linux.
+        import fcntl
+
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:

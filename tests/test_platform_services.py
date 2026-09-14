@@ -728,3 +728,34 @@ def test_the_windows_reader_still_returns_ordinary_frames():
     finally:
         reader.close()
         child.wait(timeout=10)
+
+
+def test_each_platform_module_imports_where_the_other_platform_runs():
+    """Both modules are imported on both systems, so neither may need the other's API.
+
+    The client inventory reaches into the POSIX module, and these tests import both
+    directly. A Unix-only import at the top of the POSIX module therefore does not fail
+    on Windows when that code runs — it fails at collection, before anything runs at all.
+    The Windows module has the mirror problem and answers it by reading its Win32 names
+    through getattr; this proves the POSIX one holds up under the same treatment.
+    """
+    import subprocess
+
+    program = (
+        "import sys\n"
+        # None in sys.modules is what CPython uses to mark a module as unimportable.
+        "for name in ('fcntl', 'pwd', 'grp', 'termios'):\n"
+        "    sys.modules[name] = None\n"
+        "from proton_safe_mcp.platform_services.posix import PosixServices\n"
+        "from proton_safe_mcp.onboarding import inventory\n"
+        "print(PosixServices.name)\n"
+    )
+    result = subprocess.run(  # noqa: S603 - this interpreter, a fixed argv, no shell
+        [sys.executable, "-c", program],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "posix"
