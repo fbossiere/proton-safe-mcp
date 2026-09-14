@@ -55,7 +55,9 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
   replied to, its Message-ID is reverified at the IMAP write, and both identifiers are validated
   so neither can continue into a header of its own.
 - Recipient, subject, and folder inputs are validated against header/criteria injection.
-- State files are private to the Unix account (`0700` directories, `0600` files, `O_NOFOLLOW`).
+- State files are private to one account. On Linux: `0700` directories, `0600` files and
+  `O_NOFOLLOW`. On Windows: a protected DACL granting only the owning user and the system
+  accounts, with reparse points refused in place of `O_NOFOLLOW`.
 
 ## Requirements
 
@@ -64,6 +66,11 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 - Python 3.11–3.14 (tested in CI) for the command-line installation; bundled in the desktop installer.
 - [`uv`](https://docs.astral.sh/uv/) for the command-line installation.
 - A working Secret Service keyring (`gnome-keyring` or compatible).
+
+Windows 11 x64 support is implemented in this repository but **not released**: automated
+checks run on Windows Server, while end-to-end Windows 11 acceptance remains untested. See the
+[Windows installer notes](https://fbossiere.github.io/proton-safe-mcp/windows-installer/)
+and its [acceptance sheet](https://fbossiere.github.io/proton-safe-mcp/windows-acceptance/).
 
 ## Installation
 
@@ -78,6 +85,13 @@ You still need Proton Mail Bridge, a compatible Proton plan and a session keyrin
 See the [desktop guide](https://fbossiere.github.io/proton-safe-mcp/desktop-assistant/)
 for prerequisites, screenshots and repair options. Checksums and build provenance are in
 the [release](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2).
+
+### Desktop assistant — Windows 11, x64
+
+Not available yet. The installer, the Windows platform layer and the build pipeline exist,
+but no acceptance scenario has been run on Windows and there is no download. Two external
+dependencies remain open: a Windows AI client whose full path is qualified, and a signing
+identity usable from CI.
 
 ### Command-line installation — other MCP clients
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from typing import Final
 
+from ..platform_services import services
 from .models import Code
 
 DEFAULT_LANGUAGE: Final = "fr"
@@ -35,7 +36,7 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
     "activate.start": {"fr": "Activer la connexion", "en": "Activate connection"},
     "verify.dashboard": {"fr": "Voir ma connexion", "en": "View my connection"},
     "dashboard.erase.short": {
-        "fr": "Effacer aussi les données de connexion",
+        "fr": "Effacer les données de connexion",
         "en": "Also erase saved connection details",
     },
     "progress.step": {"fr": "Étape {current} sur {total}", "en": "Step {current} of {total}"},
@@ -57,10 +58,20 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
     },
     "prereq.bridge_help": {"fr": "Obtenir Proton Mail Bridge", "en": "Get Proton Mail Bridge"},
     "bridge.advanced": {
-        "fr": "Options avancées · port et autres adresses",
-        "en": "Advanced options · port and other addresses",
+        "fr": "Options avancées",
+        "en": "Advanced options",
     },
     # -- application ---------------------------------------------------------
+    "app.start_failed": {
+        "fr": (
+            "Proton Safe n'a pas pu démarrer. Vérifiez que votre dossier de données est "
+            "accessible et qu'aucune autre ouverture n'est en cours, puis réessayez."
+        ),
+        "en": (
+            "Proton Safe could not start. Check that your data folder is accessible "
+            "and no other launch is in progress, then try again."
+        ),
+    },
     "app.title": {
         "fr": "Connecter Proton Mail à votre assistant",
         "en": "Connect Proton Mail to your assistant",
@@ -154,6 +165,42 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
     "client.shared": {
         "fr": "Connexion partagée entre : {surfaces}",
         "en": "Connection shared between: {surfaces}",
+    },
+    "client.shared_unknown": {
+        "fr": (
+            "Les autres surfaces de cet assistant n'ont pas été vérifiées sur ce "
+            "système : activez-les séparément si vous les utilisez."
+        ),
+        "en": (
+            "Other surfaces of this assistant have not been verified on this system; "
+            "turn them on separately if you use them."
+        ),
+    },
+    "client.locate": {
+        "fr": "Choisir un assistant…",
+        "en": "Locate an assistant…",
+    },
+    "uninstall.nothing_to_remove": {
+        "fr": "Aucune connexion Proton Safe n'était enregistrée pour ce compte.",
+        "en": "No Proton Safe connection was registered for this account.",
+    },
+    "uninstall.erase_done": {
+        "fr": (
+            "Les réglages et le mot de passe enregistrés par Proton Safe ont été "
+            "effacés de cet ordinateur. Proton Mail Bridge, vos messages et vos "
+            "brouillons ne sont pas touchés. Si un serveur était en cours "
+            "d'exécution, redémarrez votre assistant pour qu'il s'arrête."
+        ),
+        "en": (
+            "The settings and the password saved by Proton Safe have been erased from "
+            "this computer. Proton Mail Bridge, your messages and your drafts are "
+            "untouched. If a server was still running, restart your assistant so it "
+            "stops."
+        ),
+    },
+    "client.locate_failed": {
+        "fr": "Ce fichier n'a pas répondu comme un assistant compatible.",
+        "en": "That file did not answer like a compatible assistant.",
     },
     "client.details": {"fr": "Détails", "en": "Details"},
     # -- activation ----------------------------------------------------------
@@ -653,6 +700,18 @@ CODE_MESSAGES: Final[dict[str, dict[str, tuple[str, str]]]] = {
             "Open a normal Ubuntu session, then start the assistant again.",
         ),
     },
+    Code.SESSION_ELEVATED: {
+        "fr": (
+            "Proton Safe ne doit pas être lancé en tant qu'administrateur.",
+            "Fermez cette fenêtre et rouvrez Proton Safe depuis votre compte Windows "
+            "habituel : la connexion est installée pour ce compte.",
+        ),
+        "en": (
+            "Proton Safe must not be run as an administrator.",
+            "Close this window and open Proton Safe from your usual Windows account: "
+            "the connection is set up for that account.",
+        ),
+    },
     Code.BRIDGE_APP_UNKNOWN: {
         "fr": (
             "Proton Mail Bridge n'a pas été détecté aux emplacements connus.",
@@ -664,6 +723,77 @@ CODE_MESSAGES: Final[dict[str, dict[str, tuple[str, str]]]] = {
         ),
     },
 }
+
+#: Windows wording for the few texts that name something Linux-specific. Everything
+#: else is shared: only the sentences that would send a Windows user to the wrong place
+#: are overridden, so a translation added to the main catalogue is never forgotten here.
+WINDOWS_CATALOGUE: Final[dict[str, dict[str, str]]] = {
+    "prereq.keyring": {"fr": "Gestionnaire d'identifiants", "en": "Credential Manager"},
+    "prereq.session": {"fr": "Compte Windows", "en": "Windows account"},
+    "prereq.system": {"fr": "Windows", "en": "Windows"},
+}
+
+WINDOWS_CODE_MESSAGES: Final[dict[str, dict[str, tuple[str, str]]]] = {
+    Code.SYSTEM_UNSUPPORTED: {
+        "fr": (
+            "Ce système n'est pas pris en charge par cette version.",
+            "Cette version cible Windows 11 en 64 bits (x64). Windows 10, les "
+            "processeurs ARM et les versions 32 bits ne sont pas pris en charge.",
+        ),
+        "en": (
+            "This system is not supported by this version.",
+            "This version targets Windows 11 on 64-bit (x64). Windows 10, ARM "
+            "processors and 32-bit versions are not supported.",
+        ),
+    },
+    Code.SESSION_NO_GRAPHICAL: {
+        "fr": (
+            "Aucune session Windows interactive n'a été détectée.",
+            "Ouvrez votre session Windows habituelle, puis relancez Proton Safe.",
+        ),
+        "en": (
+            "No interactive Windows session was detected.",
+            "Sign in to your usual Windows account, then start Proton Safe again.",
+        ),
+    },
+    Code.KEYRING_LOCKED: {
+        "fr": (
+            "Le Gestionnaire d'identifiants Windows n'a pas pu être ouvert.",
+            "Reconnectez-vous à votre session Windows, puis réessayez.",
+        ),
+        "en": (
+            "Windows Credential Manager could not be opened.",
+            "Sign in to your Windows session again, then try once more.",
+        ),
+    },
+    Code.KEYRING_UNAVAILABLE: {
+        "fr": (
+            "Le Gestionnaire d'identifiants Windows n'est pas utilisable.",
+            "Ouvrez votre session Windows habituelle, sans élévation. Proton Safe "
+            "n'enregistrera le mot de passe nulle part ailleurs.",
+        ),
+        "en": (
+            "Windows Credential Manager cannot be used.",
+            "Open your usual Windows session, without elevation. Proton Safe will not "
+            "store the password anywhere else.",
+        ),
+    },
+    Code.PLUGIN_ASSETS_INVALID: {
+        "fr": (
+            "Les ressources du plugin fournies avec cette installation sont inutilisables.",
+            "Relancez l'installateur Proton Safe et choisissez « Réparer les fichiers ».",
+        ),
+        "en": (
+            "The plugin resources shipped with this installation are unusable.",
+            "Run the Proton Safe installer again and choose \u201cRepair files\u201d.",
+        ),
+    },
+}
+
+
+def _windows() -> bool:
+    return services().name == "windows"
+
 
 #: Fixed, official destinations. The assistant opens nothing else in a browser.
 OFFICIAL_LINKS: Final[dict[str, str]] = {
@@ -677,7 +807,7 @@ OFFICIAL_LINKS: Final[dict[str, str]] = {
 def translate(key: str, language: str | None = None, **values: str) -> str:
     """Return the text for ``key``, falling back to the key itself when unknown."""
     resolved = language or detect_language()
-    entry = CATALOGUE.get(key)
+    entry = (WINDOWS_CATALOGUE.get(key) if _windows() else None) or CATALOGUE.get(key)
     if entry is None:
         return key
     text = entry.get(resolved) or entry.get(DEFAULT_LANGUAGE, key)
@@ -690,7 +820,9 @@ def explain(code: str, language: str | None = None) -> tuple[str, str]:
     An unmapped code still produces something honest rather than a raw internal string.
     """
     resolved = language or detect_language()
-    entry = CODE_MESSAGES.get(str(code))
+    entry = (WINDOWS_CODE_MESSAGES.get(str(code)) if _windows() else None) or CODE_MESSAGES.get(
+        str(code)
+    )
     if entry is None:
         generic = {
             "fr": ("Une étape n'a pas abouti.", "Relancez la vérification."),
@@ -701,10 +833,18 @@ def explain(code: str, language: str | None = None) -> tuple[str, str]:
 
 
 def missing_translations() -> list[str]:
-    """Keys whose translation is incomplete, so the gap is visible rather than silent."""
+    """Keys whose translation is incomplete, so the gap is visible rather than silent.
+
+    The Windows overlays are checked too: a sentence that exists in one language only
+    would otherwise fall back silently to French on half the product.
+    """
     gaps: list[str] = []
-    for key, entry in CATALOGUE.items():
-        gaps.extend(f"{key}:{tag}" for tag in SUPPORTED_LANGUAGES if not entry.get(tag))
-    for code, entry_codes in CODE_MESSAGES.items():
-        gaps.extend(f"{code}:{tag}" for tag in SUPPORTED_LANGUAGES if not entry_codes.get(tag))
+    for name, table in (("", CATALOGUE), ("windows:", WINDOWS_CATALOGUE)):
+        for key, entry in table.items():
+            gaps.extend(f"{name}{key}:{tag}" for tag in SUPPORTED_LANGUAGES if not entry.get(tag))
+    for name, codes in (("", CODE_MESSAGES), ("windows:", WINDOWS_CODE_MESSAGES)):
+        for code, entry_codes in codes.items():
+            gaps.extend(
+                f"{name}{code}:{tag}" for tag in SUPPORTED_LANGUAGES if not entry_codes.get(tag)
+            )
     return sorted(gaps)

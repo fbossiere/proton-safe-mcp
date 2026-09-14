@@ -8,23 +8,38 @@ is the functional check. Nothing here parses a Bridge profile or looks for crede
 from __future__ import annotations
 
 import os
-import platform
 import shutil
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
 
+from ..platform_services import services
+from ..platform_services.posix import (
+    VALIDATED_DISTRIBUTION,
+    VALIDATED_MACHINE,
+    VALIDATED_VERSION,
+)
 from ..secrets import keyring_status
 from .clients.base import executable_candidates
 from .clients.openai_local import OpenAILocalAdapter
 from .models import Check, ClientInstallation, Code
 
-#: The validated target. Anything else Linux still runs, with the scope explained.
-VALIDATED_DISTRIBUTION: Final = "ubuntu"
-VALIDATED_VERSION: Final = "24.04"
-VALIDATED_MACHINE: Final = "x86_64"
+__all__ = [
+    "VALIDATED_DISTRIBUTION",
+    "VALIDATED_MACHINE",
+    "VALIDATED_VERSION",
+    "bridge_check",
+    "client_check",
+    "discover_clients",
+    "keyring_check",
+    "prerequisites",
+    "session_check",
+    "system_check",
+]
 
-#: Documented Proton Mail Bridge locations. Presence only; contents are never read.
+#: Documented Proton Mail Bridge locations. Presence only; contents are never read, and
+#: no Bridge profile is ever parsed: finding the application is a hint, and the
+#: authentication step on the next screen is the only functional check.
 BRIDGE_EXECUTABLES: Final = (
     "/usr/bin/protonmail-bridge",
     "/usr/bin/proton-bridge",
@@ -37,43 +52,49 @@ BRIDGE_DESKTOP_ENTRIES: Final = (
     "/var/lib/flatpak/exports/share/applications/ch.protonmail.protonmail-bridge.desktop",
 )
 
+#: Per-user and per-machine Bridge locations on Windows, relative to a known folder.
+WINDOWS_BRIDGE_TEMPLATES: Final = (
+    ("PROGRAMFILES", "Proton/Proton Mail Bridge/proton-bridge.exe"),
+    ("PROGRAMFILES", "Proton AG/Proton Mail Bridge/proton-bridge.exe"),
+    ("PROGRAMFILES", "Proton/Proton Mail Bridge/bridge-gui.exe"),
+    ("LOCALAPPDATA", "Programs/Proton Mail Bridge/proton-bridge.exe"),
+    ("LOCALAPPDATA", "Programs/Proton Mail Bridge/bridge-gui.exe"),
+)
 
-def _os_release() -> dict[str, str]:
-    values: dict[str, str] = {}
-    try:
-        content = Path("/etc/os-release").read_text(encoding="utf-8")
-    except OSError:
-        return values
-    for line in content.splitlines():
-        name, separator, raw = line.partition("=")
-        if separator:
-            values[name.strip()] = raw.strip().strip('"')
-    return values
+
+def _windows_bridge_candidates() -> list[Path]:
+    found: list[Path] = []
+    for variable, relative in WINDOWS_BRIDGE_TEMPLATES:
+        base = os.environ.get(variable, "")
+        if base:
+            found.append(Path(base).joinpath(*relative.split("/")))
+    return found
 
 
 def system_check() -> Check:
-    """Report the operating system against the validated scope."""
-    machine = platform.machine()
-    if platform.system() != "Linux" or machine != VALIDATED_MACHINE:
-        return Check("system", "fail", Code.SYSTEM_UNSUPPORTED, f"{platform.system()} {machine}")
-    release = _os_release()
-    distribution = release.get("ID", "").lower()
-    version = release.get("VERSION_ID", "")
-    label = f"{release.get('NAME', 'Linux')} {version}".strip()
-    validated = distribution == VALIDATED_DISTRIBUTION and version == VALIDATED_VERSION
-    # Another Linux is not refused, but the assistant says plainly what was validated.
-    return Check("system", "pass" if validated else "warn", Code.SYSTEM_SUPPORTED, label)
+    """Report the operating system against the validated scope.
+
+    What "out of scope" means differs by platform, and the platform layer decides: an
+    untested Linux still runs and is flagged, while anything outside Windows 11 x64 is
+    refused before a single file is written.
+    """
+    status, label = services().system_status()
+    if status == "fail":
+        return Check("system", "fail", Code.SYSTEM_UNSUPPORTED, label)
+    return Check("system", status, Code.SYSTEM_SUPPORTED, label)
 
 
 def session_check() -> Check:
-    """Require an ordinary graphical session, never root."""
-    if os.geteuid() == 0:
-        return Check("session", "fail", Code.SESSION_ROOT)
-    graphical = bool(os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY"))
-    if not graphical:
+    """Require an ordinary interactive session for this user, never an elevated one."""
+    facts = services().session_facts()
+    if facts.elevated:
+        # Running as root, or with an elevated Windows token, would set up an account
+        # the person is not signed in as.
+        code = Code.SESSION_ELEVATED if services().name == "windows" else Code.SESSION_ROOT
+        return Check("session", "fail", code)
+    if not facts.kind:
         return Check("session", "fail", Code.SESSION_NO_GRAPHICAL)
-    kind = "Wayland" if os.environ.get("WAYLAND_DISPLAY") else "X11"
-    return Check("session", "pass", Code.SESSION_OK, kind)
+    return Check("session", "pass", Code.SESSION_OK, facts.kind)
 
 
 def keyring_check() -> Check:
@@ -92,13 +113,16 @@ def bridge_check() -> Check:
     Finding it proves an application is present, nothing more; not finding it does not
     block the flow, because the user may have installed it elsewhere.
     """
-    candidates = [Path(item) for item in BRIDGE_EXECUTABLES]
+    windows = services().name == "windows"
+    candidates = (
+        _windows_bridge_candidates() if windows else [Path(item) for item in BRIDGE_EXECUTABLES]
+    )
     found = shutil.which("protonmail-bridge") or shutil.which("proton-bridge")
     if found:
         candidates.insert(0, Path(found))
     if executable_candidates(candidates):
         return Check("bridge", "pass", Code.BRIDGE_APP_DETECTED)
-    if any(Path(entry).is_file() for entry in BRIDGE_DESKTOP_ENTRIES):
+    if not windows and any(Path(entry).is_file() for entry in BRIDGE_DESKTOP_ENTRIES):
         return Check("bridge", "pass", Code.BRIDGE_APP_DETECTED)
     # Not a hard failure: the connection test on the next screen is the real check.
     return Check("bridge", "warn", Code.BRIDGE_APP_UNKNOWN)

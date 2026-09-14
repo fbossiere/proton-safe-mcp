@@ -8,14 +8,16 @@ driven blind.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import tomllib
 from collections.abc import Sequence
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Final
 
+from ...platform_services import services
 from ..models import (
     ClientInstallation,
     Code,
@@ -41,12 +43,41 @@ ADAPTER_ID: Final = "openai-local"
 #: Documented locations only. `/usr/lib/chatgpt/resources/codex` ships with a particular
 #: Ubuntu ChatGPT desktop package; it is a packaging detail, so it is probed like any other
 #: candidate and used only when it answers the subcommands this adapter needs.
-CANDIDATE_PATHS: Final = (
+LINUX_CANDIDATE_PATHS: Final = (
     "/usr/lib/chatgpt/resources/codex",
     "/snap/bin/codex",
     "/usr/bin/codex",
     "/usr/local/bin/codex",
 )
+
+#: Backwards-compatible name for the Linux list.
+CANDIDATE_PATHS: Final = LINUX_CANDIDATE_PATHS
+
+#: Per-user installation folders on Windows, relative to a known folder. These are
+#: bounded probes, never a recursive search: each one is still corroborated by running
+#: `--version` and every plugin subcommand this adapter would use, so a path that turns
+#: out not to exist on a real installation simply finds nothing. The location a real
+#: Windows client actually uses is recorded when that client is qualified; until then
+#: the reliable routes are the user's `PATH` and choosing the executable explicitly.
+WINDOWS_CANDIDATE_TEMPLATES: Final = (
+    ("LOCALAPPDATA", "Programs/codex/codex.exe"),
+    ("LOCALAPPDATA", "Programs/@openai/codex/codex.exe"),
+    ("LOCALAPPDATA", "Programs/ChatGPT/resources/codex/codex.exe"),
+    ("PROGRAMFILES", "ChatGPT/resources/codex/codex.exe"),
+)
+
+
+def default_candidate_paths() -> tuple[str, ...]:
+    """The documented locations to probe on this platform."""
+    if services().name != "windows":
+        return LINUX_CANDIDATE_PATHS
+    found: list[str] = []
+    for variable, relative in WINDOWS_CANDIDATE_TEMPLATES:
+        base = os.environ.get(variable, "")
+        if base:
+            found.append(str(Path(base).joinpath(*relative.split("/"))))
+    return tuple(found)
+
 
 CAP_PLUGIN: Final = "plugin"
 CAP_MARKETPLACE_ADD: Final = "plugin.marketplace.add"
@@ -63,14 +94,31 @@ REQUIRED_FOR_AUTOMATIC_INSTALL: Final = frozenset(
 RESOURCE_MARKETPLACE: Final = "marketplace"
 RESOURCE_PLUGIN: Final = "plugin"
 
-#: Both surfaces share one Codex host, so one registration covers them; registering twice
-#: would create two servers for the same managed setup.
+#: On Ubuntu these surfaces share one Codex host, so one registration covers them;
+#: registering twice would create two servers for the same managed setup. That is a
+#: verified fact about the tested Linux packaging, not a general one.
 SHARED_SURFACES: Final = ("ChatGPT desktop", "Codex CLI", "Codex IDE extension")
 
 
+def shared_surfaces() -> tuple[str, ...]:
+    """Which surfaces one registration is known to cover on this platform.
+
+    Empty on Windows on purpose. Whether ChatGPT desktop and Codex there really share
+    one host and one profile has not been verified, and claiming a shared connection
+    that does not exist would leave a user believing a surface is connected when it is
+    not. The interface says nothing rather than something unverified.
+    """
+    return () if services().name == "windows" else SHARED_SURFACES
+
+
 def codex_home() -> Path:
+    """The client's profile directory, honouring an absolute ``CODEX_HOME``.
+
+    The variable is read and never written: the assistant and the client must agree on
+    one profile, and overwriting it would move the client's own configuration.
+    """
     configured = os.environ.get("CODEX_HOME", "")
-    if configured.startswith("/"):
+    if services().is_absolute_path(configured):
         return Path(configured)
     return Path.home() / ".codex"
 
@@ -94,11 +142,13 @@ class OpenAILocalAdapter:
         self,
         runner: CommandRunner | None = None,
         *,
-        candidate_paths: Sequence[str] = CANDIDATE_PATHS,
+        candidate_paths: Sequence[str] | None = None,
         config_home: Path | None = None,
     ) -> None:
         self._run: CommandRunner = runner or run_command
-        self._candidate_paths = tuple(candidate_paths)
+        self._candidate_paths = (
+            tuple(candidate_paths) if candidate_paths is not None else default_candidate_paths()
+        )
         self._config_home = config_home
 
     # -- discovery ---------------------------------------------------------------
@@ -108,7 +158,42 @@ class OpenAILocalAdapter:
         found = shutil.which("codex")
         if found:
             paths.insert(0, Path(found))
+        # `executable_candidates` drops anything this platform will not launch directly.
+        # On Windows that removes the `.cmd` and `.bat` shims a package manager creates:
+        # driving one would mean building a command line out of user-controlled paths.
         return executable_candidates(paths)
+
+    def profile_path(self) -> Path:
+        return self.profile_dir().resolve()
+
+    def _installation_id(self, executable: Path) -> str:
+        identity = f"{executable.resolve()}\0{self.profile_path()}"
+        return f"{ADAPTER_ID}:{hashlib.sha256(identity.encode('utf-8')).hexdigest()}"
+
+    def inspect(self, executable: Path) -> ClientInstallation | None:
+        """Describe one installation the user pointed at explicitly.
+
+        This is the supported way to reach a client installed somewhere this adapter
+        does not probe. The file is not trusted for being where the user said it is: it
+        still has to answer `--version` and the plugin subcommands like any other.
+        """
+        found = executable_candidates([executable])
+        if not found:
+            return None
+        resolved = found[0]
+        version = self._run([str(resolved), "--version"])
+        if not version.ok:
+            return None
+        plugin = self._run([str(resolved), "plugin", "--help"])
+        return ClientInstallation(
+            id=self._installation_id(resolved),
+            adapter=ADAPTER_ID,
+            display_name=self.display_name,
+            executable=resolved,
+            version=_version_of(version.stdout),
+            capabilities=frozenset({CAP_PLUGIN} if plugin.ok else set()),
+            shared_surfaces=shared_surfaces(),
+        )
 
     def discover(self) -> list[ClientInstallation]:
         """Find installations and confirm each one answers `--version` and `plugin`.
@@ -118,7 +203,7 @@ class OpenAILocalAdapter:
         selects.
         """
         installations: list[ClientInstallation] = []
-        for index, executable in enumerate(self._candidates()):
+        for executable in self._candidates():
             version = self._run([str(executable), "--version"])
             if not version.ok:
                 continue
@@ -126,13 +211,13 @@ class OpenAILocalAdapter:
             capabilities = {CAP_PLUGIN} if plugin.ok else set()
             installations.append(
                 ClientInstallation(
-                    id=f"{ADAPTER_ID}:{index}",
+                    id=self._installation_id(executable),
                     adapter=ADAPTER_ID,
                     display_name=self.display_name,
                     executable=executable,
                     version=_version_of(version.stdout),
                     capabilities=frozenset(capabilities),
-                    shared_surfaces=SHARED_SURFACES,
+                    shared_surfaces=shared_surfaces(),
                 )
             )
         return installations
@@ -161,8 +246,17 @@ class OpenAILocalAdapter:
 
     # -- existing entries --------------------------------------------------------
 
+    def profile_dir(self) -> Path:
+        """The client profile this adapter reads and writes.
+
+        Recorded when an installation is registered, so a later disconnect can tell that
+        it is removing entries from the profile they were added to rather than from
+        whichever one ``CODEX_HOME`` happens to point at now.
+        """
+        return self._config_home or codex_home()
+
     def _config_path(self) -> Path:
-        return (self._config_home or codex_home()) / "config.toml"
+        return self.profile_dir() / "config.toml"
 
     def existing_servers(self) -> dict[str, dict[str, Any]]:
         """Read only the MCP server table of the client's configuration.
@@ -198,12 +292,16 @@ class OpenAILocalAdapter:
         """Whether this entry is one the assistant itself would write.
 
         A managed entry launches an absolute runtime with ``--config``; the historic
-        plugin launches `uvx` and passes environment variables instead.
+        plugin launches `uvx` and passes environment variables instead. The comparison
+        is made on the executable's stem so the same entry is recognised whether it was
+        written on Linux or on Windows, where it carries a ``.exe`` suffix.
         """
         arguments = entry.get("args")
         args = [str(item) for item in arguments] if isinstance(arguments, list) else []
         command = str(entry.get("command", ""))
-        return command.endswith("proton-safe-mcp") and "--config" in args
+        if not command or "--config" not in args:
+            return False
+        return PurePath(command.replace("\\", "/")).stem == "proton-safe-mcp"
 
     def installed_plugins(self, installation: ClientInstallation) -> list[str] | None:
         """Return the plugin references the client reports, or None when it cannot say.

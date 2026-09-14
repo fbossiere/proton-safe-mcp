@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import keyring.errors
+import pytest
 
 from proton_safe_mcp import cli, doctor
 from proton_safe_mcp.errors import BridgeError, ConfigurationError
@@ -101,7 +102,7 @@ def test_doctor_rejects_unsupported_platform(settings, monkeypatch, capsys):
     monkeypatch.setattr(doctor.ProtonBridgeClient, "probe", unexpected_call)
 
     assert cli.main(["doctor"]) == 1
-    assert "[FAIL] Platform: Darwin (Linux required)" in capsys.readouterr().out
+    assert "[FAIL] Platform: Darwin (Linux or Windows required)" in capsys.readouterr().out
 
 
 def test_doctor_does_not_create_the_state_directory(tmp_path, monkeypatch, capsys):
@@ -126,6 +127,9 @@ def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
 
     class UnreadableStateDirectory:
+        def exists(self):
+            raise PermissionError("private path not printed")
+
         def stat(self):
             raise PermissionError("private path not printed")
 
@@ -153,6 +157,7 @@ def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
     assert "private path not printed" not in output
 
 
+@pytest.mark.posix_only
 def test_doctor_rejects_private_but_unusable_state_directory(settings, monkeypatch, capsys):
     _configure(settings, monkeypatch)
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")

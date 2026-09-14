@@ -28,6 +28,7 @@ def _no_pinned_settings():
 # -- A01: the historic mode is untouched ----------------------------------------
 
 
+@pytest.mark.posix_only
 def test_a01_historic_mode_never_reads_the_managed_file(
     monkeypatch, tmp_path, write_managed_config, managed_config_path
 ):
@@ -65,6 +66,7 @@ def test_a01_historic_doctor_output_is_unchanged(settings, monkeypatch, capsys):
 # -- A02: an explicit file wins over a contradictory environment ------------------
 
 
+@pytest.mark.posix_only
 def test_a02_managed_mode_ignores_every_contradictory_proton_variable(
     monkeypatch, tmp_path, write_managed_config, managed_config_path
 ):
@@ -138,6 +140,7 @@ def test_a03_managed_mode_reads_only_the_keyring(
 # -- A09: a restart with no exports still works ----------------------------------
 
 
+@pytest.mark.posix_only
 def test_a09_serve_pins_the_managed_settings_before_importing_the_tool_surface(
     monkeypatch, fake_keyring, write_managed_config, managed_config_path, tmp_path
 ):
@@ -173,6 +176,7 @@ def test_a09_serve_pins_the_managed_settings_before_importing_the_tool_surface(
     assert get_bridge_password(pinned.bridge_user, allow_environment=False) == "bridge-secret"
 
 
+@pytest.mark.posix_only
 def test_a09_the_tool_surface_builds_from_the_pinned_settings(
     monkeypatch, write_managed_config, managed_config_path, tmp_path
 ):
@@ -207,6 +211,7 @@ def test_config_must_be_an_absolute_path(capsys):
     assert "absolute path" in capsys.readouterr().err
 
 
+@pytest.mark.posix_only
 def test_doctor_json_carries_codes_and_no_private_value(
     monkeypatch, fake_keyring, write_managed_config, managed_config_path, capsys, tmp_path
 ):

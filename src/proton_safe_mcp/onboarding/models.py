@@ -32,6 +32,9 @@ class Code(StrEnum):
     SYSTEM_UNSUPPORTED = "SYSTEM_UNSUPPORTED"
     SESSION_OK = "SESSION_OK"
     SESSION_ROOT = "SESSION_ROOT"
+    #: Windows: the assistant is running with an elevated token. It installs into one
+    #: user's own profile, so an elevated run would set up an account nobody is using.
+    SESSION_ELEVATED = "SESSION_ELEVATED"
     SESSION_NO_GRAPHICAL = "SESSION_NO_GRAPHICAL"
     KEYRING_AVAILABLE = "KEYRING_AVAILABLE"
     KEYRING_LOCKED = "KEYRING_LOCKED"

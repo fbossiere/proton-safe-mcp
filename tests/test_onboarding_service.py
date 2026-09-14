@@ -136,12 +136,9 @@ def codex_home(tmp_path):
 
 
 @pytest.fixture
-def service(tmp_path, client, codex_home, monkeypatch, fake_keyring):
+def service(tmp_path, client, codex_home, monkeypatch, fake_keyring, make_executable):
     """A service wired to a fake client, a fake keyring and private temporary paths."""
-    executable = tmp_path / "bin" / "codex"
-    executable.parent.mkdir(parents=True)
-    executable.write_text("#!/bin/sh\n")
-    executable.chmod(0o700)
+    executable = make_executable(tmp_path / "bin", "codex")
 
     adapter = OpenAILocalAdapter(
         client.run, candidate_paths=(str(executable),), config_home=codex_home
@@ -150,11 +147,7 @@ def service(tmp_path, client, codex_home, monkeypatch, fake_keyring):
     config_dir = tmp_path / "config" / "proton-safe-mcp"
     config_dir.mkdir(mode=0o700, parents=True)
 
-    runtime_dir = tmp_path / "runtime"
-    runtime_dir.mkdir()
-    runtime = runtime_dir / "proton-safe-mcp"
-    runtime.write_text("#!/bin/sh\n")
-    runtime.chmod(0o700)
+    runtime = make_executable(tmp_path / "runtime", "proton-safe-mcp")
 
     from proton_safe_mcp.onboarding.runtime import RuntimeLocation
 
@@ -813,6 +806,7 @@ def test_capabilities_come_from_the_client_not_from_its_version(service, client)
     assert described.version == "codex-cli 1.4.0"
 
 
+@pytest.mark.posix_only
 def test_two_paths_to_the_same_executable_are_reported_once(tmp_path, client, monkeypatch):
     executable = tmp_path / "codex"
     executable.write_text("#!/bin/sh\n")
@@ -922,8 +916,9 @@ def test_the_managed_server_needs_neither_uvx_nor_proton_variables(service, brid
     config = json.loads((assets.plugin_dir / ".mcp.json").read_text(encoding="utf-8"))
     server = config["mcpServers"]["proton-safe"]
 
-    assert server["command"].endswith("proton-safe-mcp")
-    assert server["command"].startswith("/")
+    assert service.runtime is not None
+    assert server["command"] == service.runtime.command[0]
+    assert Path(server["command"]).is_absolute()
     assert server["args"][:2] == ["serve", "--config"]
     assert "uvx" not in json.dumps(config)
     assert not [name for name in server["env_vars"] if name.startswith("PROTON_")]
@@ -1174,6 +1169,74 @@ def test_a_clean_removal_without_an_erase_request_keeps_the_local_data(
     assert service.journal().resources == []
 
 
+def test_a_client_chosen_by_hand_is_found_again_after_reopening_and_can_be_disconnected(
+    tmp_path, client, codex_home, bridge, fake_keyring, make_executable, monkeypatch
+):
+    """The full path for an installation none of the bounded probes reach.
+
+    Choose it, activate, close and reopen, verify, disconnect. Discovery never produces
+    this installation — that is the whole point of choosing it — so a resumed session
+    that looked it up by discovery identifier alone would find nothing, report that the
+    client needed attention, and remove none of the entries it had created.
+    """
+    elsewhere = make_executable(tmp_path / "opt" / "vendor" / "tools", "codex")
+    # Nothing probes there, and nothing on the PATH answers either.
+    adapter = OpenAILocalAdapter(client.run, candidate_paths=(), config_home=codex_home)
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+    config_dir = tmp_path / "config" / "proton-safe-mcp"
+    config_dir.mkdir(mode=0o700, parents=True)
+    runtime_path = make_executable(tmp_path / "runtime", "proton-safe-mcp")
+
+    from proton_safe_mcp.onboarding.runtime import RuntimeLocation
+
+    service = SetupService(
+        config_path=config_dir / "config.toml",
+        journal_path=tmp_path / "state" / "install.json",
+        plugin_dir=tmp_path / "plugin",
+        adapters=(adapter,),
+        runtime=RuntimeLocation((str(runtime_path),), packaged=True),
+    )
+    assert service.discover() == [], "this installation is deliberately undiscoverable"
+
+    chosen = service.inspect_client(elsewhere)
+    assert chosen is not None
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(chosen)
+    service.activate(plan, assets)
+    service.confirm_client_manually()
+
+    recorded = service.journal()
+    assert recorded.client_executable == str(elsewhere)
+    assert recorded.client_profile == str(codex_home)
+
+    reopened = _fresh_service(service)
+    assert reopened.snapshot().state is InstallState.READY
+
+    outcome = reopened.disconnect()
+
+    assert outcome.ok, "the client chosen by hand must be reachable again to disconnect"
+    assert client.plugins == [] and client.marketplaces == []
+    assert reopened.journal().resources == []
+
+
+def test_a_recorded_client_whose_executable_is_gone_reports_nothing_rather_than_stale(
+    service, bridge, client, tmp_path
+):
+    """Being recorded is not being trusted: the path is re-inspected, not assumed."""
+    service.save_bridge(_candidate())
+    plan, assets = service.plan_client(_installation(service))
+    service.activate(plan, assets)
+
+    recorded = service.journal()
+    recorded.client_executable = str(tmp_path / "removed" / "codex")
+    recorded.client_id = "openai-local:chosen"
+    service._save_journal(recorded)
+
+    reopened = _fresh_service(service)
+
+    assert reopened._recorded_installation(reopened.journal()) is None
+
+
 def test_an_outstanding_disconnect_is_visible_after_reopening(service, bridge, client):
     service.save_bridge(_candidate())
     plan, assets = service.plan_client(_installation(service))
@@ -1208,3 +1271,41 @@ def test_registering_again_withdraws_an_outstanding_disconnect(service, bridge, 
     # A withdrawn disconnect must not erase the local data later on.
     assert recorded.erase_local_requested is False
     assert reopened.snapshot().state is InstallState.CLIENT_VERIFICATION_PENDING
+
+
+def test_a_manually_chosen_client_can_be_removed_after_reopening(service, client, bridge):
+    assert service.save_bridge(BridgeCandidate(ACCOUNT, password=GOOD_SECRET)).ok
+    adapter = service.adapters[0]
+    executable = service.discover()[0].executable
+    chosen = adapter.inspect(executable)
+    assert chosen is not None
+    plan, assets = service.plan_client(chosen)
+    assert service.activate(plan, assets).ok
+    recorded = service.journal()
+    assert recorded.client_executable == str(executable.resolve())
+    # The executable is now outside discovery, just as with the Locate button.
+    adapter._candidate_paths = ()
+    reopened = SetupService(
+        config_path=service.config_path,
+        journal_path=service.journal_path,
+        plugin_dir=service.plugin_dir,
+        adapters=(adapter,),
+        runtime=service.runtime,
+    )
+    assert reopened._recorded_installation(recorded).executable == executable
+    assert reopened.disconnect().ok
+    assert client.plugins == []
+    assert client.marketplaces == []
+
+
+def test_a_changed_client_profile_never_removes_another_profiles_resources(
+    service, client, bridge, tmp_path
+):
+    assert service.save_bridge(BridgeCandidate(ACCOUNT, password=GOOD_SECRET)).ok
+    plan, assets = service.plan_client(service.discover()[0])
+    assert service.activate(plan, assets).ok
+    service.adapters[0]._config_home = tmp_path / "another-profile"
+    before = list(client.calls)
+    assert not service.disconnect().ok
+    assert client.calls == before
+    assert service.journal().resources

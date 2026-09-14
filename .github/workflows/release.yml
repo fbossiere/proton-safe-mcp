@@ -12,6 +12,14 @@ on:
         required: false
         default: false
         type: boolean
+      include_windows:
+        description: >-
+          Build, sign and publish the Windows installer with this release. Leave off
+          until a Windows client is qualified and a signing identity works in CI; a
+          release that claims Windows must not ship an unsigned or unverified one.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -136,9 +144,102 @@ jobs:
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
           gh release upload "$RELEASE_TAG" ./*.deb ./*.deb.sha256 BUILD-PROVENANCE.txt
 
+  build-windows:
+    name: Windows installer (Windows 11 x64)
+    if: ${{ !inputs.registry_only && inputs.include_windows && startsWith(inputs.tag, 'v') }}
+    runs-on: windows-latest
+    environment:
+      # Holds the signing credentials. Pull requests never reach this environment, so an
+      # untrusted build can neither sign nor publish anything.
+      name: windows-signing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.tag }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          version: "latest-known"
+      - run: uv sync --frozen --extra dev --extra desktop --extra packaging
+      # Windows is a supported platform for this release, so its tests are part of the
+      # gate, not a separate opinion gathered afterwards.
+      - name: Run the test suite on Windows
+        run: uv run pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Install the pinned Inno Setup
+        run: uv run python packaging/windows/fetch_innosetup.py --install
+      - name: Build, verify, sign and package
+        env:
+          # A command line with Inno Setup's $f placeholder for the file to sign. No key
+          # material is ever in this repository or in an artefact; the secret names a
+          # signing service the runner is authorised to call.
+          PROTON_SAFE_SIGN_COMMAND: ${{ secrets.WINDOWS_SIGN_COMMAND }}
+        run: |
+          $env:PYINSTALLER = "$PWD\.venv\Scripts\pyinstaller.exe"
+          $env:PROTON_SAFE_PYTHON = "$PWD\.venv\Scripts\python.exe"
+          pwsh packaging/windows/build_windows.ps1
+      # A release that announces Windows must not ship a build nobody can attribute.
+      # The build script names an unsigned artefact "-unsigned"; this refuses it outright.
+      - name: Refuse an unsigned release artefact
+        run: |
+          $unsigned = Get-ChildItem dist/windows -Filter "*-unsigned.exe" -ErrorAction SilentlyContinue
+          if ($unsigned) {
+            throw "This release is unsigned. Configure WINDOWS_SIGN_COMMAND, or release without include_windows."
+          }
+          $installer = Get-ChildItem dist/windows -Filter "ProtonSafe-Setup-*.exe" | Select-Object -First 1
+          $signature = Get-AuthenticodeSignature $installer.FullName
+          if ($signature.Status -ne "Valid") { throw "signature status is $($signature.Status)" }
+          Write-Host "Signed by $($signature.SignerCertificate.Subject)"
+      - name: Verify the installer installs and uninstalls unattended
+        run: pwsh packaging/windows/test_standard_account.ps1
+      - name: Show the artefact provenance
+        run: Get-Content dist/windows/BUILD-PROVENANCE-windows-x64.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-installer
+          path: |
+            dist/windows/ProtonSafe-Setup-*.exe
+            dist/windows/ProtonSafe-Setup-*.exe.sha256
+            dist/windows/BUILD-PROVENANCE-windows-x64.txt
+            dist/windows/SBOM-windows-x64.json
+          if-no-files-found: error
+
+  publish-windows:
+    name: Attach Windows installer to draft release
+    needs: [build, build-desktop, build-windows]
+    if: ${{ !inputs.registry_only && inputs.include_windows && startsWith(inputs.tag, 'v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Attach only the artefacts produced from the release tag.
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-installer
+          path: windows/
+      - name: Verify and attach the installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          cd windows
+          # The digest was taken after signing, so this checks the file that ships.
+          sha256sum --check --strict ./*.exe.sha256
+          # Immutable releases reject new assets after publication. Upload while draft.
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+          # These names sit alongside the Ubuntu ones; neither overwrites the other.
+          gh release upload "$RELEASE_TAG" ./ProtonSafe-Setup-*.exe \
+            ./ProtonSafe-Setup-*.exe.sha256 \
+            BUILD-PROVENANCE-windows-x64.txt SBOM-windows-x64.json
+
   publish-pypi:
     name: Publish to PyPI
-    needs: [build, build-desktop]
+    # A release that announces Windows must not publish its Python package while the
+    # Windows build is failing: the version would exist with no installer behind it.
+    needs: [build, build-desktop, build-windows]
+    if: ${{ always() && needs.build.result == 'success' && needs.build-desktop.result == 'success' && (needs.build-windows.result == 'success' || !inputs.include_windows) }}
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -202,7 +303,18 @@ jobs:
 
   publish-github:
     name: Publish completed GitHub Release
-    needs: [publish-desktop, publish-mcp-registry]
+    needs: [publish-desktop, publish-windows, publish-mcp-registry]
+    # The release is published once every artefact it announces is attached. The Windows
+    # clause is written against the input, not against a skipped result: publish-windows
+    # is also skipped when build-windows fails, so accepting "skipped" would publish a
+    # release claiming Windows while its installer failed to build.
+    if: >-
+      ${{
+        always() &&
+        needs.publish-desktop.result == 'success' &&
+        needs.publish-mcp-registry.result == 'success' &&
+        (needs.publish-windows.result == 'success' || !inputs.include_windows)
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

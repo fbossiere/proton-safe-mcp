@@ -21,7 +21,7 @@ def test_an_approved_backend_is_usable_for_a_managed_setup(fake_keyring):
     assert status.state == "available"
     assert status.code == "KEYRING_AVAILABLE"
     assert status.usable_for_managed_setup
-    assert "SecretService" in status.backend
+    assert type(fake_keyring).__module__ in status.backend
 
 
 def test_a_locked_keyring_is_told_apart_from_a_missing_one(fake_keyring):
@@ -154,6 +154,7 @@ def test_the_secret_service_backend_ships_with_this_installation():
     assert secrets_module.secret_service_backend_available() is True
 
 
+@pytest.mark.posix_only
 def test_a_missing_secret_service_module_is_detected(monkeypatch):
     import builtins
 
@@ -169,6 +170,7 @@ def test_a_missing_secret_service_module_is_detected(monkeypatch):
     assert secrets_module.secret_service_backend_available() is False
 
 
+@pytest.mark.posix_only
 def test_a_too_old_secretstorage_is_refused(monkeypatch):
     import secretstorage
 

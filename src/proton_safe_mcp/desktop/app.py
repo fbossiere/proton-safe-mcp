@@ -18,6 +18,8 @@ from .. import __version__
 from ..onboarding.messages import OFFICIAL_LINKS, detect_language, explain, translate
 from ..onboarding.models import Check, ClientInstallation, Code, InstallState
 from ..onboarding.service import BridgeCandidate, SetupService, Snapshot
+from ..platform_services import services
+from .single_instance import SingleInstanceGuard, signal_existing_instance
 from .theme import app_icon, apply_theme
 from .widgets import (
     CheckRow,
@@ -174,7 +176,7 @@ class PrerequisitesScreen(Screen):
             self.rows[check_id] = row
             self.body.addWidget(row)
 
-        links = QtWidgets.QHBoxLayout()
+        links = QtWidgets.QVBoxLayout()
         self.bridge_link = QtWidgets.QPushButton(translate("prereq.bridge_help", self.language))
         self.bridge_link.setAccessibleName("proton.me/mail/bridge")
         self.bridge_link.clicked.connect(lambda: window.open_official("bridge"))
@@ -182,7 +184,6 @@ class PrerequisitesScreen(Screen):
         self.recheck.clicked.connect(self.refresh)
         links.addWidget(self.bridge_link)
         links.addWidget(self.recheck)
-        links.addStretch(1)
         self.body.addLayout(links)
 
         self.primary.clicked.connect(lambda: window.show_screen("bridge"))
@@ -340,6 +341,16 @@ class ClientScreen(Screen):
         self.body.addWidget(self.list)
         self.details = DetailsBox(self.language)
         self.body.addWidget(self.details)
+        # A client installed somewhere this version does not probe is still reachable,
+        # without asking anyone to type a command. What is chosen is then verified the
+        # same way a discovered installation is.
+        actions = QtWidgets.QHBoxLayout()
+        self.locate = QtWidgets.QPushButton(translate("client.locate", self.language))
+        self.locate.setAccessibleName(translate("client.locate", self.language))
+        self.locate.clicked.connect(self._locate)
+        actions.addWidget(self.locate)
+        actions.addStretch(1)
+        self.body.addLayout(actions)
         self.list.currentRowChanged.connect(self._show_details)
         self.primary.clicked.connect(self._choose)
         self.installations: list[ClientInstallation] = []
@@ -353,15 +364,49 @@ class ClientScreen(Screen):
             lambda _token: self.window_ref.service.discover(), self._show, self.show_code
         )
 
+    def _locate(self) -> None:
+        """Ask for the client's own executable and verify it before offering it."""
+        chosen, _filter = QtWidgets.QFileDialog.getOpenFileName(
+            self, translate("client.locate", self.language)
+        )
+        if not chosen:
+            return
+        self.set_status(translate("common.working", self.language))
+        self.window_ref.run(
+            lambda _token: self.window_ref.service.inspect_client(Path(chosen)),
+            self._located,
+            self.show_code,
+        )
+
+    def _located(self, installation: ClientInstallation | None) -> None:
+        if installation is None:
+            self.set_status(translate("client.locate_failed", self.language))
+            return
+        existing = [item.executable for item in self.installations]
+        if installation.executable not in existing:
+            self.installations.append(installation)
+        self._render()
+        self.list.setCurrentRow(len(self.installations) - 1)
+
+    def _surface_note(self, installation: ClientInstallation) -> str:
+        """Say which other surfaces one registration covers, only when that is known."""
+        if not installation.shared_surfaces:
+            return translate("client.shared_unknown", self.language)
+        return translate(
+            "client.shared", self.language, surfaces=", ".join(installation.shared_surfaces)
+        )
+
     def _show(self, installations: Sequence[ClientInstallation]) -> None:
         self.installations = list(installations)
+        self._render()
+
+    def _render(self) -> None:
         self.list.clear()
         for installation in self.installations:
-            surfaces = ", ".join(installation.shared_surfaces)
             item = QtWidgets.QListWidgetItem(
                 f"{installation.display_name} — {installation.version}"
             )
-            item.setToolTip(translate("client.shared", self.language, surfaces=surfaces))
+            item.setToolTip(self._surface_note(installation))
             self.list.addItem(item)
         if self.installations:
             self.list.setCurrentRow(0)
@@ -376,11 +421,7 @@ class ClientScreen(Screen):
             installation = self.installations[row]
             self.details.set_text(
                 f"{installation.executable}\n{installation.version}\n"
-                + translate(
-                    "client.shared",
-                    self.language,
-                    surfaces=", ".join(installation.shared_surfaces),
-                )
+                + self._surface_note(installation)
             )
 
     def _choose(self) -> None:
@@ -865,6 +906,19 @@ class MainWindow(QtWidgets.QMainWindow):
         if url:
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
+    def present(self) -> None:
+        """Bring this window back to the front, from wherever it was left.
+
+        Called when someone opens Proton Safe a second time. A half-finished setup keeps
+        its fields and its place in the flow; nothing restarts.
+        """
+        if self.isMinimized():
+            self.showNormal()
+        else:
+            self.show()
+        self.raise_()
+        self.activateWindow()
+
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.runner.cancel()
         self.runner.wait(10_000)
@@ -880,10 +934,10 @@ def verify_bundle(config_path: Path) -> int:
     """
     import tempfile
 
-    from ..secrets import secret_service_backend_available
+    from ..secrets import approved_backend_available
 
-    if not secret_service_backend_available():
-        print("the Secret Service keyring backend is missing from this build", file=sys.stderr)
+    if not approved_backend_available():
+        print("this build does not carry a usable credential store backend", file=sys.stderr)
         return 1
     with tempfile.TemporaryDirectory() as workspace:
         service = SetupService(config_path=config_path, plugin_dir=Path(workspace) / "plugin")
@@ -910,24 +964,91 @@ def verify_bundle(config_path: Path) -> int:
     return 0
 
 
+def uninstall_connection(*, erase_local: bool) -> int:
+    """Remove this installation's client entries, without opening a window.
+
+    The Windows uninstaller calls this before it deletes the program files, in the
+    user's own session. The assistant owns the journal, the client adapters and the
+    credential store, so the uninstaller never edits a client configuration or touches
+    Credential Manager itself: it asks the component that knows what Proton Safe
+    created, and only that is removed.
+
+    Exit codes are stable, because an installer reads them rather than text:
+
+    ``0`` the managed entries are gone — a client restart may still be needed before it
+    stops offering the tools; ``1`` entries remain, so the settings, the password and
+    the journal are kept and a requested erase is deferred until a retry succeeds.
+    """
+    from ..onboarding.journal import default_journal_path
+
+    service = SetupService()
+    journal_path = service.journal_path or default_journal_path()
+    if not service.config_path.exists() and not journal_path.exists():
+        # This account never set anything up. There is nothing to disconnect, and an
+        # uninstall must not create state on its way out.
+        print(translate("uninstall.nothing_to_remove", detect_language()))
+        return 0
+
+    outcome = service.disconnect(erase_local=erase_local)
+    message, action = explain(str(outcome.code), detect_language())
+    stream = sys.stdout if outcome.ok else sys.stderr
+    print(f"{message} {action}".strip(), file=stream)
+    if outcome.ok and erase_local:
+        # Say plainly what an erase does and does not reach. A secret already read into
+        # a running server's memory is not revoked by deleting it from the store.
+        print(translate("uninstall.erase_done", detect_language()), file=stream)
+    return 0 if outcome.ok else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the desktop assistant."""
-    import os
-
     arguments = list(argv) if argv is not None else sys.argv
     if "--verify-bundle" in arguments:
+        # Packaging only. It touches no account state — a temporary directory, and the
+        # embedded resources — so it is the one mode that runs wherever a build does,
+        # including on a CI runner signed in as an administrator.
         index = arguments.index("--config")
         return verify_bundle(Path(arguments[index + 1]).resolve())
 
-    if os.geteuid() == 0:
-        message, action = explain(str(Code.SESSION_ROOT), detect_language())
+    platform = services()
+    if platform.session_facts().elevated:
+        # The setup writes into one account's own profile and registers a client for
+        # that account. Elevated, it would set up an account nobody is signed in as.
+        # Removal is the same account question in reverse: elevated, it would look for
+        # the administrator's configuration, journal and credential, find none, and
+        # report a connection as removed while it stayed exactly where it was.
+        code = Code.SESSION_ELEVATED if platform.name == "windows" else Code.SESSION_ROOT
+        message, action = explain(str(code), detect_language())
         print(f"{message} {action}", file=sys.stderr)
         return 1
+
+    if "--uninstall-connection" in arguments:
+        return uninstall_connection(erase_local="--erase-local" in arguments)
+
+    # Two assistants would each hold their own view of one configuration, one journal
+    # and one client. Asked to open a second time, bring back the first.
+    if signal_existing_instance():
+        return 0
+
     application = QtWidgets.QApplication(arguments)
     application.setApplicationName("Proton Safe")
     application.setApplicationVersion(__version__)
     application.setDesktopFileName("proton-safe-assistant")
     window = MainWindow()
+    guard = SingleInstanceGuard(window.present)
+    if not guard.listen():
+        # Another launch took this account's slot between the check above and here.
+        # Losing that race is not a reason to open a second window: ask the one that
+        # won to come forward, exactly as the early check would have done.
+        if signal_existing_instance():
+            return 0
+        QtWidgets.QMessageBox.critical(
+            window,
+            translate("app.title", detect_language()),
+            translate("app.start_failed", detect_language()),
+        )
+        return 1
+    application.aboutToQuit.connect(guard.close)
     window.start()
     window.show()
     return int(application.exec())

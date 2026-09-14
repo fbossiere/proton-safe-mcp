@@ -20,6 +20,7 @@ from . import configuration_store
 from .addresses import validate_address
 from .configuration_store import LIMIT_BOUNDS, StoredConfiguration
 from .errors import ConfigurationError
+from .platform_services import resolve_state_directory, services
 
 MAX_SENDER_ADDRESSES = 25
 
@@ -61,19 +62,13 @@ def _sender_aliases(primary: str) -> tuple[str, ...]:
 
 
 def _default_state_dir() -> Path:
-    # An empty or relative XDG_STATE_HOME is ignored, as the XDG base directory
-    # specification requires: Path("") would stage attachments in the working directory.
-    xdg_state_home = os.environ.get("XDG_STATE_HOME", "")
-    base = (
-        Path(xdg_state_home) if xdg_state_home.startswith("/") else Path.home() / ".local" / "state"
-    )
-    return (base / "proton-safe-mcp").resolve()
+    """This account's state directory, as the platform resolves it."""
+    return services().state_dir()
 
 
 def _state_dir() -> Path:
-    if configured := os.environ.get("PROTON_MCP_STATE_DIR"):
-        return Path(configured).expanduser().resolve()
-    return _default_state_dir()
+    """The state directory, honouring an explicit absolute override."""
+    return resolve_state_directory(os.environ.get("PROTON_MCP_STATE_DIR"), _default_state_dir())
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,9 +181,10 @@ class Settings:
         )
 
     def ensure_directories(self) -> None:
+        """Create the state directories, private to this account on either platform."""
+        platform = services()
         for directory in (self.state_dir, self.uploads_dir):
-            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-            directory.chmod(0o700)
+            platform.ensure_private_directory(directory)
 
 
 _startup_settings: Settings | None = None

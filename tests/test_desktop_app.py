@@ -8,6 +8,7 @@ supported state for a PyPI install of the server.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -28,7 +29,11 @@ from proton_safe_mcp.desktop.widgets import (  # noqa: E402
     Disclosure,
     SecretField,
 )
-from proton_safe_mcp.onboarding.messages import OFFICIAL_LINKS, translate  # noqa: E402
+from proton_safe_mcp.onboarding.messages import (  # noqa: E402
+    OFFICIAL_LINKS,
+    explain,
+    translate,
+)
 from proton_safe_mcp.onboarding.models import Check, Code, InstallState  # noqa: E402
 from proton_safe_mcp.onboarding.service import SetupService, Snapshot  # noqa: E402
 
@@ -40,6 +45,13 @@ INTERACTIVE = (
     QtWidgets.QCheckBox,
     QtWidgets.QListWidget,
 )
+
+
+@pytest.fixture(autouse=True)
+def ordinary_desktop_session(monkeypatch):
+    from proton_safe_mcp.platform_services import SessionFacts, services
+
+    monkeypatch.setattr(services(), "session_facts", lambda: SessionFacts("test desktop", False))
 
 
 @pytest.fixture(scope="session")
@@ -115,7 +127,14 @@ def test_the_window_fits_a_1280_by_720_screen_at_200_percent_scaling(
             assert window.width() == 640
             assert window.height() == 330
             scroll = screen.content_scroll
-            assert scroll.horizontalScrollBar().maximum() == 0
+            assert scroll.horizontalScrollBar().maximum() == 0, (
+                name,
+                [
+                    (type(child).__name__, child.objectName(), child.minimumSizeHint().width())
+                    for child in scroll.widget().findChildren(QtWidgets.QWidget)
+                    if child.isVisible() and child.minimumSizeHint().width() > 400
+                ],
+            )
             assert scroll.viewport().height() > 100
             for value in (0, scroll.verticalScrollBar().maximum()):
                 scroll.verticalScrollBar().setValue(value)
@@ -159,7 +178,7 @@ def test_a_status_is_never_carried_by_colour_alone():
     description = row.accessibleDescription()
     marks = row.findChildren(QtWidgets.QLabel)
     assert translate("status.fail", "fr") in description
-    assert "verrouillé" in description
+    assert explain("KEYRING_LOCKED", "fr")[0] in description
     assert marks[0].text() == STATUS_MARKS["fail"]
     # Distinct statuses produce distinct text and a distinct mark, not just a colour.
     row.show_check(Check("keyring", "pass", Code.KEYRING_AVAILABLE))
@@ -297,7 +316,7 @@ def test_a_failed_operation_shows_a_translated_code_not_a_raw_message(
     text = window.screens["prerequisites"].status.text()
 
     assert "/home/someone/private" not in text
-    assert "verrouillé" in text
+    assert explain("KEYRING_LOCKED", "fr")[0] in text
 
 
 def test_cancelling_a_running_operation_reports_it_as_cancelled(window, application):
@@ -921,3 +940,252 @@ def test_tab_scrolls_the_next_bridge_field_fully_into_view(wizard, application):
     bounds = QtCore.QRect(field.mapTo(viewport, QtCore.QPoint()), field.size())
     assert viewport.rect().contains(bounds)
     window.close()
+
+
+# -- the entry point the Windows uninstaller calls ---------------------------------
+
+
+def test_the_uninstaller_entry_point_creates_nothing_when_nothing_was_set_up(
+    tmp_path, monkeypatch, capsys
+):
+    """An uninstall must not leave state behind for an account that never set up."""
+    from proton_safe_mcp.desktop import app as desktop_app
+
+    monkeypatch.setattr(
+        desktop_app,
+        "SetupService",
+        lambda: SetupService(
+            config_path=tmp_path / "config" / "config.toml",
+            journal_path=tmp_path / "state" / "install.json",
+            plugin_dir=tmp_path / "plugin",
+            adapters=(),
+        ),
+    )
+
+    assert desktop_app.main(["proton-safe-assistant", "--uninstall-connection"]) == 0
+
+    assert "Proton Safe" in capsys.readouterr().out
+    assert not list(tmp_path.rglob("*.json"))
+    assert not (tmp_path / "config").exists()
+
+
+def test_the_uninstaller_entry_point_reports_a_client_that_refused_removal(
+    tmp_path, monkeypatch, capsys
+):
+    """Exit code 1 is what tells the uninstaller not to announce a disconnection."""
+    from proton_safe_mcp.desktop import app as desktop_app
+    from proton_safe_mcp.onboarding.models import Outcome
+
+    journal = tmp_path / "state" / "install.json"
+    journal.parent.mkdir(parents=True)
+    journal.write_text("{}", encoding="utf-8")
+
+    class Refusing(SetupService):
+        def disconnect(self, *, erase_local: bool = False) -> Outcome:
+            assert erase_local, "the erase request must reach the service"
+            return Outcome(False, Code.CLIENT_ACTION_REQUIRED, details={"remaining": ["plugin"]})
+
+    monkeypatch.setattr(
+        desktop_app,
+        "SetupService",
+        lambda: Refusing(
+            config_path=tmp_path / "config" / "config.toml",
+            journal_path=journal,
+            plugin_dir=tmp_path / "plugin",
+            adapters=(),
+        ),
+    )
+
+    code = desktop_app.main(["proton-safe-assistant", "--uninstall-connection", "--erase-local"])
+
+    assert code == 1
+    captured = capsys.readouterr()
+    assert captured.err.strip(), "the reason belongs on stderr for the installer log"
+    # A refused removal must never claim the local data was erased.
+    assert "effac" not in captured.out.lower() and "erased" not in captured.out.lower()
+
+
+def test_the_uninstaller_entry_point_refuses_an_elevated_session(tmp_path, monkeypatch, capsys):
+    """Elevated, it would look for the administrator's account, find none, and report a
+    connection as removed while it stayed exactly where it was."""
+    from proton_safe_mcp.desktop import app as desktop_app
+    from proton_safe_mcp.platform_services import services, use_services
+
+    class Elevated(type(services())):  # type: ignore[misc]
+        def session_facts(self):
+            from proton_safe_mcp.platform_services.base import SessionFacts
+
+            return SessionFacts("test", True)
+
+    def refuse():
+        raise AssertionError("an elevated session must never reach the removal")
+
+    monkeypatch.setattr(desktop_app, "uninstall_connection", lambda **_: refuse())
+
+    with use_services(Elevated()):
+        code = desktop_app.main(["proton-safe-assistant", "--uninstall-connection"])
+
+    assert code == 1
+    assert capsys.readouterr().err.strip()
+
+
+# -- one window per account --------------------------------------------------------
+
+
+def test_a_second_launch_raises_the_existing_window_instead_of_opening_another(
+    application, service, monkeypatch, tmp_path
+):
+    from proton_safe_mcp.platform_services import services
+
+    monkeypatch.setattr(services(), "state_dir", lambda: tmp_path / "state")
+    """Two assistants would each hold their own view of one configuration and journal."""
+    from proton_safe_mcp.desktop.single_instance import (
+        SingleInstanceGuard,
+        endpoint_name,
+        signal_existing_instance,
+    )
+
+    raised = []
+    guard = SingleInstanceGuard(lambda: raised.append(True))
+    assert guard.listen(), "the first launch claims this account's endpoint"
+    try:
+        assert signal_existing_instance(), "a second launch must find the first"
+        # The knock is delivered on the event loop, as it is in the real application.
+        for _ in range(50):
+            application.processEvents()
+            if raised:
+                break
+        assert raised == [True], "the running window is brought back, not a new one"
+    finally:
+        guard.close()
+
+    # Once it is gone, the next launch is free to become the running instance.
+    assert not signal_existing_instance()
+    assert endpoint_name().startswith("proton-safe-assistant-")
+
+
+def test_two_launches_racing_each_other_cannot_both_become_the_running_instance(
+    application, service
+):
+    """Both reach the claim before either is listening — the case a knock cannot catch.
+
+    Asking "is anyone there?" and then claiming the endpoint is two steps, and two
+    launches can each complete the first before either starts the second. Whoever
+    claimed second used to clear the first's live endpoint and listen anyway, leaving
+    two windows over one configuration, one journal and one client.
+    """
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard
+
+    first = SingleInstanceGuard(lambda: None)
+    second = SingleInstanceGuard(lambda: None)
+    try:
+        assert first.listen(), "the first launch takes the slot"
+
+        assert not second.listen(), "the second must not take it as well"
+    finally:
+        second.close()
+        first.close()
+
+
+def test_the_slot_is_free_again_once_the_running_instance_releases_it(application, service):
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard
+
+    first = SingleInstanceGuard(lambda: None)
+    assert first.listen()
+    first.close()
+
+    second = SingleInstanceGuard(lambda: None)
+    try:
+        assert second.listen(), "a released slot is available to the next launch"
+    finally:
+        second.close()
+
+
+def test_an_endpoint_left_by_a_killed_instance_does_not_block_the_next_launch(application, service):
+    """Recovery after an abrupt stop: the lock is gone, so the endpoint is stale."""
+    from PySide6 import QtNetwork
+
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard, endpoint_name
+
+    abandoned = QtNetwork.QLocalServer()
+    assert abandoned.listen(endpoint_name()), "stand in for a process that was killed"
+
+    guard = SingleInstanceGuard(lambda: None)
+    try:
+        assert guard.listen(), "a stale endpoint is cleared once the lock proves it stale"
+    finally:
+        guard.close()
+        abandoned.close()
+
+
+def test_the_endpoint_name_carries_no_readable_personal_detail():
+    from proton_safe_mcp.desktop.single_instance import endpoint_name
+
+    name = endpoint_name()
+
+    assert "/" not in name and "\\" not in name
+    assert str(Path.home().name) not in name
+
+
+def test_two_contending_guards_cannot_both_own_the_endpoint(application, tmp_path, monkeypatch):
+    from proton_safe_mcp.desktop.single_instance import (
+        SingleInstanceGuard,
+        signal_existing_instance,
+    )
+    from proton_safe_mcp.platform_services import services
+
+    monkeypatch.setattr(services(), "state_dir", lambda: tmp_path / "state")
+    first, second = SingleInstanceGuard(lambda: None), SingleInstanceGuard(lambda: None)
+    try:
+        assert first.listen()
+        assert not second.listen()
+        second.close()
+        assert signal_existing_instance(), "closing the loser must not unlink the winner"
+        first.close()
+        assert second.listen(), "the next launch can claim a released lock"
+    finally:
+        first.close()
+        second.close()
+
+
+def test_uninstall_entry_point_refuses_elevation_before_touching_state(monkeypatch):
+    from proton_safe_mcp.desktop import app
+    from proton_safe_mcp.platform_services import SessionFacts, services
+
+    monkeypatch.setattr(services(), "session_facts", lambda: SessionFacts("Windows", True))
+
+    def forbidden(**kwargs):
+        pytest.fail("an elevated process must never begin disconnecting")
+
+    monkeypatch.setattr(app, "uninstall_connection", forbidden)
+    assert app.main(["proton-safe-assistant", "--uninstall-connection"]) == 1
+
+
+def test_unsafe_instance_lock_directory_refuses_startup(application, monkeypatch):
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard
+    from proton_safe_mcp.platform_services import PrivacyError, services
+
+    def refuse(_path):
+        raise PrivacyError("private storage unavailable", code="CONFIG_PERMISSIONS")
+
+    monkeypatch.setattr(services(), "ensure_private_directory", refuse)
+    guard = SingleInstanceGuard(lambda: None)
+    assert not guard.listen()
+    guard.close()
+
+
+@pytest.mark.parametrize("other_instance", [False, True])
+def test_startup_distinguishes_a_real_failure_from_another_instance(
+    window, application, monkeypatch, other_instance
+):
+    from proton_safe_mcp.desktop import app
+
+    attempts = iter([False, other_instance])
+    monkeypatch.setattr(app, "signal_existing_instance", lambda: next(attempts))
+    monkeypatch.setattr(app.QtWidgets, "QApplication", lambda _args: application)
+    monkeypatch.setattr(app, "MainWindow", lambda: window)
+    monkeypatch.setattr(app.SingleInstanceGuard, "listen", lambda _self: False)
+    messages = []
+    monkeypatch.setattr(app.QtWidgets.QMessageBox, "critical", lambda *args: messages.append(args))
+    assert app.main(["proton-safe-assistant"]) == (0 if other_instance else 1)
+    assert bool(messages) is not other_instance

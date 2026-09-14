@@ -74,11 +74,23 @@ The website deliberately links to a **specific published version**. Do not pair
 2. In a website follow-up PR, update `extra.desktop_release` in `mkdocs.yml`, both download
    pages, the desktop guide and the stable version references. Replace the SHA-256 on both
    download pages with the value verified from the **published** installer, not a local rebuild.
+   Update `size` and `size_bytes` from the published asset too: the home page and both
+   download pages quote the size, and a local rebuild is not the file people receive.
 3. Search the documentation for the previous version and inspect each remaining occurrence;
    examples and historical evidence may intentionally retain it.
 4. Build with `mkdocs build --strict`, then run `python tests/check_built_site.py`. Verify that all download buttons agree on the release
    tag and filename, and check local links, screenshots, English/French text and mobile layout.
 5. Merge and confirm the Pages deployment. Recheck the public download and feedback links.
+
+The home page and both download pages present two systems, Ubuntu and Windows, and both
+stay visible. A small script marks the visitor's likely system to bring one card forward;
+it makes no request, stores nothing, and the page behaves identically without it.
+
+While `extra.windows_release.available` is `false`, no page may link to a Windows
+installer: naming the system and stating the status is right, offering a file is not.
+`tests/check_built_site.py` fails the build if one appears. Flip that flag only once the
+signed artefact is published and verified, and add the Windows size and digest at the same
+time.
 
 Until the follow-up deploys, the site keeps offering the previous verified installer instead
 of advertising an asset that is not yet published. There is no automatic update mechanism

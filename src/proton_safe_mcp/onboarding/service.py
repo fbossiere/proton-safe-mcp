@@ -166,6 +166,21 @@ class SetupService:
     def discover(self) -> list[ClientInstallation]:
         return discover_clients(self.adapters)
 
+    def inspect_client(self, executable: Path) -> ClientInstallation | None:
+        """Describe a client the user pointed at, for an installation not probed here.
+
+        The chosen file is treated exactly like a discovered one: it must answer its
+        own ``--version`` and the plugin subcommands before anything is written. Being
+        chosen by the user makes it a candidate, not a trusted one.
+        """
+        for adapter in self.adapters:
+            inspect = getattr(adapter, "inspect", None)
+            if callable(inspect):
+                found = inspect(executable)
+                if isinstance(found, ClientInstallation):
+                    return found
+        return None
+
     def adapter_for(self, installation: ClientInstallation) -> ClientAdapter:
         for adapter in self.adapters:
             if adapter.id == installation.adapter:
@@ -386,6 +401,9 @@ class SetupService:
         recorded.plugin_dir = str(assets.marketplace_dir)
         recorded.client_id = plan.installation.id
         recorded.client_adapter = plan.installation.adapter
+        recorded.client_executable = str(plan.installation.executable.resolve())
+        profile = getattr(adapter, "profile_path", None)
+        recorded.client_profile = str(profile()) if callable(profile) else ""
         recorded.runtime_command = list(self.serve_command())
         self._save_journal(recorded)
 
@@ -479,8 +497,33 @@ class SetupService:
     def _recorded_installation(self, recorded: Journal) -> ClientInstallation | None:
         if not recorded.client_id:
             return None
-        for installation in self.discover():
-            if installation.id == recorded.client_id:
+        if recorded.client_executable:
+            executable = Path(recorded.client_executable)
+            if not executable.is_absolute():
+                return None
+            for adapter in self.adapters:
+                if adapter.id != recorded.client_adapter:
+                    continue
+                profile = getattr(adapter, "profile_path", None)
+                if recorded.client_profile and (
+                    not callable(profile) or str(profile()) != recorded.client_profile
+                ):
+                    return None
+                inspect = getattr(adapter, "inspect", None)
+                if callable(inspect):
+                    installation = inspect(executable)
+                    if (
+                        isinstance(installation, ClientInstallation)
+                        and installation.id == recorded.client_id
+                    ):
+                        return installation
+            return None
+        # Journals predating stable identities used discovery indexes. Keep the old
+        # discovery path for those records; all new registrations persist the path.
+        for index, installation in enumerate(self.discover()):
+            if installation.id == recorded.client_id or (
+                recorded.client_id == f"{installation.adapter}:{index}"
+            ):
                 return installation
         return None
 

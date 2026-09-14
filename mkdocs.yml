@@ -61,6 +61,7 @@ nav:
       - Accueil: fr/index.md
       - Télécharger: fr/telecharger.md
       - Essayer et donner son avis: fr/essayer.md
+      - Proton Safe pour Windows: fr/windows.md
   - Project overview: overview.md
   - Getting started: getting-started.md
   - Desktop assistant: desktop-assistant.md
@@ -69,6 +70,9 @@ nav:
   - External testing: external-testing.md
   - Desktop validation: desktop-testing.md
   - Desktop acceptance sheet: desktop-acceptance.md
+  - Windows:
+      - Windows installer: windows-installer.md
+      - Windows acceptance sheet: windows-acceptance.md
   - User guide:
       - Configuration: configuration.md
       - MCP tools: mcp-tools.md
@@ -89,3 +93,14 @@ extra:
   desktop_release:
     version: "2.1.2"
     url: https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb
+    # The size of the published asset, read from the release itself, not from a local
+    # rebuild. Update it with the version at every release.
+    size: "68 MB"
+    size_bytes: 71015644
+    notes: https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2
+  windows_release:
+    # No Windows artefact exists. While this is false the site offers no Windows
+    # download anywhere: it names the system, states the status and links to it.
+    available: false
+    status: windows-installer/
+    status_fr: fr/windows/

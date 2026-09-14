@@ -2,11 +2,30 @@
 locale: fr
 ---
 
-# Télécharger Proton Safe pour Ubuntu
+# Télécharger Proton Safe
 
 [English](../download.md)
 
 **Une application guidée pour connecter Proton Mail à votre assistant ChatGPT desktop / Codex en local.**
+
+## Choisir son système
+
+**Ubuntu 24.04 · Intel / AMD 64 bits (x86_64) — disponible.**
+Version 2.1.2, un fichier `.deb` de 68 Mo, publié par François Bossière, projet
+indépendant : gratuit, sous licence MIT, hébergé dans la version officielle sur GitHub.
+Proton Mail Bridge et un forfait Proton payant compatible sont nécessaires.
+[Aller au téléchargement](#obtenir-le-fichier) ·
+[Notes de version](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2)
+
+**Windows 11 · 64 bits (x64) — pas encore disponible.**
+Aucun installateur Windows n'est publié, et cette page ne proposera pas un fichier que
+personne n'a exécuté : le code est écrit, mais il n'a été validé sur aucune machine
+Windows. Ce sera un fichier signé `ProtonSafe-Setup-<version>-x64.exe`, dans la même
+version, installé pour votre compte Windows sans mot de passe administrateur.
+[Où en est la version Windows](windows.md) ·
+[Fiche de recette (EN)](../windows-acceptance.md)
+
+macOS, les processeurs ARM, WSL et les téléphones sont hors périmètre.
 
 ## Avant de télécharger
 
@@ -32,7 +51,7 @@ Python et `uv` sont inclus. Pas besoin de les installer ni de modifier un fichie
 
 ## Obtenir le fichier
 
-[Télécharger pour Ubuntu — v2.1.2 (.deb)](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb){ .md-button .md-button--primary }
+[Télécharger pour Ubuntu — v2.1.2 · .deb · 68 Mo](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb){ .md-button .md-button--primary }
 
 Gratuit, sous licence MIT, hébergé dans la **version officielle du projet sur GitHub**.
 Aucun compte GitHub n’est nécessaire pour le télécharger. Projet indépendant, non affilié à Proton
@@ -83,9 +102,9 @@ et sans approbation de sa part.
     66ab3963e4ab0985d86a1d25dcbaea483e30bd0febd8ed1ec56183c96f83a567
     ```
 
-    Elle permet de détecter un fichier endommagé ou différent. Téléchargez les deux fichiers
-    depuis la version officielle : cette empreinte n’est pas une garantie indépendante de
-    l’identité de l’éditeur.
+    Le fichier publié pèse 71 015 644 octets. L’empreinte permet de détecter un fichier
+    endommagé ou différent. Téléchargez les deux fichiers depuis la version officielle :
+    cette empreinte n’est pas une garantie indépendante de l’identité de l’éditeur.
 
 ## Mettre à jour ou retirer la connexion
 
@@ -102,7 +121,8 @@ logiciels Ubuntu. [Détails sur le retrait (EN)](../desktop-assistant.md#after-i
 
 ## Un autre système ou assistant ?
 
-Ce paquet cible Ubuntu 24.04 et ChatGPT desktop / Codex en local. Pour les autres clients MCP,
+Ce paquet cible Ubuntu 24.04 et ChatGPT desktop / Codex en local. Windows 11 en 64 bits est
+[en cours de développement et non publié](windows.md). Pour les autres clients MCP,
 consultez [l’installation en ligne de commande (EN)](../getting-started.md) et les
 [guides des clients (EN)](../clients.md). Ce sont des parcours plus techniques et distincts :
 ce téléchargement n’ajoute pas de compatibilité avec ChatGPT web ou mobile.

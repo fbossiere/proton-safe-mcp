@@ -66,15 +66,14 @@ def test_the_desktop_entry_passes_no_user_value_on_the_command_line(desktop_entr
 # -- locating the runtime inside a bundle -----------------------------------------
 
 
-def test_the_runtime_is_found_beside_the_assistant_in_a_bundle(tmp_path, monkeypatch):
+def test_the_runtime_is_found_beside_the_assistant_in_a_bundle(
+    tmp_path, monkeypatch, make_executable
+):
     """The packaged layout: both executables sit in the same directory."""
     bundle = tmp_path / "opt" / "proton-safe-assistant"
     bundle.mkdir(parents=True)
-    assistant = bundle / "proton-safe-assistant"
-    runtime = bundle / "proton-safe-mcp"
-    for executable in (assistant, runtime):
-        executable.write_text("#!/bin/sh\n")
-        executable.chmod(0o700)
+    assistant = make_executable(bundle, "proton-safe-assistant")
+    runtime = make_executable(bundle, "proton-safe-mcp")
     monkeypatch.setattr(sys, "executable", str(assistant))
 
     located = locate_runtime()
@@ -228,3 +227,27 @@ def test_the_built_bundle_verifies_itself(tmp_path, write_managed_config):
 
     assert completed.returncode == 0, completed.stderr
     assert "runtime 13 tools" in completed.stdout
+
+
+def test_windowed_verification_reports_failure_without_an_exception_dialog(tmp_path, monkeypatch):
+    import runpy
+    import sys
+    from types import ModuleType
+
+    report = tmp_path / "rapport de vérification.log"
+    app = ModuleType("proton_safe_mcp.desktop.app")
+
+    def fail():
+        raise RuntimeError("intentional bundle failure")
+
+    app.main = fail
+    monkeypatch.setitem(sys.modules, "proton_safe_mcp.desktop.app", app)
+    monkeypatch.setattr(
+        sys, "argv", ["assistant", "--verify-bundle", "--verification-report", str(report)]
+    )
+    with pytest.raises(SystemExit) as exited:
+        runpy.run_path(
+            str(Path(__file__).parents[1] / "packaging/entry_assistant.py"), run_name="__main__"
+        )
+    assert exited.value.code == 1
+    assert "intentional bundle failure" in report.read_text(encoding="utf-8")

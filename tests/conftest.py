@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import keyring
 import keyring.backend
 import keyring.backends.fail
@@ -7,6 +10,84 @@ import keyring.errors
 import pytest
 
 from proton_safe_mcp.config import Settings
+from proton_safe_mcp.platform_services import use_services
+from proton_safe_mcp.platform_services import windows as windows_services
+from proton_safe_mcp.platform_services.winacl import private_sddl
+from proton_safe_mcp.platform_services.windows import WindowsServices
+
+#: A plausible account SID for a fixture. It belongs to nobody.
+FIXTURE_USER_SID = "S-1-5-21-1004336348-1177238915-682003330-1001"
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "posix_only: the subject of the test is a Unix guarantee — a mode, a uid or a "
+        "symlink — that Windows does not have. The Windows equivalent is covered by "
+        "tests/test_platform_services.py and tests/test_windows_behaviour.py.",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if sys.platform != "win32":
+        return
+    skip = pytest.mark.skip(reason="this test's subject is a Unix-only guarantee")
+    for item in items:
+        if "posix_only" in item.keywords:
+            item.add_marker(skip)
+
+
+@pytest.fixture
+def make_executable():
+    """Create a stand-in executable the running platform will agree to launch.
+
+    The name carries the platform's suffix, so a test that needs a discoverable client
+    or runtime works on both systems instead of quietly finding nothing on Windows.
+    """
+    from proton_safe_mcp.platform_services import services
+
+    def create(directory: Path, stem: str) -> Path:
+        path = Path(directory) / services().executable_name(stem)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"MZ" if services().name == "windows" else b"#!/bin/sh\n")
+        path.chmod(0o700)
+        return path
+
+    return create
+
+
+@pytest.fixture
+def as_windows(monkeypatch, tmp_path):
+    """Run the block against the Windows services, with only the Win32 calls stubbed.
+
+    Everything this product decides — where files go, what may be launched, what a
+    child inherits, which credential entries a self-test owns — is ordinary Python and
+    runs here. Only the four calls that ask Windows itself for a folder, an identity or
+    a security descriptor are replaced, because this machine has none of them.
+    """
+    private = f"O:{FIXTURE_USER_SID}" + private_sddl(FIXTURE_USER_SID, directory=True)
+    monkeypatch.setattr(windows_services, "current_user_sid", lambda: FIXTURE_USER_SID)
+    monkeypatch.setattr(windows_services, "is_elevated", lambda: False)
+    monkeypatch.setattr(windows_services, "known_folder", lambda *_a, **_k: tmp_path / "AppData")
+    monkeypatch.setattr(windows_services, "apply_private_dacl", lambda *_a, **_k: None)
+    monkeypatch.setattr(windows_services, "describe_security", lambda _path: private)
+    monkeypatch.setattr(windows_services, "_is_reparse_point", lambda _path: False)
+    platform = WindowsServices()
+    with use_services(platform):
+        yield platform
+
+
+@pytest.fixture
+def windows_executable(as_windows, tmp_path):
+    """Create a file Windows services will agree to launch."""
+
+    def create(path: str | Path) -> Path:
+        created = Path(path)
+        created.parent.mkdir(parents=True, exist_ok=True)
+        created.write_bytes(b"MZ")
+        return created
+
+    return create
 
 
 @pytest.fixture(autouse=True)
@@ -62,7 +143,9 @@ class _InMemoryKeyring(keyring.backend.KeyringBackend):
             raise keyring.errors.PasswordDeleteError("absent")
 
 
-_InMemoryKeyring.__module__ = "keyring.backends.SecretService"
+_InMemoryKeyring.__module__ = (
+    "keyring.backends.Windows" if sys.platform == "win32" else "keyring.backends.SecretService"
+)
 
 
 @pytest.fixture
@@ -95,7 +178,9 @@ def unavailable_keyring(monkeypatch):
 def managed_config_path(tmp_path):
     """An absolute path inside a private directory, as the assistant would create."""
     directory = tmp_path / "config" / "proton-safe-mcp"
-    directory.mkdir(mode=0o700, parents=True)
+    from proton_safe_mcp.platform_services import services
+
+    services().ensure_private_directory(directory)
     return directory / "config.toml"
 
 

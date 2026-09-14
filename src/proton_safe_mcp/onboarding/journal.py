@@ -8,12 +8,11 @@ can be recognised at the next start. It is never evidence that anything works to
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
+from ..platform_services import PrivacyError, services
 from .models import InstallState
 
 JOURNAL_SCHEMA_VERSION: Final = 1
@@ -24,9 +23,8 @@ _FORBIDDEN_KEYS: Final = frozenset({"password", "secret", "token", "credential",
 
 
 def default_journal_path() -> Path:
-    xdg_state_home = os.environ.get("XDG_STATE_HOME", "")
-    base = Path(xdg_state_home) if xdg_state_home.startswith("/") else Path.home() / ".local/state"
-    return base / "proton-safe-mcp" / "assistant" / _JOURNAL_NAME
+    """This account's journal location, alongside the rest of its private state."""
+    return services().state_dir() / "assistant" / _JOURNAL_NAME
 
 
 @dataclass(slots=True)
@@ -52,6 +50,15 @@ class Journal:
     plugin_dir: str = ""
     client_id: str = ""
     client_adapter: str = ""
+    #: The absolute path of the executable that was registered. A discovery identifier
+    #: describes where a client was found, not which one it is: an installation the user
+    #: pointed at is never rediscovered, and a probed one can change position when
+    #: another candidate appears. The path is what a later repair or disconnect looks
+    #: the installation up by, after revalidating it like any other.
+    client_executable: str = ""
+    #: The client profile directory that was written to, so a disconnect removes entries
+    #: from the same profile they were added to.
+    client_profile: str = ""
     runtime_command: list[str] = field(default_factory=list)
     resources: list[ManagedResource] = field(default_factory=list)
     #: Set only by an explicit "I checked in my assistant" action, never by a probe.
@@ -102,12 +109,21 @@ def _reject_secrets(payload: dict[str, Any]) -> None:
             stack.extend(current)
 
 
+#: A journal is a short record of what was created; anything larger is not one.
+MAX_JOURNAL_BYTES: Final = 256 * 1024
+
+
 def read(path: Path | None = None) -> Journal:
-    """Load the journal, returning a fresh one when it is absent or unreadable."""
+    """Load the journal, returning a fresh one when it is absent or unreadable.
+
+    A journal that is not private to this account is treated as absent rather than
+    trusted: it decides what a repair or a disconnect is allowed to remove.
+    """
     location = path or default_journal_path()
     try:
-        payload = json.loads(location.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        raw = services().read_private_file(location, max_bytes=MAX_JOURNAL_BYTES)
+        payload = json.loads(raw.decode("utf-8"))
+    except (OSError, PrivacyError, UnicodeDecodeError, json.JSONDecodeError):
         return Journal()
     if not isinstance(payload, dict) or payload.get("schema_version") != JOURNAL_SCHEMA_VERSION:
         return Journal()
@@ -132,20 +148,8 @@ def write(journal: Journal, path: Path | None = None) -> Path:
     location = path or default_journal_path()
     payload = asdict(journal)
     _reject_secrets(payload)
-    location.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(dir=location.parent, prefix=".install-")
-    temporary_path = Path(temporary)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, location)
-    except BaseException:
-        temporary_path.unlink(missing_ok=True)
-        raise
+    document = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    services().write_private_file(location, document.encode("utf-8"))
     return location
 
 

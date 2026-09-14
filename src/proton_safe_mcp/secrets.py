@@ -13,16 +13,29 @@ import keyring.backend
 import keyring.errors
 
 from .errors import ConfigurationError, KeyringError
+from .platform_services import services
 
 SERVICE_NAME = "proton-safe-mcp"
 
-# The managed setup stores the credential where the session keyring protects it. A backend
-# that keeps secrets in a plain file, or none at all, is refused rather than silently used:
-# falling back to a file, the environment or a client's JSON would defeat the whole point.
-APPROVED_BACKEND_MODULES: Final = frozenset({"keyring.backends.SecretService"})
+# The self-test never touches the service that holds the real credential. On Windows,
+# writing under the same service name would make Credential Manager move an existing
+# entry to a compound target to resolve the account collision — a real credential
+# displaced by a diagnostic. A separate service cannot do that on either platform.
+PROBE_SERVICE_NAME: Final = f"{SERVICE_NAME}-selftest"
 
 # Written and removed by the assistant's own keyring self-test. It is never a credential.
 PROBE_KEY: Final = "assistant-keyring-probe"
+
+
+def approved_backend_modules() -> frozenset[str]:
+    """The credential stores this platform's managed setup accepts.
+
+    A backend that keeps secrets in a plain file, or none at all, is refused rather than
+    silently used: falling back to a file, the environment or a client's JSON would
+    defeat the whole point.
+    """
+    return services().approved_keyring_modules
+
 
 KeyringState = Literal["available", "locked", "unavailable", "unapproved"]
 
@@ -38,9 +51,21 @@ class KeyringStatus:
         return self.state == "available"
 
 
+def _configured_backend() -> object:
+    """Resolve the keyring and apply this platform's storage policy before any write.
+
+    On Windows this is what pins Credential Manager persistence to this computer
+    instead of the library default, which asks for the credential to roam.
+    """
+    backend = keyring.get_keyring()
+    services().configure_keyring(backend)
+    return backend
+
+
 def store_bridge_password(user: str, password: str) -> None:
     if not password:
         raise ConfigurationError("The Bridge password cannot be empty")
+    _configured_backend()
     keyring.set_password(SERVICE_NAME, user, password)
 
 
@@ -88,19 +113,32 @@ def get_bridge_password(user: str, *, allow_environment: bool = True) -> str:
     return password
 
 
-def secret_service_backend_available() -> bool:
-    """Whether this installation actually ships a usable Secret Service backend.
+def approved_backend_available() -> bool:
+    """Whether this installation actually ships a usable approved backend.
 
     A packaged build resolves keyring backends dynamically, so a missing module would
-    otherwise look exactly like a session with no keyring daemon. Telling the two apart
-    is what makes a packaging defect visible instead of blamed on the user's session.
+    otherwise look exactly like a session with no credential store. Telling the two
+    apart is what makes a packaging defect visible instead of blamed on the user.
     """
+    if services().name == "windows":
+        try:
+            import keyring.backends.Windows as windows_backend
+        except ImportError:
+            return False
+        # The backend imports on any platform but records why it cannot work; an empty
+        # trap is the only proof that its Credential Manager bindings really shipped.
+        return not getattr(windows_backend, "missing_deps", True)
     try:
         import keyring.backends.SecretService  # noqa: F401
         import secretstorage
     except ImportError:
         return False
     return getattr(secretstorage, "__version_tuple__", (0,)) >= (3, 2)
+
+
+def secret_service_backend_available() -> bool:
+    """Backwards-compatible name for the Linux packaging check."""
+    return approved_backend_available()
 
 
 def _backend_modules(backend: object) -> list[str]:
@@ -125,13 +163,15 @@ def keyring_status() -> KeyringStatus:
     ``locked`` and ``unavailable`` are distinguished because the first is something the
     user can fix with the system dialog and the second is not.
     """
-    backend = keyring.get_keyring()
+    backend = _configured_backend()
     name = backend_name(backend)
     modules = _backend_modules(backend)
-    if not any(module in APPROVED_BACKEND_MODULES for module in modules):
+    if not any(module in approved_backend_modules() for module in modules):
         return KeyringStatus("unapproved", "KEYRING_UNAVAILABLE", name)
     try:
-        keyring.get_password(SERVICE_NAME, PROBE_KEY)
+        # A read against the self-test service: it can neither return nor disturb the
+        # real credential, whichever platform resolves the lookup.
+        keyring.get_password(PROBE_SERVICE_NAME, PROBE_KEY)
     except keyring.errors.KeyringLocked:
         return KeyringStatus("locked", "KEYRING_LOCKED", name)
     except keyring.errors.KeyringError:
@@ -140,27 +180,44 @@ def keyring_status() -> KeyringStatus:
 
 
 def verify_keyring_round_trip() -> KeyringStatus:
-    """Write, read back and delete one random, non-sensitive value under the probe key.
+    """Write, read back and delete one random, non-sensitive value of our own.
 
-    No other keyring entry is read or modified.
+    It uses a separate self-test service and a fresh account key each time, so no real
+    credential can be overwritten, displaced, duplicated or left behind by a diagnosis.
+    Every entry the store may have created for that key is removed afterwards.
     """
     current = keyring_status()
     if not current.usable_for_managed_setup:
         return current
+    account = f"{PROBE_KEY}-{base64.urlsafe_b64encode(os.urandom(9)).decode('ascii')}"
     token = base64.urlsafe_b64encode(os.urandom(18)).decode("ascii")
     try:
-        keyring.set_password(SERVICE_NAME, PROBE_KEY, token)
-        read_back = keyring.get_password(SERVICE_NAME, PROBE_KEY)
+        keyring.set_password(PROBE_SERVICE_NAME, account, token)
+        read_back = keyring.get_password(PROBE_SERVICE_NAME, account)
     except keyring.errors.KeyringLocked:
         return KeyringStatus("locked", "KEYRING_LOCKED", current.backend)
     except keyring.errors.KeyringError:
         return KeyringStatus("unavailable", "KEYRING_UNAVAILABLE", current.backend)
     finally:
-        with contextlib.suppress(keyring.errors.KeyringError):
-            keyring.delete_password(SERVICE_NAME, PROBE_KEY)
+        _remove_probe_entries(account)
     if read_back != token:
         return KeyringStatus("unavailable", "KEYRING_UNAVAILABLE", current.backend)
     return current
+
+
+def _remove_probe_entries(account: str) -> None:
+    """Delete every entry the store may have written for one self-test account.
+
+    Credential Manager can hold a secondary, compound entry alongside the primary one;
+    the platform layer names both so neither is left behind.
+    """
+    with contextlib.suppress(keyring.errors.KeyringError):
+        keyring.delete_password(PROBE_SERVICE_NAME, account)
+    for target in services().keyring_probe_targets(PROBE_SERVICE_NAME, account):
+        if target == PROBE_SERVICE_NAME:
+            continue
+        with contextlib.suppress(keyring.errors.KeyringError):
+            keyring.delete_password(target, account)
 
 
 def require_managed_keyring() -> KeyringStatus:

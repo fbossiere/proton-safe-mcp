@@ -19,6 +19,7 @@ class Page(HTMLParser):
         self.ids: set[str] = set()
         self.links: list[str] = []
         self.downloads: list[str] = []
+        self.windows_downloads: list[str] = []
         self.external_assets: list[str] = []
         self.language: str | None = None
         self.title = ""
@@ -38,6 +39,10 @@ class Page(HTMLParser):
         href = attributes.get("href") or ""
         if tag == "a" and href.endswith(".deb"):
             self.downloads.append(href)
+        # A link to a Windows installer asset, wherever on the site it appears. While no
+        # such artefact has been published and verified, there must be none.
+        if tag == "a" and href.lower().endswith(".exe"):
+            self.windows_downloads.append(href)
         is_asset = tag in ("script", "img", "iframe") or (
             tag == "link" and attributes.get("rel") in ("stylesheet", "preconnect")
         )
@@ -114,6 +119,23 @@ def main() -> None:
     )
     if release["url"] != expected_download:
         errors.append("Release version and installer URL disagree")
+    if not release.get("size") or not release.get("size_bytes"):
+        # The download pages quote a size. It must come from the published asset, so it
+        # is recorded beside the version rather than typed into a page from memory.
+        errors.append("The published installer size is missing from extra.desktop_release")
+
+    # The Windows button is published only once its artefact exists and has been
+    # verified. Until then, no page anywhere may link to a Windows installer: naming the
+    # system and stating the status is allowed, offering a file is not.
+    windows = config["extra"].get("windows_release", {})
+    if not windows.get("available"):
+        offered = {
+            str(path.relative_to(root)): page.windows_downloads
+            for path, page in pages.items()
+            if page.windows_downloads
+        }
+        if offered:
+            errors.append(f"Windows is not released, but a download is offered: {offered}")
     for relative, language in onboarding.items():
         page = pages.get(root / relative)
         if page is None:

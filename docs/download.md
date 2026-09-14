@@ -1,8 +1,27 @@
-# Download Proton Safe for Ubuntu
+# Download Proton Safe
 
 [Français](fr/telecharger.md)
 
 **A guided app to connect Proton Mail to your local ChatGPT desktop / Codex assistant.**
+
+## Choose your system
+
+**Ubuntu 24.04 · Intel / AMD 64-bit (x86_64) — available.**
+Version 2.1.2, a 68 MB `.deb`, published by François Bossière as an independent project:
+free, MIT licensed, hosted on the official GitHub Release. Proton Mail Bridge and a
+compatible paid Proton plan are required.
+[Go to the installer](#get-the-installer) ·
+[Release notes](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2)
+
+**Windows 11 · 64-bit (x64) — not available yet.**
+No Windows installer is published, and this page will not offer a build nobody has run:
+end-to-end Windows 11 validation is still outstanding. When it lands it will be a
+signed `ProtonSafe-Setup-<version>-x64.exe` in the same release, installing for your
+Windows account with no administrator password.
+[Where the Windows version stands](windows-installer.md) ·
+[Acceptance sheet](windows-acceptance.md)
+
+macOS, ARM processors, WSL and phones are out of scope entirely.
 
 ## Before you download
 
@@ -27,7 +46,7 @@ Python and `uv` are included. You do not need to install them or edit a configur
 
 ## Get the installer
 
-[Download for Ubuntu — v2.1.2 (.deb)](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb){ .md-button .md-button--primary }
+[Download for Ubuntu — v2.1.2 · .deb · 68 MB](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb){ .md-button .md-button--primary }
 
 Free, MIT licensed, hosted on the project's **official GitHub Release**. No GitHub account
 is needed to download it. This is an independent project, not affiliated with or endorsed by Proton.
@@ -76,8 +95,9 @@ is needed to download it. This is an independent project, not affiliated with or
     66ab3963e4ab0985d86a1d25dcbaea483e30bd0febd8ed1ec56183c96f83a567
     ```
 
-    The checksum detects a damaged or mismatched download. Obtain both files from the
-    official release; a checksum is not a separate guarantee of the publisher's identity.
+    The published file is 71,015,644 bytes. The checksum detects a damaged or mismatched
+    download. Obtain both files from the official release; a checksum is not a separate
+    guarantee of the publisher's identity.
 
 ## Updates and removal
 
@@ -93,6 +113,7 @@ Ubuntu's software manager. See [connection removal](desktop-assistant.md#after-i
 ## Another operating system or assistant?
 
 This desktop installer currently targets Ubuntu 24.04 and local ChatGPT desktop / Codex.
+Windows 11 x64 is [in development and not released](windows-installer.md).
 For other MCP clients, see the [command-line setup](getting-started.md) and
 [client guides](clients.md). These are separate, more technical installation paths;
 this download does not add support for ChatGPT web or mobile.

@@ -203,7 +203,9 @@ def test_locate_runtime_prefers_the_executable_beside_this_interpreter():
     runtime = locate_runtime()
     if runtime is None:  # pragma: no cover
         pytest.skip("no installed runtime")
-    beside = Path(sys.executable).resolve().parent / "proton-safe-mcp"
+    from proton_safe_mcp.platform_services import services
+
+    beside = Path(sys.executable).resolve().parent / services().executable_name("proton-safe-mcp")
     if beside.is_file():
         assert runtime.command[0] == str(beside)
         assert runtime.packaged
@@ -211,7 +213,11 @@ def test_locate_runtime_prefers_the_executable_beside_this_interpreter():
         assert runtime.command[0] == str(Path(shutil.which("proton-safe-mcp")).resolve())
 
 
-@pytest.mark.parametrize("output", ["", "partial frame without a newline", "x" * (512 * 1024 + 1)])
+@pytest.mark.parametrize(
+    "output",
+    ["", "partial frame without a newline", "x" * (512 * 1024 + 1)],
+    ids=["silent", "partial", "oversized"],
+)
 def test_silent_partial_and_oversized_responses_return_promptly(tmp_path, managed_config, output):
     """A finite two-second impostor proves the probe returns before the child does."""
     payload = tmp_path / "payload"
