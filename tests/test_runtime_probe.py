@@ -147,6 +147,7 @@ def test_a_runtime_that_cannot_start_is_reported_not_raised(tmp_path, managed_co
     assert str(outcome.code) == "RUNTIME_START_FAILED"
 
 
+@pytest.mark.posix_only
 def test_a_runtime_with_an_unexpected_tool_list_is_refused(tmp_path, managed_config):
     """A swapped runtime must be visible, not silently accepted."""
     impostor = tmp_path / "impostor"
@@ -177,6 +178,7 @@ def test_a_runtime_with_an_unexpected_tool_list_is_refused(tmp_path, managed_con
     assert "send_message" in outcome.details["dangerous"]
 
 
+@pytest.mark.posix_only
 def test_a_flooding_runtime_is_bounded_rather_than_read_forever(tmp_path, managed_config):
     flooder = tmp_path / "flooder"
     flooder.write_text(

@@ -1,39 +1,50 @@
 """A small, palette-aware visual system for the native setup assistant."""
 
+from typing import Final
+
 from PySide6 import QtCore, QtGui, QtWidgets
+
+#: The sizes the window, the task bar and a Windows shortcut ask for. Small sizes are
+#: included so the icon stays legible where Windows scales it down hardest.
+ICON_SIZES: Final = (16, 20, 24, 32, 40, 48, 64, 128, 256)
+
+
+def icon_pixmap(size: int) -> QtGui.QPixmap:
+    """Draw the product mark at one resolution, without a runtime asset.
+
+    The same drawing serves the window icon on both platforms and the `.ico` the
+    Windows installer ships, so the identity cannot drift between them.
+    """
+    pixmap = QtGui.QPixmap(size, size)
+    pixmap.fill(QtCore.Qt.GlobalColor.transparent)
+    painter = QtGui.QPainter(pixmap)
+    painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+    painter.scale(size / 64, size / 64)
+    painter.setPen(QtCore.Qt.PenStyle.NoPen)
+    painter.setBrush(QtGui.QColor("#7860db"))
+    painter.drawRoundedRect(QtCore.QRectF(0, 0, 64, 64), 17, 17)
+    painter.setPen(QtGui.QPen(QtGui.QColor("#ffffff"), 3))
+    painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
+    painter.drawRoundedRect(QtCore.QRectF(13, 18, 38, 28), 5, 5)
+    painter.drawPolyline(
+        QtGui.QPolygonF([QtCore.QPointF(14, 21), QtCore.QPointF(32, 34), QtCore.QPointF(50, 21)])
+    )
+    painter.setPen(QtCore.Qt.PenStyle.NoPen)
+    painter.setBrush(QtGui.QColor("#d0f5df"))
+    painter.drawEllipse(QtCore.QRectF(36, 35, 24, 24))
+    painter.setPen(QtGui.QPen(QtGui.QColor("#24563e"), 2.5))
+    painter.drawPolyline(
+        QtGui.QPolygonF([QtCore.QPointF(42, 47), QtCore.QPointF(46, 51), QtCore.QPointF(54, 43)])
+    )
+    painter.end()
+    return pixmap
 
 
 def app_icon() -> QtGui.QIcon:
-    """Draw our own mail/check mark at multiple resolutions, without a runtime asset."""
+    """The window icon, drawn at every resolution the desktop may ask for."""
     icon = QtGui.QIcon()
-    for size in (32, 64, 128, 256):
-        pixmap = QtGui.QPixmap(size, size)
-        pixmap.fill(QtCore.Qt.GlobalColor.transparent)
-        painter = QtGui.QPainter(pixmap)
-        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
-        painter.scale(size / 64, size / 64)
-        painter.setPen(QtCore.Qt.PenStyle.NoPen)
-        painter.setBrush(QtGui.QColor("#7860db"))
-        painter.drawRoundedRect(QtCore.QRectF(0, 0, 64, 64), 17, 17)
-        painter.setPen(QtGui.QPen(QtGui.QColor("#ffffff"), 3))
-        painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(QtCore.QRectF(13, 18, 38, 28), 5, 5)
-        painter.drawPolyline(
-            QtGui.QPolygonF(
-                [QtCore.QPointF(14, 21), QtCore.QPointF(32, 34), QtCore.QPointF(50, 21)]
-            )
-        )
-        painter.setPen(QtCore.Qt.PenStyle.NoPen)
-        painter.setBrush(QtGui.QColor("#d0f5df"))
-        painter.drawEllipse(QtCore.QRectF(36, 35, 24, 24))
-        painter.setPen(QtGui.QPen(QtGui.QColor("#24563e"), 2.5))
-        painter.drawPolyline(
-            QtGui.QPolygonF(
-                [QtCore.QPointF(42, 47), QtCore.QPointF(46, 51), QtCore.QPointF(54, 43)]
-            )
-        )
-        painter.end()
-        icon.addPixmap(pixmap)
+    for size in ICON_SIZES:
+        icon.addPixmap(icon_pixmap(size))
     return icon
 
 

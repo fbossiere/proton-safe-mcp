@@ -20,6 +20,7 @@ from proton_safe_mcp.onboarding.clients.base import (
     run_command,
 )
 from proton_safe_mcp.onboarding.models import Code
+from proton_safe_mcp.platform_services import posix as posix_services
 
 
 def _script(tmp_path: Path, name: str, body: str) -> Path:
@@ -140,6 +141,7 @@ def test_only_real_executable_files_become_candidates(tmp_path):
     assert kept == [executable.resolve()]
 
 
+@pytest.mark.posix_only
 def test_two_paths_to_one_executable_are_kept_once(tmp_path):
     executable = _script(tmp_path, "codex", "print('x')\n")
     link = tmp_path / "codex-link"
@@ -148,6 +150,7 @@ def test_two_paths_to_one_executable_are_kept_once(tmp_path):
     assert executable_candidates([executable, link]) == [executable.resolve()]
 
 
+@pytest.mark.posix_only
 def test_a_broken_symlink_is_skipped(tmp_path):
     link = tmp_path / "codex"
     link.symlink_to(tmp_path / "nowhere")
@@ -158,6 +161,7 @@ def test_a_broken_symlink_is_skipped(tmp_path):
 # -- prerequisites -----------------------------------------------------------------
 
 
+@pytest.mark.posix_only
 def test_running_as_root_blocks_the_session_check(monkeypatch):
     monkeypatch.setattr(os, "geteuid", lambda: 0)
 
@@ -167,6 +171,7 @@ def test_running_as_root_blocks_the_session_check(monkeypatch):
     assert check.code is Code.SESSION_ROOT
 
 
+@pytest.mark.posix_only
 def test_a_session_with_no_display_blocks(monkeypatch):
     monkeypatch.setattr(os, "geteuid", lambda: 1000)
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
@@ -182,6 +187,7 @@ def test_a_session_with_no_display_blocks(monkeypatch):
     ("variables", "expected_hint"),
     [({"WAYLAND_DISPLAY": "wayland-0"}, "Wayland"), ({"DISPLAY": ":0"}, "X11")],
 )
+@pytest.mark.posix_only
 def test_both_wayland_and_x11_sessions_are_accepted(monkeypatch, variables, expected_hint):
     monkeypatch.setattr(os, "geteuid", lambda: 1000)
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
@@ -195,27 +201,33 @@ def test_both_wayland_and_x11_sessions_are_accepted(monkeypatch, variables, expe
     assert check.hint == expected_hint
 
 
+@pytest.mark.posix_only
 def test_a_non_x86_or_non_linux_system_is_blocked(monkeypatch):
-    monkeypatch.setattr(inventory.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(posix_services.platform, "system", lambda: "Darwin")
 
     assert inventory.system_check().status == "fail"
 
-    monkeypatch.setattr(inventory.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(inventory.platform, "machine", lambda: "aarch64")
+    monkeypatch.setattr(posix_services.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(posix_services.platform, "machine", lambda: "aarch64")
 
     assert inventory.system_check().status == "fail"
 
 
+@pytest.mark.posix_only
 def test_the_validated_distribution_passes_and_another_linux_only_warns(monkeypatch, tmp_path):
-    monkeypatch.setattr(inventory.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(inventory.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(posix_services.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(posix_services.platform, "machine", lambda: "x86_64")
     monkeypatch.setattr(
-        inventory, "_os_release", lambda: {"ID": "ubuntu", "VERSION_ID": "24.04", "NAME": "Ubuntu"}
+        posix_services,
+        "_os_release",
+        lambda: {"ID": "ubuntu", "VERSION_ID": "24.04", "NAME": "Ubuntu"},
     )
     assert inventory.system_check().status == "pass"
 
     monkeypatch.setattr(
-        inventory, "_os_release", lambda: {"ID": "debian", "VERSION_ID": "12", "NAME": "Debian"}
+        posix_services,
+        "_os_release",
+        lambda: {"ID": "debian", "VERSION_ID": "12", "NAME": "Debian"},
     )
     other = inventory.system_check()
     # Not refused, but the validated scope is stated rather than implied.
@@ -276,9 +288,10 @@ def test_the_prerequisite_list_is_the_five_documented_lines(monkeypatch):
     ]
 
 
+@pytest.mark.posix_only
 def test_an_unreadable_os_release_does_not_crash_the_check(monkeypatch):
     monkeypatch.setattr(
-        inventory.Path, "read_text", lambda _self, **_kwargs: (_ for _ in ()).throw(OSError())
+        posix_services.Path, "read_text", lambda _self, **_kwargs: (_ for _ in ()).throw(OSError())
     )
 
-    assert inventory._os_release() == {}
+    assert posix_services._os_release() == {}

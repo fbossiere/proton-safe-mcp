@@ -8,6 +8,7 @@ supported state for a PyPI install of the server.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -921,3 +922,107 @@ def test_tab_scrolls_the_next_bridge_field_fully_into_view(wizard, application):
     bounds = QtCore.QRect(field.mapTo(viewport, QtCore.QPoint()), field.size())
     assert viewport.rect().contains(bounds)
     window.close()
+
+
+# -- the entry point the Windows uninstaller calls ---------------------------------
+
+
+def test_the_uninstaller_entry_point_creates_nothing_when_nothing_was_set_up(
+    tmp_path, monkeypatch, capsys
+):
+    """An uninstall must not leave state behind for an account that never set up."""
+    from proton_safe_mcp.desktop import app as desktop_app
+
+    monkeypatch.setattr(
+        desktop_app,
+        "SetupService",
+        lambda: SetupService(
+            config_path=tmp_path / "config" / "config.toml",
+            journal_path=tmp_path / "state" / "install.json",
+            plugin_dir=tmp_path / "plugin",
+            adapters=(),
+        ),
+    )
+
+    assert desktop_app.main(["proton-safe-assistant", "--uninstall-connection"]) == 0
+
+    assert "Proton Safe" in capsys.readouterr().out
+    assert not list(tmp_path.rglob("*.json"))
+    assert not (tmp_path / "config").exists()
+
+
+def test_the_uninstaller_entry_point_reports_a_client_that_refused_removal(
+    tmp_path, monkeypatch, capsys
+):
+    """Exit code 1 is what tells the uninstaller not to announce a disconnection."""
+    from proton_safe_mcp.desktop import app as desktop_app
+    from proton_safe_mcp.onboarding.models import Outcome
+
+    journal = tmp_path / "state" / "install.json"
+    journal.parent.mkdir(parents=True)
+    journal.write_text("{}", encoding="utf-8")
+
+    class Refusing(SetupService):
+        def disconnect(self, *, erase_local: bool = False) -> Outcome:
+            assert erase_local, "the erase request must reach the service"
+            return Outcome(False, Code.CLIENT_ACTION_REQUIRED, details={"remaining": ["plugin"]})
+
+    monkeypatch.setattr(
+        desktop_app,
+        "SetupService",
+        lambda: Refusing(
+            config_path=tmp_path / "config" / "config.toml",
+            journal_path=journal,
+            plugin_dir=tmp_path / "plugin",
+            adapters=(),
+        ),
+    )
+
+    code = desktop_app.main(["proton-safe-assistant", "--uninstall-connection", "--erase-local"])
+
+    assert code == 1
+    captured = capsys.readouterr()
+    assert captured.err.strip(), "the reason belongs on stderr for the installer log"
+    # A refused removal must never claim the local data was erased.
+    assert "effac" not in captured.out.lower() and "erased" not in captured.out.lower()
+
+
+# -- one window per account --------------------------------------------------------
+
+
+def test_a_second_launch_raises_the_existing_window_instead_of_opening_another(
+    application, service
+):
+    """Two assistants would each hold their own view of one configuration and journal."""
+    from proton_safe_mcp.desktop.single_instance import (
+        SingleInstanceGuard,
+        endpoint_name,
+        signal_existing_instance,
+    )
+
+    raised = []
+    guard = SingleInstanceGuard(lambda: raised.append(True))
+    assert guard.listen(), "the first launch claims this account's endpoint"
+    try:
+        assert signal_existing_instance(), "a second launch must find the first"
+        # The knock is delivered on the event loop, as it is in the real application.
+        for _ in range(50):
+            application.processEvents()
+            if raised:
+                break
+        assert raised == [True], "the running window is brought back, not a new one"
+    finally:
+        guard.close()
+
+    # Once it is gone, the next launch is free to become the running instance.
+    assert not signal_existing_instance()
+    assert endpoint_name().startswith("proton-safe-assistant-")
+
+
+def test_the_endpoint_name_carries_no_readable_personal_detail():
+    from proton_safe_mcp.desktop.single_instance import endpoint_name
+
+    name = endpoint_name()
+
+    assert "/" not in name and "\\" not in name
+    assert str(Path.home().name) not in name

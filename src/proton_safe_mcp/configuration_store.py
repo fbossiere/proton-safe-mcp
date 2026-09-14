@@ -5,13 +5,15 @@ historic environment-driven mode never looks for it, so creating one cannot chan
 existing installation that has not been migrated.
 
 Nothing secret is stored here: the Bridge credential lives in the OS keyring only.
+
+Where the file lives and what "private to this account" means are platform questions,
+so both are asked of ``platform_services``: a Unix mode is the answer on Linux and a
+protected ACL is the answer on Windows. The schema and every validation below are
+shared, and neither platform relaxes a check the other enforces.
 """
 
 from __future__ import annotations
 
-import os
-import stat
-import tempfile
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -19,6 +21,7 @@ from typing import Any, Final
 
 from .addresses import validate_address
 from .errors import ConfigurationError
+from .platform_services import PrivacyError, services
 
 SCHEMA_VERSION: Final = 1
 CONFIG_FILE_NAME: Final = "config.toml"
@@ -27,9 +30,6 @@ APPLICATION_DIR_NAME: Final = "proton-safe-mcp"
 # Reading a configuration must never be able to pull in a file of arbitrary size.
 MAX_CONFIG_BYTES: Final = 64 * 1024
 MAX_ALIASES: Final = 24
-
-_PRIVATE_DIR_MODE: Final = 0o700
-_PRIVATE_FILE_MODE: Final = 0o600
 
 # name -> (default, maximum). Same values and bounds as the historic environment variables.
 LIMIT_BOUNDS: Final[dict[str, tuple[int, int]]] = {
@@ -42,10 +42,8 @@ LIMIT_BOUNDS: Final[dict[str, tuple[int, int]]] = {
 
 
 def default_config_path() -> Path:
-    """Return the XDG location of the managed configuration without creating anything."""
-    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "")
-    base = Path(xdg_config_home) if xdg_config_home.startswith("/") else Path.home() / ".config"
-    return base / APPLICATION_DIR_NAME / CONFIG_FILE_NAME
+    """Return this account's configuration location, without creating anything."""
+    return services().config_dir() / CONFIG_FILE_NAME
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,69 +185,30 @@ def parse(text: str) -> StoredConfiguration:
     )
 
 
-def _check_private_mode(mode: int, path_kind: str) -> None:
-    if stat.S_IMODE(mode) & 0o077:
-        raise _fail(
-            f"The configuration {path_kind} is readable by other accounts on this computer.",
-            "CONFIG_PERMISSIONS",
-        )
-
-
-def _check_directory(directory: Path) -> None:
-    try:
-        info = os.stat(directory, follow_symlinks=True)
-    except FileNotFoundError as exc:
-        raise _fail("The configuration directory does not exist.", "CONFIG_MISSING") from exc
-    except OSError as exc:
-        raise _fail(
-            f"The configuration directory cannot be inspected ({type(exc).__name__}).",
-            "CONFIG_INVALID",
-        ) from exc
-    if info.st_uid != os.getuid():
-        raise _fail("The configuration directory belongs to another account.", "CONFIG_PERMISSIONS")
-    _check_private_mode(info.st_mode, "directory")
+def _privacy_failure(exc: PrivacyError) -> ConfigurationError:
+    """Turn a platform privacy refusal into the coded error callers already handle."""
+    return _fail(str(exc), exc.code or "CONFIG_PERMISSIONS")
 
 
 def read(path: Path) -> StoredConfiguration:
     """Load an explicit configuration file, refusing anything unsafe.
 
-    A missing, malformed, symlinked or world-readable file fails the call. There is no
-    silent repair and no fallback to another source: the caller asked for this file.
+    A missing, malformed, redirected or shared file fails the call. There is no silent
+    repair and no fallback to another source: the caller asked for this file.
     """
     path = Path(path)
     if not path.is_absolute():
         raise _fail("The configuration path must be absolute.", "CONFIG_INVALID")
 
-    _check_directory(path.parent)
+    platform = services()
     try:
-        # O_NOFOLLOW refuses a symlink at the final component, and the checks below run
-        # against the descriptor actually opened rather than a path re-resolved afterwards.
-        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
-    except FileNotFoundError as exc:
-        raise _fail("No configuration file was found at that path.", "CONFIG_MISSING") from exc
-    except OSError as exc:
-        # ELOOP lands here when the path is a symlink.
-        raise _fail(
-            f"The configuration file cannot be opened ({type(exc).__name__}).",
-            "CONFIG_PERMISSIONS" if isinstance(exc, PermissionError) else "CONFIG_INVALID",
-        ) from exc
+        platform.verify_private_directory(path.parent)
+        raw = platform.read_private_file(path, max_bytes=MAX_CONFIG_BYTES)
+    except PrivacyError as exc:
+        raise _privacy_failure(exc) from exc
 
-    try:
-        # Inspect the descriptor that was actually opened, before wrapping it in a file
-        # object: O_RDONLY succeeds on a directory, which fdopen would then reject noisily.
-        info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode):
-            raise _fail("The configuration path is not a regular file.", "CONFIG_INVALID")
-        if info.st_uid != os.getuid():
-            raise _fail("The configuration file belongs to another account.", "CONFIG_PERMISSIONS")
-        _check_private_mode(info.st_mode, "file")
-        if info.st_size > MAX_CONFIG_BYTES:
-            raise _fail("The configuration file is unexpectedly large.", "CONFIG_INVALID")
-        with os.fdopen(descriptor, "rb", closefd=False) as handle:
-            raw = handle.read(MAX_CONFIG_BYTES + 1)
-    finally:
-        os.close(descriptor)
-
+    if len(raw) > MAX_CONFIG_BYTES:
+        raise _fail("The configuration file is unexpectedly large.", "CONFIG_INVALID")
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -288,52 +247,35 @@ def render(configuration: StoredConfiguration) -> str:
 def ensure_private_directory(directory: Path) -> None:
     """Create the product's own configuration directory, private to this account.
 
-    Only the leaf is tightened: parents such as ``~/.config`` keep the permissions the
-    user chose, and nothing is changed recursively.
+    Only the leaf is tightened: parents such as the user's profile keep the permissions
+    the system and the user chose, and nothing is changed recursively.
     """
-    directory.mkdir(mode=_PRIVATE_DIR_MODE, parents=True, exist_ok=True)
     try:
-        info = os.stat(directory, follow_symlinks=False)
-    except OSError as exc:
-        raise _fail(
-            f"The configuration directory cannot be inspected ({type(exc).__name__}).",
-            "CONFIG_PERMISSIONS",
-        ) from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-        raise _fail("The configuration directory is not a directory.", "CONFIG_PERMISSIONS")
-    if stat.S_IMODE(info.st_mode) & 0o077:
-        directory.chmod(_PRIVATE_DIR_MODE)
+        services().ensure_private_directory(directory)
+    except PrivacyError as exc:
+        raise _privacy_failure(exc) from exc
 
 
 def write(configuration: StoredConfiguration, path: Path) -> None:
-    """Write the configuration atomically, private to this account."""
+    """Write the configuration atomically, private to this account.
+
+    The previous file stays intact unless the replacement was written in full, so a
+    failure here never leaves a setup without a configuration it can still read.
+    """
     path = Path(path)
     if not path.is_absolute():
         raise _fail("The configuration path must be absolute.", "CONFIG_INVALID")
-    directory = path.parent
-    ensure_private_directory(directory)
-
-    descriptor, temporary = tempfile.mkstemp(dir=directory, prefix=".config-", suffix=".toml")
-    temporary_path = Path(temporary)
     try:
-        os.fchmod(descriptor, _PRIVATE_FILE_MODE)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(render(configuration))
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
-    except BaseException:
-        temporary_path.unlink(missing_ok=True)
-        raise
-    directory_descriptor = os.open(directory, os.O_RDONLY | os.O_CLOEXEC)
-    try:
-        os.fsync(directory_descriptor)
-    finally:
-        os.close(directory_descriptor)
+        services().write_private_file(path, render(configuration).encode("utf-8"))
+    except PrivacyError as exc:
+        raise _privacy_failure(exc) from exc
 
 
 def repair_permissions(path: Path) -> None:
     """Tighten only the product's own configuration file and directory."""
     ensure_private_directory(path.parent)
-    if path.exists() and not path.is_symlink():
-        path.chmod(_PRIVATE_FILE_MODE)
+    try:
+        if path.exists():
+            services().secure_existing_path(path)
+    except PrivacyError as exc:
+        raise _privacy_failure(exc) from exc

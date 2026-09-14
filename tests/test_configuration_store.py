@@ -9,6 +9,7 @@ import pytest
 
 from proton_safe_mcp import configuration_store as store
 from proton_safe_mcp.errors import ConfigurationError
+from proton_safe_mcp.platform_services import posix as posix_services
 
 
 def _read_code(path):
@@ -34,6 +35,7 @@ def test_a_valid_file_round_trips_through_render_and_read(
     assert loaded.limits == {}
 
 
+@pytest.mark.posix_only
 def test_the_file_and_its_directory_are_written_private(write_managed_config, managed_config_path):
     write_managed_config(managed_config_path)
 
@@ -68,6 +70,7 @@ def test_a_relative_path_is_refused(tmp_path, monkeypatch):
     assert caught.value.code == "CONFIG_INVALID"
 
 
+@pytest.mark.posix_only
 def test_a_symlinked_configuration_is_refused(managed_config_path, tmp_path):
     real = tmp_path / "elsewhere.toml"
     real.write_text("schema_version = 1\n[bridge]\nuser = 'person@example.com'\n")
@@ -78,6 +81,7 @@ def test_a_symlinked_configuration_is_refused(managed_config_path, tmp_path):
     assert _read_code(managed_config_path) in {"CONFIG_INVALID", "CONFIG_PERMISSIONS"}
 
 
+@pytest.mark.posix_only
 def test_a_world_readable_file_is_refused(write_managed_config, managed_config_path):
     write_managed_config(managed_config_path)
     managed_config_path.chmod(0o644)
@@ -85,6 +89,7 @@ def test_a_world_readable_file_is_refused(write_managed_config, managed_config_p
     assert _read_code(managed_config_path) == "CONFIG_PERMISSIONS"
 
 
+@pytest.mark.posix_only
 def test_a_world_readable_directory_is_refused(write_managed_config, managed_config_path):
     write_managed_config(managed_config_path)
     managed_config_path.parent.chmod(0o755)
@@ -158,6 +163,7 @@ def test_writing_is_atomic_and_leaves_no_temporary(write_managed_config, managed
     assert store.read(managed_config_path).bridge_user == "other@example.com"
 
 
+@pytest.mark.posix_only
 def test_a_failed_write_keeps_the_previous_file_and_removes_its_temporary(
     write_managed_config, managed_config_path, monkeypatch
 ):
@@ -167,7 +173,9 @@ def test_a_failed_write_keeps_the_previous_file_and_removes_its_temporary(
     def explode(*_args, **_kwargs):
         raise OSError("disk full")
 
-    monkeypatch.setattr(store.os, "replace", explode)
+    # The atomic replacement is the platform layer's job now, so that is where the
+    # failure is injected. What is asserted is unchanged: the previous file survives.
+    monkeypatch.setattr(posix_services.os, "replace", explode)
     with pytest.raises(OSError):
         store.write(store.StoredConfiguration(bridge_user="new@example.com"), managed_config_path)
 
@@ -190,6 +198,7 @@ def test_limits_and_state_dir_survive_a_round_trip(managed_config_path, tmp_path
     assert not (tmp_path / "state").exists()
 
 
+@pytest.mark.posix_only
 def test_ensure_private_directory_does_not_touch_its_parents(tmp_path):
     parent = tmp_path / "home-like"
     parent.mkdir(mode=0o755)
@@ -205,6 +214,7 @@ def test_a_control_character_cannot_be_rendered():
         store.render(store.StoredConfiguration(bridge_user="a\tb@example.com"))
 
 
+@pytest.mark.posix_only
 def test_a_file_owned_by_another_account_is_refused(
     write_managed_config, managed_config_path, monkeypatch
 ):

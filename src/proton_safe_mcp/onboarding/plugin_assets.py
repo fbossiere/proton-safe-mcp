@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +16,7 @@ from typing import Any, Final
 
 from .. import __version__
 from ..errors import ProtonMCPError
+from ..platform_services import services
 from .models import Code
 
 #: A marketplace of the assistant's own, so the managed entry cannot collide with the
@@ -39,9 +39,8 @@ class PluginAssetError(ProtonMCPError):
 
 
 def default_plugin_dir() -> Path:
-    xdg_data_home = os.environ.get("XDG_DATA_HOME", "")
-    base = Path(xdg_data_home) if xdg_data_home.startswith("/") else Path.home() / ".local/share"
-    return base / "proton-safe-mcp" / "desktop-plugin"
+    """This account's managed plugin and its local marketplace."""
+    return services().data_dir() / "desktop-plugin"
 
 
 def canonical_root() -> Path:
@@ -120,9 +119,8 @@ def _load_manifest(root: Path) -> dict[str, Any]:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    path.chmod(0o600)
+    document = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    services().write_private_file(path, document.encode("utf-8"))
 
 
 def render(
@@ -145,21 +143,23 @@ def render(
     digest = resource_digest(root)
     manifest = _load_manifest(root)
 
+    platform = services()
     marketplace_dir = (destination or default_plugin_dir()).resolve()
     plugin_dir = marketplace_dir / "plugins" / MANAGED_PLUGIN
 
-    marketplace_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    platform.ensure_private_directory(marketplace_dir)
     # Replacing the managed tree wholesale keeps an interrupted previous render from
     # leaving a stale skill behind. Only this directory is ever removed.
     if plugin_dir.exists():
         shutil.rmtree(plugin_dir)
-    plugin_dir.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    platform.ensure_private_directory(plugin_dir.parent)
 
     shutil.copytree(root, plugin_dir)
-    for path in _resource_files(plugin_dir):
-        path.chmod(0o600)
-    for directory in [plugin_dir, *(p for p in plugin_dir.rglob("*") if p.is_dir())]:
-        directory.chmod(0o700)
+    # Copied files carry whatever the destination gave them. Tightening every one of
+    # them, rather than trusting inheritance, is what makes the managed tree private on
+    # a profile whose permissions someone widened.
+    for path in (plugin_dir, *plugin_dir.rglob("*")):
+        platform.secure_existing_path(path)
 
     missing = [
         name
@@ -186,7 +186,7 @@ def render(
                 MANAGED_SERVER_NAME: {
                     "command": serve_command[0],
                     "args": list(serve_command[1:]),
-                    "env_vars": ["DBUS_SESSION_BUS_ADDRESS", "HOME", "XDG_RUNTIME_DIR"],
+                    "env_vars": list(platform.client_passthrough_environment),
                     "startup_timeout_sec": 30,
                     "tool_timeout_sec": 120,
                 }

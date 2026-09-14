@@ -1,5 +1,10 @@
 # Desktop validation
 
+!!! info "Windows"
+    This page covers the Ubuntu package. The Windows installer has its own
+    [acceptance sheet](windows-acceptance.md) and [build notes](windows-installer.md);
+    nothing on that path has been validated yet.
+
 ## Maintainer test report — 13 September 2026
 
 After installing and trying the assistant, the maintainer reported that it works successfully

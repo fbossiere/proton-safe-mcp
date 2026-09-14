@@ -136,12 +136,9 @@ def codex_home(tmp_path):
 
 
 @pytest.fixture
-def service(tmp_path, client, codex_home, monkeypatch, fake_keyring):
+def service(tmp_path, client, codex_home, monkeypatch, fake_keyring, make_executable):
     """A service wired to a fake client, a fake keyring and private temporary paths."""
-    executable = tmp_path / "bin" / "codex"
-    executable.parent.mkdir(parents=True)
-    executable.write_text("#!/bin/sh\n")
-    executable.chmod(0o700)
+    executable = make_executable(tmp_path / "bin", "codex")
 
     adapter = OpenAILocalAdapter(
         client.run, candidate_paths=(str(executable),), config_home=codex_home
@@ -150,11 +147,7 @@ def service(tmp_path, client, codex_home, monkeypatch, fake_keyring):
     config_dir = tmp_path / "config" / "proton-safe-mcp"
     config_dir.mkdir(mode=0o700, parents=True)
 
-    runtime_dir = tmp_path / "runtime"
-    runtime_dir.mkdir()
-    runtime = runtime_dir / "proton-safe-mcp"
-    runtime.write_text("#!/bin/sh\n")
-    runtime.chmod(0o700)
+    runtime = make_executable(tmp_path / "runtime", "proton-safe-mcp")
 
     from proton_safe_mcp.onboarding.runtime import RuntimeLocation
 
@@ -813,6 +806,7 @@ def test_capabilities_come_from_the_client_not_from_its_version(service, client)
     assert described.version == "codex-cli 1.4.0"
 
 
+@pytest.mark.posix_only
 def test_two_paths_to_the_same_executable_are_reported_once(tmp_path, client, monkeypatch):
     executable = tmp_path / "codex"
     executable.write_text("#!/bin/sh\n")

@@ -19,6 +19,7 @@ from typing import Any
 
 from .config import Settings
 from .errors import AttachmentError
+from .platform_services import services
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 TOKEN_RE = re.compile(r"^([0-9a-f]{32})\.([A-Za-z0-9_-]{32,64})$")
@@ -34,16 +35,6 @@ ALLOWED_TYPES: dict[str, str] = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
 }
-
-
-def _write_all(fd: int, data: bytes) -> None:
-    """Write every byte, including when the OS reports a short write."""
-    remaining = memoryview(data)
-    while remaining:
-        written = os.write(fd, remaining)
-        if written == 0:
-            raise OSError("write returned zero bytes")
-        remaining = remaining[written:]
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,14 +106,10 @@ class AttachmentStore:
             new_size = metadata["current_size"] + len(chunk)
             if new_size > metadata["expected_size"]:
                 raise AttachmentError("Chunk would exceed the declared attachment size")
-            path = self._blob_path(upload_id, partial=True)
-            flags = os.O_WRONLY | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
-            fd = os.open(path, flags)
-            try:
-                _write_all(fd, chunk)
-                os.fsync(fd)
-            finally:
-                os.close(fd)
+            # Appending goes through the platform so a staged blob that was replaced by
+            # a link — a symlink on Linux, a junction or other reparse point on
+            # Windows — is refused rather than written through.
+            services().append_to_private_file(self._blob_path(upload_id, partial=True), chunk)
             metadata["current_size"] = new_size
             metadata["next_chunk"] += 1
             self._write_json(self._meta_path(upload_id), metadata)
@@ -151,7 +138,7 @@ class AttachmentStore:
 
             ready = self._blob_path(upload_id, partial=False)
             os.replace(partial, ready)
-            ready.chmod(0o600)
+            services().secure_existing_path(ready)
             secret = secrets.token_urlsafe(32)
             metadata.update(
                 {
@@ -179,7 +166,7 @@ class AttachmentStore:
             if not hmac.compare_digest(candidate, metadata.get("token_hash", "")):
                 raise AttachmentError("Invalid attachment token")
             path = self._blob_path(upload_id, partial=False)
-            if not path.is_file() or path.is_symlink():
+            if not services().is_plain_file(path):
                 raise AttachmentError("Staged attachment is unavailable")
             data = path.read_bytes()
             if len(data) != metadata["expected_size"]:
@@ -271,7 +258,7 @@ class AttachmentStore:
 
     def _read_meta(self, upload_id: str) -> dict[str, Any]:
         path = self._meta_path(upload_id)
-        if not path.is_file() or path.is_symlink():
+        if not services().is_plain_file(path):
             raise AttachmentError("Unknown attachment upload")
         try:
             metadata = json.loads(path.read_text(encoding="utf-8"))
@@ -291,13 +278,8 @@ class AttachmentStore:
 
     @staticmethod
     def _write_bytes(path: Path, data: bytes) -> None:
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(path, flags, 0o600)
-        try:
-            _write_all(fd, data)
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        """Create a new private file, refusing to write through an existing one."""
+        services().create_private_file(path, data)
 
     @staticmethod
     def _write_json(path: Path, value: dict[str, Any]) -> None:
@@ -305,7 +287,6 @@ class AttachmentStore:
         data = json.dumps(value, ensure_ascii=False, sort_keys=True).encode("utf-8")
         AttachmentStore._write_bytes(temporary, data)
         os.replace(temporary, path)
-        path.chmod(0o600)
 
     def _destroy_upload(self, upload_id: str) -> None:
         for path in (
@@ -314,7 +295,9 @@ class AttachmentStore:
             self._blob_path(upload_id, partial=False),
         ):
             try:
-                if path.is_file() and not path.is_symlink():
+                # Only a real file this store owns is removed. A link left in place of a
+                # staged blob is reported by being skipped, never followed and deleted.
+                if services().is_plain_file(path):
                     path.unlink()
             except FileNotFoundError:
                 pass

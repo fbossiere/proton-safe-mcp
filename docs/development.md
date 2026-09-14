@@ -28,6 +28,28 @@ For the Ubuntu installer, also follow the bundle and package checks in
 [Desktop validation](desktop-testing.md). Qt needs `libegl1` and `libglib2.0-0t64`
 on Ubuntu 24.04 even with the offscreen platform.
 
+### Working on the Windows path from Linux
+
+Most of the Windows implementation is ordinary Python and is tested on every platform:
+`tests/test_platform_services.py` covers access control lists, launchable files, child
+environments and the private-file sequencing, and `tests/test_windows_behaviour.py` covers
+what the product decides — runtime discovery, paths through JSON and TOML, prerequisites,
+the credential self-test and the French and English wording. Both run in the normal
+`pytest` command above, so a change to `platform_services/windows.py` is checked here and
+type-checked by `mypy` here too.
+
+The `as_windows` fixture installs the Windows services with only the four Win32 calls
+stubbed. Use it rather than asserting on source text.
+
+Tests whose subject is a Unix guarantee — a mode, a uid, a symlink — carry
+`@pytest.mark.posix_only` and skip themselves on Windows. Do not reach for that marker to
+make a test pass on Windows: if the behaviour matters on both systems, the fix is a
+platform-neutral test, or a Windows equivalent beside the POSIX one.
+
+What cannot be settled from Linux: starting a real client, reading a real Credential
+Manager entry, surviving a restart, and the absence of a UAC prompt on a standard account.
+Those are the [Windows acceptance scenarios](windows-acceptance.md).
+
 The repository test suite validates the checked-in plugin manifest, marketplace, MCP command,
 secret exclusions, and skill boundary. In a Codex development environment, also run the built-in
 plugin validator before changing the plugin package:

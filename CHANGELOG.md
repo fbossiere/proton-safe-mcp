@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Windows 11 x64 support in the repository: a platform services layer, a per-user Inno
+  Setup installer, a Windows build and packaging pipeline, CI jobs, and French and English
+  documentation. **Nothing on the Windows path has been validated on Windows**, no Windows
+  installer is published, and Proton Safe is not yet compatible with Windows. Every
+  scenario in the new [Windows acceptance sheet](docs/windows-acceptance.md) is Not tested,
+  and two external dependencies remain open: a Windows AI client whose full path is
+  qualified, and a signing identity usable from CI.
+- A platform services layer (`src/proton_safe_mcp/platform_services/`) holding the five
+  concerns the two systems cannot share: known folders, private storage, session identity,
+  credential store policy, and starting and reading a child process. The mail engine, the
+  tool limits, the draft rules and the whole onboarding flow stay single-implementation.
+- Windows private storage as an explicit protected DACL, with reparse points refused and
+  the opened file confirmed to be the inspected one, standing in for `O_NOFOLLOW`.
+- The Bridge password on Windows in Credential Manager, with persistence pinned to this
+  computer instead of the library default, which asks Windows to roam it.
+- An explicit **Locate an assistant installed elsewhere…** choice on the client screen,
+  for an installation the bounded probes do not reach. It is verified like any other.
+- `--uninstall-connection` on the assistant, so the Windows uninstaller asks the component
+  that owns the journal, the client adapters and the credential store to disconnect rather
+  than reimplementing any of it. Its exit code decides what the uninstaller reports.
+- `packaging/make_sbom.py` and `packaging/version.py`, shared by both platforms' builds.
+- The home page and both download pages now present two systems, Ubuntu and Windows, with
+  both always visible, and quote the published installer's size alongside its version. A
+  small script marks the visitor's likely system to bring one card forward; it makes no
+  request, stores nothing, and the page behaves identically without it. No Windows
+  download is offered: `tests/check_built_site.py` fails the build if one appears while
+  `extra.windows_release.available` is false.
+
+### Changed
+
+- The credential-store self-test now uses a separate service name and a fresh random key
+  each attempt, and removes every entry the store may have created for it. Under the real
+  service name, Windows Credential Manager would have displaced an existing credential to
+  a compound target to resolve the account collision.
+- The runtime locator refuses an ambiguous resolution instead of falling back to the
+  running executable. In a bundle that would have opened a window instead of serving MCP.
+- `doctor` reports the state directory through the platform, so "private" means a Unix
+  mode on Linux and an access control list on Windows, each explained in its own terms.
+- The POSIX validations are unchanged. No check was relaxed into a weaker rule both
+  systems could satisfy.
+
 ## [2.1.2] - 2026-09-13
 
 ### Fixed

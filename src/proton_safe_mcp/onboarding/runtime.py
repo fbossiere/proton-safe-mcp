@@ -10,8 +10,6 @@ from __future__ import annotations
 # The assistant starts only its own runtime, with a fixed argv and no shell.
 import contextlib
 import json
-import os
-import select
 import shutil
 import subprocess
 import sys
@@ -20,7 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
+from ..platform_services import LineReader, services
 from .models import Code, Outcome
+
+#: The runtime executable's name, without the platform's suffix.
+RUNTIME_STEM: Final = "proton-safe-mcp"
 
 #: The whole handshake, not one message.
 HANDSHAKE_TIMEOUT_SECONDS: Final = 30.0
@@ -74,15 +76,26 @@ def locate_runtime() -> RuntimeLocation | None:
     The desktop package installs the runtime beside the assistant, so a managed client
     entry points at an absolute path that cannot be shadowed by the user's ``PATH``.
     """
+    platform = services()
+    name = platform.executable_name(RUNTIME_STEM)
     here = Path(sys.executable).resolve().parent
-    for candidate in (here / "proton-safe-mcp", here.parent / "proton-safe-mcp"):
-        if candidate.is_file() and os.access(candidate, os.X_OK):
+    for candidate in (here / name, here.parent / name):
+        if platform.is_executable_file(candidate):
             return RuntimeLocation((str(candidate),), packaged=True)
     if getattr(sys, "frozen", False):  # pragma: no cover - only true inside the bundle
-        return RuntimeLocation((str(Path(sys.executable).resolve()), "serve"), packaged=True)
-    found = shutil.which("proton-safe-mcp")
+        running = Path(sys.executable).resolve()
+        if running.stem != RUNTIME_STEM:
+            # Inside the bundle the interface and the runtime sit side by side. If the
+            # runtime was not found beside it, the executable running this code is the
+            # interface, and reusing it would open a window instead of serving MCP.
+            # An ambiguous resolution is reported as "not found", never guessed.
+            return None
+        return RuntimeLocation((str(running), "serve"), packaged=True)
+    found = shutil.which(RUNTIME_STEM)
     if found:
-        return RuntimeLocation((str(Path(found).resolve()),), packaged=False)
+        resolved = Path(found).resolve()
+        if platform.is_executable_file(resolved):
+            return RuntimeLocation((str(resolved),), packaged=False)
     return None
 
 
@@ -104,32 +117,17 @@ def _frame(message: dict[str, Any]) -> bytes:
     return (json.dumps(message) + "\n").encode("utf-8")
 
 
-def _read_result(
-    stream: Any, request_id: int, budget: list[int], pending: bytearray, deadline: float
-) -> dict[str, Any] | None:
+def _read_result(reader: LineReader, request_id: int, deadline: float) -> dict[str, Any] | None:
     """Read bounded JSON-RPC frames with one deadline shared by the whole handshake.
 
-    A buffered readline can wait forever for a newline. Read ready pipe bytes directly
-    instead, retaining any following frame for the next request (Linux desktop runtime).
+    A buffered ``readline`` can wait forever for a newline, and waiting on a pipe is not
+    the same call on both platforms, so the reader comes from the platform layer. Frames
+    that arrive early are retained for the next request.
     """
     while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError("runtime handshake deadline reached")
-        newline = pending.find(b"\n")
-        if newline < 0:
-            if not select.select([stream], [], [], remaining)[0]:
-                raise TimeoutError("runtime handshake deadline reached")
-            chunk = os.read(stream.fileno(), min(65536, budget[0] + 1))
-            if not chunk:
-                return None
-            budget[0] -= len(chunk)
-            if budget[0] < 0:
-                raise ValueError("runtime produced more output than a handshake needs")
-            pending.extend(chunk)
-            continue
-        line = bytes(pending[:newline])
-        del pending[: newline + 1]
+        line = reader.read_line(deadline)
+        if line is None:
+            return None
         try:
             message = json.loads(line)
         except (ValueError, UnicodeError):
@@ -162,7 +160,8 @@ def probe_runtime(
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             env=child_environment,
-            start_new_session=True,
+            # Detached, and with no console window of its own on Windows.
+            **services().spawn_options(),
         )
     except (OSError, ValueError):
         return Outcome.failure(Code.RUNTIME_START_FAILED, stage="spawn")
@@ -175,23 +174,21 @@ def probe_runtime(
 
 def _managed_environment() -> dict[str, str]:
     """Pass through only what the session needs to reach the keyring and the filesystem."""
-    allowed = (
-        "DBUS_SESSION_BUS_ADDRESS",
-        "HOME",
-        "LANG",
-        "PATH",
-        "XDG_DATA_HOME",
-        "XDG_RUNTIME_DIR",
-        "XDG_STATE_HOME",
-    )
-    return {name: os.environ[name] for name in allowed if name in os.environ}
+    return services().managed_environment()
 
 
 def _handshake(process: subprocess.Popen[bytes], *, timeout: float) -> Outcome:
     assert process.stdin is not None and process.stdout is not None
-    budget = [MAX_HANDSHAKE_BYTES]
     deadline = time.monotonic() + timeout
-    pending = bytearray()
+    reader = services().open_line_reader(process.stdout, budget=MAX_HANDSHAKE_BYTES)
+    try:
+        return _exchange(process, reader, deadline)
+    finally:
+        reader.close()
+
+
+def _exchange(process: subprocess.Popen[bytes], reader: LineReader, deadline: float) -> Outcome:
+    assert process.stdin is not None
     try:
         process.stdin.write(
             _frame(
@@ -208,14 +205,14 @@ def _handshake(process: subprocess.Popen[bytes], *, timeout: float) -> Outcome:
             )
         )
         process.stdin.flush()
-        initialized = _read_result(process.stdout, 1, budget, pending, deadline)
+        initialized = _read_result(reader, 1, deadline)
         if initialized is None or not isinstance(initialized.get("result"), dict):
             return Outcome.failure(Code.RUNTIME_START_FAILED, stage="initialize")
 
         process.stdin.write(_frame({"jsonrpc": "2.0", "method": "notifications/initialized"}))
         process.stdin.write(_frame({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}))
         process.stdin.flush()
-        listed = _read_result(process.stdout, 2, budget, pending, deadline)
+        listed = _read_result(reader, 2, deadline)
     except TimeoutError:
         return Outcome.failure(Code.RUNTIME_START_FAILED, stage="timeout")
     except (OSError, ValueError):

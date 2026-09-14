@@ -100,6 +100,39 @@ If local compromise is suspected:
 2. Rotate the Bridge-generated client credential in the Bridge UI.
 3. Preserve logs and the exact deployed commit for investigation.
 
+## Windows file and credential protection
+
+Windows is implemented but not yet validated; see the
+[Windows installer notes](windows-installer.md). What the implementation does, and does
+not, claim:
+
+A Unix mode has no Windows equivalent, so "private to this account" is expressed as an
+explicit **protected DACL**: full access for the owning user, `SYSTEM` and
+`Administrators`, no entry for any other account, and inheritance switched off so a parent
+folder someone widened cannot grant access. It applies to the configuration, the
+connection journal, the managed plugin and staged attachments.
+
+Windows has no `O_NOFOLLOW`. A redirection is caught instead by refusing reparse points —
+symbolic links, junctions and the rest — and by confirming that the file actually opened is
+the file that was inspected, so a swap between the two checks is detected rather than
+followed.
+
+The Bridge password is stored in **Windows Credential Manager**, with persistence pinned to
+this computer rather than the library default, which asks Windows to roam the credential to
+the account's other machines. The store self-test writes under a separate service name with
+a fresh random key, so a diagnostic can never overwrite, displace or duplicate a real
+credential.
+
+**What this protects against:** other ordinary accounts on the same computer, and a secret
+accidentally left on disk in the clear.
+
+**What it does not protect against:** a malicious program running under the same user
+account, an administrator, or a compromised system. No file permission on any operating
+system does.
+
+The POSIX validations are unchanged on Linux. Nothing was relaxed to a rule both systems
+could satisfy: where Windows cannot establish a guarantee, the operation is refused.
+
 ## Report a vulnerability
 
 Do not open a public issue. Use [GitHub private vulnerability reporting](https://github.com/fbossiere/proton-safe-mcp/security/advisories/new) and include the affected version or commit, reproduction steps, and impact assessment.

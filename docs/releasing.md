@@ -40,6 +40,13 @@ manually upload the same version first.
    gh workflow run release.yml --ref v2.1.2 -f tag=v2.1.2
    ```
 
+   Add `-f include_windows=true` **only** once a Windows client is qualified and the
+   signing identity works in CI. With it on, the Windows build, its test run, its
+   signature and its unattended install/uninstall check all become blocking: the release
+   will not publish anything if any of them fails, and it refuses an unsigned installer
+   outright. With it off — the default — the release is Ubuntu and PyPI only, exactly as
+   before, and no Windows asset or claim appears anywhere.
+
 The dispatched `.github/workflows/release.yml` workflow verifies version
 consistency, rebuilds and tests the Python distributions and Ubuntu desktop package. Both
 builds must succeed before either installer upload or PyPI publishing starts; registry
@@ -72,6 +79,12 @@ The site may keep offering the previous verified installer until that follow-up 
   and **Publish completed GitHub Release**.
 - Download the `.deb`, its `.sha256` and `BUILD-PROVENANCE.txt` from the release; check the
   digest and verify the recorded source commit matches the signed tag.
+- For a Windows release, also download `ProtonSafe-Setup-<version>-x64.exe`, its `.sha256`,
+  `BUILD-PROVENANCE-windows-x64.txt` and `SBOM-windows-x64.json`. Check the digest, confirm
+  the recorded commit, and verify the Authenticode signature and its chain on the file as
+  downloaded through a browser, with its mark-of-the-web and Microsoft Defender active.
+  Record what SmartScreen actually did in [the acceptance sheet](windows-acceptance.md);
+  never advise anyone to turn a protection off.
 
 - PyPI: `https://pypi.org/project/proton-safe-mcp/`
 - MCP Registry API:

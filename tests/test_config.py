@@ -128,6 +128,7 @@ def test_malformed_sender_aliases_stop_the_server(monkeypatch, tmp_path, aliases
         Settings.from_env()
 
 
+@pytest.mark.posix_only
 @pytest.mark.parametrize("xdg_state_home", ["", "relative/state"])
 def test_empty_or_relative_xdg_state_home_is_ignored(monkeypatch, tmp_path, xdg_state_home):
     """A relative XDG_STATE_HOME must never stage attachments in the working directory."""
@@ -142,6 +143,7 @@ def test_empty_or_relative_xdg_state_home_is_ignored(monkeypatch, tmp_path, xdg_
     assert settings.state_dir == tmp_path / ".local" / "state" / "proton-safe-mcp"
 
 
+@pytest.mark.posix_only
 def test_absolute_xdg_state_home_is_honoured(monkeypatch, tmp_path):
     monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
     monkeypatch.delenv("PROTON_MCP_STATE_DIR", raising=False)

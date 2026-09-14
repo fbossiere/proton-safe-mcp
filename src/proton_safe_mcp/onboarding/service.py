@@ -166,6 +166,21 @@ class SetupService:
     def discover(self) -> list[ClientInstallation]:
         return discover_clients(self.adapters)
 
+    def inspect_client(self, executable: Path) -> ClientInstallation | None:
+        """Describe a client the user pointed at, for an installation not probed here.
+
+        The chosen file is treated exactly like a discovered one: it must answer its
+        own ``--version`` and the plugin subcommands before anything is written. Being
+        chosen by the user makes it a candidate, not a trusted one.
+        """
+        for adapter in self.adapters:
+            inspect = getattr(adapter, "inspect", None)
+            if callable(inspect):
+                found = inspect(executable)
+                if isinstance(found, ClientInstallation):
+                    return found
+        return None
+
     def adapter_for(self, installation: ClientInstallation) -> ClientAdapter:
         for adapter in self.adapters:
             if adapter.id == installation.adapter:

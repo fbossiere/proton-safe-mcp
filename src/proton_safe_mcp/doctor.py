@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import platform
-import stat
 import sys
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
@@ -16,7 +15,8 @@ import keyring.errors
 from .config import Settings
 from .errors import ProtonMCPError
 from .mail import ProtonBridgeClient
-from .secrets import get_bridge_password, keyring_status, secret_service_backend_available
+from .platform_services import services
+from .secrets import approved_backend_available, get_bridge_password, keyring_status
 
 Status = Literal["PASS", "WARN", "FAIL", "SKIP"]
 
@@ -62,9 +62,14 @@ def _package_check() -> CheckResult:
 
 
 def _platform_check() -> CheckResult:
+    """Report whether this is one of the platforms the product is built for.
+
+    Whether the exact version is in scope is a separate, finer question the setup
+    assistant asks; this one only says that a platform implementation exists at all.
+    """
     operating_system = platform.system() or "unknown"
-    supported = operating_system == "Linux"
-    detail = "supported" if supported else "Linux required"
+    supported = operating_system in {"Linux", "Windows"}
+    detail = "supported" if supported else "Linux or Windows required"
     return CheckResult(
         "platform",
         "Platform",
@@ -125,50 +130,37 @@ def _sender_addresses_check(settings: Settings) -> CheckResult:
     return CheckResult("sender_addresses", "Sender addresses", "PASS", detail, "SENDERS_CONFIGURED")
 
 
+#: How the platform's verdict on a directory maps onto this report.
+_STATE_DIRECTORY_RESULTS: Final[dict[str, tuple[Status, str]]] = {
+    "private": ("PASS", "STATE_DIR_PRIVATE"),
+    "not_private": ("FAIL", "STATE_DIR_PERMISSIONS"),
+    "unreadable": ("FAIL", "STATE_DIR_UNREADABLE"),
+    "missing": ("WARN", "STATE_DIR_MISSING"),
+}
+
+
 def _state_directory_check(settings: Settings) -> CheckResult:
-    try:
-        metadata = settings.state_dir.stat()
-    except FileNotFoundError:
-        return CheckResult(
-            "state_directory",
-            "State directory",
-            "WARN",
-            "not created yet; first use will create it with private permissions",
-            "STATE_DIR_MISSING",
-        )
-    except OSError as exc:
-        return CheckResult(
-            "state_directory",
-            "State directory",
-            "FAIL",
-            f"could not inspect permissions ({type(exc).__name__})",
-            "STATE_DIR_UNREADABLE",
-        )
-    mode = stat.S_IMODE(metadata.st_mode)
-    private = stat.S_ISDIR(metadata.st_mode) and mode & 0o700 == 0o700 and mode & 0o077 == 0
-    return CheckResult(
-        "state_directory",
-        "State directory",
-        "PASS" if private else "FAIL",
-        (
-            "private permissions"
-            if private
-            else "must grant rwx to the owner and be inaccessible to group and others"
-        ),
-        "STATE_DIR_PRIVATE" if private else "STATE_DIR_PERMISSIONS",
-    )
+    """Confirm the state directory is private, by whatever this platform means by it."""
+    state, detail = services().directory_privacy(settings.state_dir)
+    status, code = _STATE_DIRECTORY_RESULTS[state]
+    if state == "missing":
+        detail = "not created yet; first use will create it with private permissions"
+    elif state == "private":
+        detail = "private permissions"
+    return CheckResult("state_directory", "State directory", status, detail, code)
 
 
 def _keyring_detail(state: str) -> str:
+    store = "Credential Manager" if services().name == "windows" else "Secret Service"
     if state == "available":
-        return "Secret Service is available for this session"
-    if not secret_service_backend_available():
+        return f"{store} is available for this session"
+    if not approved_backend_available():
         # A build that forgot the dynamic backend modules must not look like a user's
         # locked session: this sentence is what the packaging check looks for.
-        return "the Secret Service backend is missing from this installation"
+        return f"the {store} backend is missing from this installation"
     if state == "locked":
-        return "the session keyring is locked"
-    return "Secret Service is installed but not reachable in this session"
+        return "the credential store is locked"
+    return f"{store} is installed but not reachable in this session"
 
 
 def _keyring_check() -> CheckResult:
@@ -249,7 +241,8 @@ def run_checks(*, config_path: Path | None = None) -> list[CheckResult]:
 
     results = [_python_check(), _package_check(), _platform_check()]
     if results[-1].status == "FAIL":
-        # Nothing below is meaningful off Linux, and it must not touch credentials.
+        # Nothing below is meaningful on an unsupported platform, and it must not
+        # touch credentials there.
         return results
 
     settings, configuration = _configuration_check(config_path)

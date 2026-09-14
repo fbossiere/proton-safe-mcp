@@ -7,9 +7,6 @@ other integrations the user has installed.
 
 from __future__ import annotations
 
-import contextlib
-import os
-
 # Adapters run known client executables with a fixed argument list and no shell.
 import subprocess
 from collections.abc import Sequence
@@ -17,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Protocol, runtime_checkable
 
+from ...platform_services import services
 from ..models import ClientInstallation, RegistrationOutcome, RegistrationPlan
 from ..plugin_assets import ManagedPluginAssets
 
@@ -56,21 +54,22 @@ class CommandRunner(Protocol):
 
 def run_command(argv: Sequence[str], *, timeout: float = COMMAND_TIMEOUT_SECONDS) -> CommandResult:
     """Run a client command with a fixed argv, a deadline and a bounded reply."""
+    platform = services()
     arguments = [str(item) for item in argv]
+    # An absolute path and a list of arguments. Nothing here is ever handed to a shell
+    # or a command interpreter, so a path holding a space, an accent or a shell
+    # metacharacter is passed through untouched rather than re-parsed.
     if not arguments or not Path(arguments[0]).is_absolute():
         return CommandResult(False, -1, "")
-    environment = {
-        name: os.environ[name]
-        for name in ("HOME", "PATH", "LANG", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS")
-        if name in os.environ
-    }
     try:
         completed = subprocess.run(  # noqa: S603 - fixed argv, no shell, bounded
             arguments,
             capture_output=True,
             timeout=timeout,
-            env=environment,
+            env=platform.client_environment(),
             check=False,
+            # No console window flashes when the assistant probes a client on Windows.
+            **platform.spawn_options(),
         )
     except subprocess.TimeoutExpired:
         return CommandResult(False, -1, "", timed_out=True)
@@ -84,24 +83,15 @@ def run_command(argv: Sequence[str], *, timeout: float = COMMAND_TIMEOUT_SECONDS
 
 
 def executable_candidates(paths: Sequence[Path]) -> list[Path]:
-    """Keep only real, executable files, resolved and de-duplicated.
+    """Keep only real, launchable files, resolved and de-duplicated.
 
     Candidates come from a fixed list of documented locations. A file is never run just
     because it is called `codex`: the caller still corroborates it with `--version` and
-    the exact plugin subcommands it intends to use.
+    the exact plugin subcommands it intends to use. What counts as launchable is a
+    platform question — an execute bit on Linux, a native executable on Windows, where
+    a `.cmd` or `.bat` wrapper is refused rather than quoted into a command line.
     """
-    seen: set[Path] = set()
-    kept: list[Path] = []
-    for path in paths:
-        with contextlib.suppress(OSError):
-            resolved = path.resolve(strict=True)
-            if resolved in seen or not resolved.is_file():
-                continue
-            if not os.access(resolved, os.X_OK):
-                continue
-            seen.add(resolved)
-            kept.append(resolved)
-    return kept
+    return services().executable_candidates(paths)
 
 
 class ClientAdapter(Protocol):

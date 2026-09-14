@@ -37,9 +37,24 @@
       <p class="eyebrow">{{ t('PROTON MAIL × YOUR AI ASSISTANT', 'PROTON MAIL × VOTRE ASSISTANT IA') }}</p>
       <h1 id="hero-title">{{ t('Find the email.', 'Retrouvez l’échange.') }}<br>{{ t('Prepare the reply.', 'Préparez la réponse.') }}<br><span>{{ t('You press send.', 'À vous d’envoyer.') }}</span></h1>
       <p class="intro">{{ t('Connect Proton Mail to your assistant to find conversations, summarise what matters and prepare drafts. Set it up with a guided desktop app.', 'Connectez Proton Mail à votre assistant pour retrouver vos échanges, résumer l’essentiel et préparer des brouillons. Une application vous guide pour l’installation.') }}</p>
-      <p class="compatibility"><strong>Ubuntu 24.04 · Intel / AMD {{ t("64-bit", "64 bits") }}</strong><br>{{ t('Requires Proton Mail Bridge, a compatible paid Proton plan and local ChatGPT desktop / Codex.', 'Nécessite Proton Mail Bridge, un forfait Proton payant compatible et ChatGPT desktop / Codex en local.') }}</p>
-      <div class="actions"><a class="button primary" href="{{ config.extra.desktop_release.url }}">{{ t('Download for Ubuntu', 'Télécharger pour Ubuntu') }} <span aria-hidden="true">↓</span></a><a class="text-link" href="{{ download | url }}">{{ t('Check requirements', 'Vérifier les prérequis') }} <span aria-hidden="true">→</span></a></div>
-      <p class="micro">v{{ config.extra.desktop_release.version }} · .deb · {{ t('Free & open source · Hosted on GitHub', 'Gratuit et open source · Hébergé sur GitHub') }}</p>
+      <div class="systems" role="group" aria-label="{{ t('Choose your system', 'Choisir son système') }}">
+        <div class="system" data-system="linux">
+          <p class="system-name"><strong>Ubuntu 24.04 · Intel / AMD {{ t("64-bit", "64 bits") }}</strong></p>
+          <a class="button primary" href="{{ config.extra.desktop_release.url }}">{{ t('Download the installer', 'Télécharger l’installateur') }} <span aria-hidden="true">↓</span></a>
+          <p class="micro">v{{ config.extra.desktop_release.version }} · .deb · {{ config.extra.desktop_release.size }} · <a href="{{ config.extra.desktop_release.notes }}">{{ t('Release notes', 'Notes de version') }}</a></p>
+        </div>
+        <div class="system" data-system="windows">
+          <p class="system-name"><strong>Windows 11 · {{ t("64-bit (x64)", "64 bits (x64)") }}</strong></p>
+          {% if config.extra.windows_release.available %}
+          <a class="button primary" href="{{ config.extra.windows_release.url }}">{{ t('Download the installer', 'Télécharger l’installateur') }} <span aria-hidden="true">↓</span></a>
+          {% else %}
+          <p class="system-status">{{ t('Not available yet', 'Pas encore disponible') }}</p>
+          <p class="micro"><a href="{{ (config.extra.windows_release.status_fr if fr else config.extra.windows_release.status) | url }}">{{ t('Where the Windows version stands', 'Où en est la version Windows') }} <span aria-hidden="true">→</span></a></p>
+          {% endif %}
+        </div>
+      </div>
+      <p class="compatibility">{{ t('Published by François Bossière, an independent project, free and open source on GitHub.', 'Publié par François Bossière, projet indépendant, gratuit et open source sur GitHub.') }}<br>{{ t('Requires Proton Mail Bridge, a compatible paid Proton plan and local ChatGPT desktop / Codex.', 'Nécessite Proton Mail Bridge, un forfait Proton payant compatible et ChatGPT desktop / Codex en local.') }}</p>
+      <div class="actions"><a class="text-link" href="{{ download | url }}">{{ t('Check requirements', 'Vérifier les prérequis') }} <span aria-hidden="true">→</span></a></div>
     </div>
     <figure class="product-preview">
       <div class="preview-label"><span class="dot" aria-hidden="true"></span>{{ t('YOUR CONNECTION, STEP BY STEP', 'VOTRE CONNEXION, PAS À PAS') }}</div>
@@ -63,5 +78,30 @@
   <section class="section wrap finish" id="start-here" aria-labelledby="try-title"><div><p class="eyebrow">{{ t('HELP SHAPE THE NEXT VERSION', 'AIDEZ À AMÉLIORER LA SUITE') }}</p><h2 id="try-title">{{ t('Try it on one useful task.', 'Essayez sur un besoin concret.') }}</h2><p>{{ t('Can you install it, find an exchange and prepare a useful draft? Tell us what helped and where you got stuck, without sharing your mail.', 'Arrivez-vous à l’installer, à retrouver un échange et à préparer un brouillon utile ? Dites-nous ce qui vous aide et ce qui vous bloque, sans partager vos messages.') }}</p></div><a class="button primary" href="{{ trial | url }}">{{ t('Try it & give feedback', 'Essayer et donner mon avis') }} <span aria-hidden="true">→</span></a></section>
 </main>
 <footer class="footer wrap"><div class="footer-brand"><strong>Proton Safe</strong><p>{{ t('Independent project by François Bossière.', 'Projet indépendant de François Bossière.') }}<br>{{ t('Not affiliated with or endorsed by Proton.', 'Non affilié à Proton et sans approbation de sa part.') }}</p></div><div class="footer-links"><a href="{{ 'overview/' | url }}">Documentation</a><a href="{{ download | url }}">{{ t('Download & updates', 'Téléchargement et mises à jour') }}</a><a href="https://github.com/fbossiere/proton-safe-mcp/blob/main/LICENSE">{{ t('MIT licence', 'Licence MIT') }}</a><a href="https://github.com/fbossiere/proton-safe-mcp/security/policy">{{ t('Report a vulnerability', 'Signaler une vulnérabilité') }}</a></div><p class="micro">{{ t('No analytics or third-party fonts added by this site.', 'Ce site n’ajoute ni outil de mesure d’audience ni police distante.') }}</p></footer>
+<script>
+/* Marks the visitor's likely system so they do not have to look for their own line.
+   Both choices are in the HTML above and both stay visible: this only adds an
+   attribute the stylesheet uses to bring one forward. Nothing is measured, stored or
+   sent anywhere, no request is made, and the page behaves identically without it. */
+(function () {
+  try {
+    var data = navigator.userAgentData;
+    var hint = (data && data.platform) || navigator.platform || '';
+    var agent = navigator.userAgent || '';
+    var detected = '';
+    if (/win/i.test(hint) || /Windows/i.test(agent)) {
+      detected = 'windows';
+    } else if ((/linux/i.test(hint) || /Linux|X11/i.test(agent)) && !/Android/i.test(agent)) {
+      detected = 'linux';
+    }
+    if (detected) {
+      var card = document.querySelector('.system[data-system="' + detected + '"]');
+      if (card) { card.setAttribute('data-detected', 'true'); }
+    }
+  } catch (error) {
+    /* An unreadable hint is not a problem worth reporting: both choices are shown. */
+  }
+})();
+</script>
 </body>
 </html>
