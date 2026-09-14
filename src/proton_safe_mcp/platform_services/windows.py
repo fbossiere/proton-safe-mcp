@@ -681,7 +681,13 @@ class WindowsServices(PlatformServices):
 
     def is_executable_file(self, path: Path) -> bool:
         try:
-            return path.is_file() and path.suffix.lower() in LAUNCHABLE_SUFFIXES
+            if not path.is_file() or path.suffix.lower() not in LAUNCHABLE_SUFFIXES:
+                return False
+            # Native Windows executables start with the DOS/PE signature. Reject
+            # empty files and renamed scripts before offering them as candidates.
+            # The actual command/MCP probe still establishes whether a candidate works.
+            with path.open("rb") as handle:
+                return handle.read(2) == b"MZ"
         except OSError:
             return False
 

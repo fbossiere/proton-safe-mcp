@@ -167,6 +167,7 @@ Filename: "{app}\{#AssistantExe}"; Description: "{cm:LaunchApp}"; Flags: nowait 
 [Code]
 var
   EraseChosen: Boolean;
+  TasksInstruction: String;
 
 function IsWindows11OrNewer(): Boolean;
 var
@@ -226,9 +227,18 @@ begin
 end;
 
 procedure InitializeWizard();
+begin
+  TasksInstruction := WizardForm.SelectTasksLabel.Caption;
+  WizardForm.WelcomeLabel1.Caption := ExpandConstant('{cm:AppTitle}');
+  WizardForm.FinishedLabel.Caption := ExpandConstant('{cm:Installed}');
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
 var
   Existing, Intro: String;
 begin
+  { The actual destination is initialized after InitializeWizard. Read it only
+    when a page is being displayed; this also reflects a previous installation. }
   { The destination page is disabled because there is nothing to choose: the product is
     per-user and goes in one place. The location is still shown, read-only, so nobody has
     to guess where their files went, and it appears beside the one option there is. }
@@ -246,7 +256,7 @@ begin
   WizardForm.WelcomeLabel2.Caption := Intro;
   { Appended, not replaced: the page keeps its own instruction and gains the one thing
     it cannot otherwise say, now that the destination page is disabled. }
-  WizardForm.SelectTasksLabel.Caption := WizardForm.SelectTasksLabel.Caption + #13#10#13#10 +
+  WizardForm.SelectTasksLabel.Caption := TasksInstruction + #13#10#13#10 +
     FmtMessage(ExpandConstant('{cm:InstallLocation}'), [ExpandConstant('{app}')]);
   WizardForm.FinishedLabel.Caption := ExpandConstant('{cm:Installed}');
 end;

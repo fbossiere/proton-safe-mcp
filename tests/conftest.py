@@ -49,7 +49,7 @@ def make_executable():
     def create(directory: Path, stem: str) -> Path:
         path = Path(directory) / services().executable_name(stem)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("#!/bin/sh\n")
+        path.write_bytes(b"MZ" if services().name == "windows" else b"#!/bin/sh\n")
         path.chmod(0o700)
         return path
 

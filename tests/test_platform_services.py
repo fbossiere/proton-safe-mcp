@@ -209,7 +209,7 @@ def test_windows_refuses_the_launcher_scripts_a_package_manager_creates(tmp_path
     """Driving a `.cmd` would mean quoting user-controlled paths into a command line."""
     platform = WindowsServices()
     real = tmp_path / "codex.exe"
-    real.write_bytes(b"")
+    real.write_bytes(b"MZ")
     for name in ("codex.cmd", "codex.bat", "codex.ps1", "codex"):
         (tmp_path / name).write_bytes(b"")
 
@@ -847,3 +847,11 @@ def test_windows_pipe_buffer_respects_the_budget_before_consumption():
         process.wait(timeout=5)
         reader.close()
     assert not reader._thread.is_alive()
+
+
+@pytest.mark.parametrize("payload", [b"", b"M", b"#!/bin/sh\n", b"not an executable"])
+@pytest.mark.parametrize("suffix", [".exe", ".com"])
+def test_windows_rejects_non_native_files_with_executable_suffixes(tmp_path, payload, suffix):
+    candidate = tmp_path / ("assistant" + suffix)
+    candidate.write_bytes(payload)
+    assert not WindowsServices().is_executable_file(candidate)
