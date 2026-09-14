@@ -127,7 +127,14 @@ def test_the_window_fits_a_1280_by_720_screen_at_200_percent_scaling(
             assert window.width() == 640
             assert window.height() == 330
             scroll = screen.content_scroll
-            assert scroll.horizontalScrollBar().maximum() == 0, name
+            assert scroll.horizontalScrollBar().maximum() == 0, (
+                name,
+                [
+                    (type(child).__name__, child.objectName(), child.minimumSizeHint().width())
+                    for child in scroll.widget().findChildren(QtWidgets.QWidget)
+                    if child.isVisible() and child.minimumSizeHint().width() > 400
+                ],
+            )
             assert scroll.viewport().height() > 100
             for value in (0, scroll.verticalScrollBar().maximum()):
                 scroll.verticalScrollBar().setValue(value)

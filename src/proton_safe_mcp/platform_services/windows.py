@@ -32,7 +32,7 @@ from .base import (
     SessionFacts,
     UnsupportedPlatformError,
 )
-from .winacl import assess_privacy, private_descriptor, private_sddl
+from .winacl import assess_privacy, private_descriptor, private_sddl, split_sections
 
 #: Windows 11 starts at build 22000. Windows 10 is a deliberate product exclusion.
 MINIMUM_BUILD: Final = 22000
@@ -292,7 +292,28 @@ def describe_security(path: Path) -> str:
         ):
             raise _last_error("Reading the permissions of this file")
         with _LocalMemory(text):
-            return str(text.value or "")
+            sddl = str(text.value or "")
+        # Machine-relative aliases (for example LA) cannot be expanded by a
+        # static table. Resolve the actual owner from this same native descriptor.
+        owner = ctypes.c_void_p()
+        defaulted = wintypes.BOOL()
+        if (
+            not windll.advapi32.GetSecurityDescriptorOwner(
+                descriptor, ctypes.byref(owner), ctypes.byref(defaulted)
+            )
+            or not owner
+        ):
+            raise _last_error("Reading file ownership")
+        owner_text = ctypes.c_wchar_p()
+        if not windll.advapi32.ConvertSidToStringSidW(owner, ctypes.byref(owner_text)):
+            raise _last_error("Reading file ownership")
+        with _LocalMemory(owner_text):
+            sid = str(owner_text.value or "")
+        alias = split_sections(sddl).get("O", "")
+        if alias and alias != sid:
+            sddl = sddl.replace(f"O:{alias}", f"O:{sid}", 1)
+            sddl = sddl.replace(f";;;{alias})", f";;;{sid})")
+        return sddl
 
 
 def apply_private_dacl(path: Path, *, directory: bool) -> None:

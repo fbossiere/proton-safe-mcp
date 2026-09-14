@@ -63,6 +63,13 @@ class WrappedLabel(QtWidgets.QLabel):
         super().__init__(text)
         self.setWordWrap(True)
 
+    def minimumSizeHint(self) -> QtCore.QSize:
+        # A paragraph must wrap to the available width, including with Windows'
+        # font metrics. Its preferred unbroken width must not widen the page.
+        hint = super().minimumSizeHint()
+        hint.setWidth(0)
+        return hint
+
     def setText(self, text: str) -> None:
         super().setText(text)
         self._fit_height()

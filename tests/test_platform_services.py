@@ -809,6 +809,12 @@ def test_native_identity_and_private_storage(tmp_path):
     assert sid.startswith("S-1-5-")
     assert isinstance(windows_services.is_elevated(), bool)
     target = tmp_path / "private" / "config.toml"
+    target.parent.mkdir()
+    windows_services.apply_private_dacl(target.parent, directory=True)
+    descriptor = windows_services.describe_security(target.parent)
+    assert windows_services.private_descriptor(descriptor, sid, directory=True), descriptor.replace(
+        sid, "CURRENT_USER"
+    )
     platform.write_private_file(target, b"native private file")
     assert platform.read_private_file(target, max_bytes=100) == b"native private file"
     assert platform.directory_privacy(target.parent)[0] == "private"

@@ -78,7 +78,6 @@ OWNER_RIGHTS_SID: Final = "S-1-3-4"
 _SID_ALIASES: Final[dict[str, str]] = {
     "SY": SYSTEM_SID,
     "BA": ADMINISTRATORS_SID,
-    "LA": "S-1-5-21-0-0-0-500",
     "CO": CREATOR_OWNER_SID,
     "OW": OWNER_RIGHTS_SID,
     "WD": EVERYONE_SID,
