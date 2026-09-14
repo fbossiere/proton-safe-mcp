@@ -50,7 +50,14 @@ class Journal:
     plugin_dir: str = ""
     client_id: str = ""
     client_adapter: str = ""
+    #: The absolute path of the executable that was registered. A discovery identifier
+    #: describes where a client was found, not which one it is: an installation the user
+    #: pointed at is never rediscovered, and a probed one can change position when
+    #: another candidate appears. The path is what a later repair or disconnect looks
+    #: the installation up by, after revalidating it like any other.
     client_executable: str = ""
+    #: The client profile directory that was written to, so a disconnect removes entries
+    #: from the same profile they were added to.
     client_profile: str = ""
     runtime_command: list[str] = field(default_factory=list)
     resources: list[ManagedResource] = field(default_factory=list)

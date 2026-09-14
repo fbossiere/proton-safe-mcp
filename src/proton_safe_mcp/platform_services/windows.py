@@ -32,7 +32,7 @@ from .base import (
     SessionFacts,
     UnsupportedPlatformError,
 )
-from .winacl import private_descriptor, private_sddl
+from .winacl import assess_privacy, private_descriptor, private_sddl
 
 #: Windows 11 starts at build 22000. Windows 10 is a deliberate product exclusion.
 MINIMUM_BUILD: Final = 22000
@@ -366,10 +366,12 @@ class WindowsLineReader(LineReader):
     away from. The child is terminated by the caller, which is what actually ends it.
     """
 
+    _CHUNK: ClassVar[int] = 16 * 1024
+
     def __init__(self, stream: IO[bytes], *, budget: int) -> None:
         super().__init__(stream, budget=budget)
         self._queue: queue.Queue[bytes | None] = queue.Queue(maxsize=2)
-        self._producer_budget = budget + 1
+        self._allowance = budget + 1
         self._closed = threading.Event()
         self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
@@ -384,15 +386,14 @@ class WindowsLineReader(LineReader):
         return False
 
     def _pump(self) -> None:
-        remaining = self._producer_budget
-        while remaining > 0 and not self._closed.is_set():
+        while self._allowance > 0 and not self._closed.is_set():
             try:
-                chunk = os.read(self._stream.fileno(), min(65536, remaining))
+                chunk = os.read(self._stream.fileno(), min(self._CHUNK, self._allowance))
             except (OSError, ValueError):
                 break
             if not chunk or not self._put(chunk):
                 break
-            remaining -= len(chunk)
+            self._allowance -= len(chunk)
         self._put(None)
 
     def _receive(self, timeout: float) -> bytes | None:
@@ -485,6 +486,13 @@ class WindowsServices(PlatformServices):
             )
         existed = directory.is_dir()
         directory.mkdir(parents=True, exist_ok=True)
+        if (
+            existed
+            and not assess_privacy(
+                describe_security(directory), user_sid=current_user_sid()
+            ).owner_ok
+        ):
+            raise PrivacyError("This folder belongs to another account.", code="CONFIG_PERMISSIONS")
         if not existed or not private_descriptor(
             describe_security(directory), current_user_sid(), directory=True
         ):
@@ -586,6 +594,7 @@ class WindowsServices(PlatformServices):
         self.verify_private_directory(path.parent)
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | _O_BINARY | _O_NOINHERIT
         descriptor = os.open(path, flags, 0o600)
+        failed = True
         try:
             # The verified parent restricts inheritance from creation; seal the file
             # before any data is written, then verify Windows accepted the change.
@@ -593,8 +602,12 @@ class WindowsServices(PlatformServices):
             self._require_private(path)
             _write_all(descriptor, data)
             os.fsync(descriptor)
+            failed = False
         finally:
             os.close(descriptor)
+            if failed:
+                with contextlib.suppress(OSError):
+                    path.unlink(missing_ok=True)
 
     def append_to_private_file(self, path: Path, data: bytes) -> None:
         if _is_reparse_point(path):
@@ -656,6 +669,22 @@ class WindowsServices(PlatformServices):
 
     def open_line_reader(self, stream: IO[bytes], *, budget: int) -> LineReader:
         return WindowsLineReader(stream, budget=budget)
+
+    def try_lock(self, descriptor: int) -> bool:
+        """``_locking``, which Windows drops when the handle closes with the process."""
+        import msvcrt  # Windows only, so imported where it is used.
+
+        # Read through getattr for the same reason as the open flags above: this module
+        # is developed and type-checked on Linux, where these names do not exist.
+        locking = getattr(msvcrt, "locking", None)
+        non_blocking = getattr(msvcrt, "LK_NBLCK", None)
+        if locking is None or non_blocking is None:  # pragma: no cover - platform guard
+            return False
+        try:
+            locking(descriptor, non_blocking, 1)
+        except OSError:
+            return False
+        return True
 
     # -- keyring -----------------------------------------------------------------
 

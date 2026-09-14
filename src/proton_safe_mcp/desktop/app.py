@@ -1005,6 +1005,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the desktop assistant."""
     arguments = list(argv) if argv is not None else sys.argv
     if "--verify-bundle" in arguments:
+        # Packaging only. It touches no account state — a temporary directory, and the
+        # embedded resources — so it is the one mode that runs wherever a build does,
+        # including on a CI runner signed in as an administrator.
         index = arguments.index("--config")
         return verify_bundle(Path(arguments[index + 1]).resolve())
 
@@ -1012,12 +1015,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     if platform.session_facts().elevated:
         # The setup writes into one account's own profile and registers a client for
         # that account. Elevated, it would set up an account nobody is signed in as.
+        # Removal is the same account question in reverse: elevated, it would look for
+        # the administrator's configuration, journal and credential, find none, and
+        # report a connection as removed while it stayed exactly where it was.
         code = Code.SESSION_ELEVATED if platform.name == "windows" else Code.SESSION_ROOT
         message, action = explain(str(code), detect_language())
         print(f"{message} {action}", file=sys.stderr)
         return 1
+
     if "--uninstall-connection" in arguments:
         return uninstall_connection(erase_local="--erase-local" in arguments)
+
     # Two assistants would each hold their own view of one configuration, one journal
     # and one client. Asked to open a second time, bring back the first.
     if signal_existing_instance():
@@ -1030,7 +1038,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     window = MainWindow()
     guard = SingleInstanceGuard(window.present)
     if not guard.listen():
-        # Losing the race with another launch is not a reason to open a second window.
+        # Another launch took this account's slot between the check above and here.
+        # Losing that race is not a reason to open a second window: ask the one that
+        # won to come forward, exactly as the early check would have done.
+        signal_existing_instance()
         return 0
     application.aboutToQuit.connect(guard.close)
     window.start()

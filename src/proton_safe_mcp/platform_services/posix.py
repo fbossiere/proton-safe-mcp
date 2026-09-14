@@ -272,6 +272,20 @@ class PosixServices(PlatformServices):
     def open_line_reader(self, stream: IO[bytes], *, budget: int) -> LineReader:
         return PosixLineReader(stream, budget=budget)
 
+    def try_lock(self, descriptor: int) -> bool:
+        """``flock``, which the kernel drops when this process ends, however it ends."""
+        # Imported here, not at the top: Windows imports this module too — the client
+        # inventory reaches it, and so do the tests — and `fcntl` does not exist there.
+        # This mirrors how the Windows module reads its own Win32 names through getattr
+        # so that it stays importable, and type-checkable, on Linux.
+        import fcntl
+
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return False
+        return True
+
 
 def _write_all(descriptor: int, data: bytes) -> None:
     """Write every byte, including when the OS reports a short write."""

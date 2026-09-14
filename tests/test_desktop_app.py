@@ -998,6 +998,30 @@ def test_the_uninstaller_entry_point_reports_a_client_that_refused_removal(
     assert "effac" not in captured.out.lower() and "erased" not in captured.out.lower()
 
 
+def test_the_uninstaller_entry_point_refuses_an_elevated_session(tmp_path, monkeypatch, capsys):
+    """Elevated, it would look for the administrator's account, find none, and report a
+    connection as removed while it stayed exactly where it was."""
+    from proton_safe_mcp.desktop import app as desktop_app
+    from proton_safe_mcp.platform_services import services, use_services
+
+    class Elevated(type(services())):  # type: ignore[misc]
+        def session_facts(self):
+            from proton_safe_mcp.platform_services.base import SessionFacts
+
+            return SessionFacts("test", True)
+
+    def refuse():
+        raise AssertionError("an elevated session must never reach the removal")
+
+    monkeypatch.setattr(desktop_app, "uninstall_connection", lambda **_: refuse())
+
+    with use_services(Elevated()):
+        code = desktop_app.main(["proton-safe-assistant", "--uninstall-connection"])
+
+    assert code == 1
+    assert capsys.readouterr().err.strip()
+
+
 # -- one window per account --------------------------------------------------------
 
 
@@ -1031,6 +1055,60 @@ def test_a_second_launch_raises_the_existing_window_instead_of_opening_another(
     # Once it is gone, the next launch is free to become the running instance.
     assert not signal_existing_instance()
     assert endpoint_name().startswith("proton-safe-assistant-")
+
+
+def test_two_launches_racing_each_other_cannot_both_become_the_running_instance(
+    application, service
+):
+    """Both reach the claim before either is listening — the case a knock cannot catch.
+
+    Asking "is anyone there?" and then claiming the endpoint is two steps, and two
+    launches can each complete the first before either starts the second. Whoever
+    claimed second used to clear the first's live endpoint and listen anyway, leaving
+    two windows over one configuration, one journal and one client.
+    """
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard
+
+    first = SingleInstanceGuard(lambda: None)
+    second = SingleInstanceGuard(lambda: None)
+    try:
+        assert first.listen(), "the first launch takes the slot"
+
+        assert not second.listen(), "the second must not take it as well"
+    finally:
+        second.close()
+        first.close()
+
+
+def test_the_slot_is_free_again_once_the_running_instance_releases_it(application, service):
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard
+
+    first = SingleInstanceGuard(lambda: None)
+    assert first.listen()
+    first.close()
+
+    second = SingleInstanceGuard(lambda: None)
+    try:
+        assert second.listen(), "a released slot is available to the next launch"
+    finally:
+        second.close()
+
+
+def test_an_endpoint_left_by_a_killed_instance_does_not_block_the_next_launch(application, service):
+    """Recovery after an abrupt stop: the lock is gone, so the endpoint is stale."""
+    from PySide6 import QtNetwork
+
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard, endpoint_name
+
+    abandoned = QtNetwork.QLocalServer()
+    assert abandoned.listen(endpoint_name()), "stand in for a process that was killed"
+
+    guard = SingleInstanceGuard(lambda: None)
+    try:
+        assert guard.listen(), "a stale endpoint is cleared once the lock proves it stale"
+    finally:
+        guard.close()
+        abandoned.close()
 
 
 def test_the_endpoint_name_carries_no_readable_personal_detail():

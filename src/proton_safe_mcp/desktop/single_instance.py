@@ -13,7 +13,9 @@ Safe", and the only reaction is to raise the window that already exists.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -24,6 +26,10 @@ from ..platform_services import services
 #: A fixed prefix plus a per-account digest, so two people signed in at once each get
 #: their own endpoint instead of one blocking the other.
 _PREFIX = "proton-safe-assistant"
+
+#: The file whose exclusive lock is the slot itself. It holds no content: what matters
+#: is who has it locked, which the operating system tracks and releases on its own.
+_LOCK_NAME = "single-instance.lock"
 
 
 def endpoint_name() -> str:
@@ -55,38 +61,58 @@ class SingleInstanceGuard(QtCore.QObject):
     def __init__(self, on_raise: Callable[[], None], parent: QtCore.QObject | None = None) -> None:
         super().__init__(parent)
         self._on_raise = on_raise
+        #: The descriptor whose lock is this process's claim on the slot. The operating
+        #: system releases it however this process ends, so it never goes stale.
+        self._lock: int | None = None
         self._server = QtNetwork.QLocalServer(self)
         # This account only. On Windows the pipe's DACL is restricted to the owner; on
         # Linux the socket is created inside the user's own runtime directory.
         self._server.setSocketOptions(QtNetwork.QLocalServer.SocketOption.UserAccessOption)
         self._server.newConnection.connect(self._knocked)
-        directory = services().state_dir() / "assistant"
-        services().ensure_private_directory(directory)
-        self._lock = QtCore.QLockFile(str(directory / f"{endpoint_name()}.lock"))
-        self._lock.setStaleLockTime(0)
-        self._owns_endpoint = False
 
     def listen(self) -> bool:
-        """Claim the endpoint, clearing one left behind by a crash."""
-        if self._owns_endpoint:
+        """Claim this account's assistant slot, or report that one is already taken.
+
+        The endpoint alone cannot decide this. Two launches can each find nothing
+        answering and then each claim the name, the second clearing the first's live
+        endpoint on its way — two windows over one configuration, one journal and one
+        client. So the slot is an exclusive file lock, taken first and held for the life
+        of the process: only the holder goes on to claim the endpoint, and an endpoint
+        found while holding the lock was necessarily left behind by a process that is
+        gone, which is what makes clearing it safe.
+        """
+        if self._lock is not None:
             return True
-        if not self._lock.tryLock(0):
+        platform = services()
+        directory = platform.state_dir() / "assistant"
+        try:
+            platform.ensure_private_directory(directory)
+            handle = os.open(directory / _LOCK_NAME, os.O_RDWR | os.O_CREAT, 0o600)
+        except OSError:
+            # Without somewhere private to put the lock there is nothing to serialise
+            # on, and opening a second window anyway is the worse of the two outcomes.
             return False
+        if not platform.try_lock(handle):
+            os.close(handle)
+            return False
+        self._lock = handle
         name = endpoint_name()
-        # Only the lock owner can clean a socket left by a crashed process.
-        QtNetwork.QLocalServer.removeServer(name)
-        if self._server.listen(name):
-            self._owns_endpoint = True
-            return True
-        self._lock.unlock()
-        return False
+        if not self._server.listen(name):
+            QtNetwork.QLocalServer.removeServer(name)
+            if not self._server.listen(name):
+                self.close()
+                return False
+        return True
 
     def close(self) -> None:
-        if self._owns_endpoint:
-            self._server.close()
+        self._server.close()
+        if self._lock is not None:
+            # Only ever this process's own endpoint, and only while it still holds the
+            # lock that makes it this process's to remove.
             QtNetwork.QLocalServer.removeServer(endpoint_name())
-            self._owns_endpoint = False
-            self._lock.unlock()
+            with contextlib.suppress(OSError):
+                os.close(self._lock)
+            self._lock = None
 
     def _knocked(self) -> None:
         connection = self._server.nextPendingConnection()

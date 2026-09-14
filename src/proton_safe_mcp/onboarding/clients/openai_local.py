@@ -164,7 +164,7 @@ class OpenAILocalAdapter:
         return executable_candidates(paths)
 
     def profile_path(self) -> Path:
-        return (self._config_home or codex_home()).resolve()
+        return self.profile_dir().resolve()
 
     def _installation_id(self, executable: Path) -> str:
         identity = f"{executable.resolve()}\0{self.profile_path()}"
@@ -246,8 +246,17 @@ class OpenAILocalAdapter:
 
     # -- existing entries --------------------------------------------------------
 
+    def profile_dir(self) -> Path:
+        """The client profile this adapter reads and writes.
+
+        Recorded when an installation is registered, so a later disconnect can tell that
+        it is removing entries from the profile they were added to rather than from
+        whichever one ``CODEX_HOME`` happens to point at now.
+        """
+        return self._config_home or codex_home()
+
     def _config_path(self) -> Path:
-        return (self._config_home or codex_home()) / "config.toml"
+        return self.profile_dir() / "config.toml"
 
     def existing_servers(self) -> dict[str, dict[str, Any]]:
         """Read only the MCP server table of the client's configuration.

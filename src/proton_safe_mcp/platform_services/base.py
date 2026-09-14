@@ -232,6 +232,16 @@ class PlatformServices(ABC):
     def open_line_reader(self, stream: IO[bytes], *, budget: int) -> LineReader:
         """Wrap a child's stdout so frames can be read under a deadline."""
 
+    @abstractmethod
+    def try_lock(self, descriptor: int) -> bool:
+        """Take an exclusive lock on an open file, or return False without waiting.
+
+        The lock is held by the process, not by the file's contents, so the operating
+        system releases it however the process ends — including a power cut, which is
+        what makes it safe to conclude that anything left behind by an unlocked holder
+        is stale. Two launches racing each other cannot both succeed.
+        """
+
     # -- keyring -----------------------------------------------------------------
 
     def configure_keyring(self, backend: object) -> None:

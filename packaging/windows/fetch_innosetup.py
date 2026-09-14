@@ -95,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Downloading Inno Setup {version}…")
     payload = download(lock["url"])
+    if len(payload) != int(lock["size"]):
+        return 1
     digest = hashlib.sha256(payload).hexdigest()
     if digest != lock["sha256"].lower():
         print(
