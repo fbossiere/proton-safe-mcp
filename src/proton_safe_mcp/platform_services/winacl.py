@@ -233,3 +233,35 @@ def allowed_sids_for(user_sid: str) -> frozenset[str]:
     return frozenset(
         {user_sid, SYSTEM_SID, ADMINISTRATORS_SID, CREATOR_OWNER_SID, OWNER_RIGHTS_SID}
     )
+
+
+def private_descriptor(sddl: str, user_sid: str, *, directory: bool = False) -> bool:
+    """Accept only a complete, protected DACL owned by this account.
+
+    Unknown/conditional ACE syntax fails closed. A null DACL grants everyone full
+    access; it is never equivalent to an empty DACL or evidence of privacy.
+    """
+    owner, aces, protected = parse_security_descriptor(sddl)
+    body = split_sections(sddl).get("D", "")
+    if owner != user_sid or not protected or not aces:
+        return False
+    flags = body.split("(", 1)[0]
+    if not re.fullmatch(r"(?:P|AI|AR)*", flags):
+        return False
+    raw_entries = _ACE_RE.findall(body)
+    if body != flags + "".join(f"({raw})" for raw in raw_entries):
+        return False
+    if any(len(raw.split(";")) != 6 for raw in raw_entries):
+        return False
+    if any(ace.kind not in {"A", "D"} for ace in aces):
+        return False
+    if foreign_grants(sddl, allowed_sids=allowed_sids_for(user_sid)):
+        return False
+    return any(
+        ace.kind == "A"
+        and ace.sid == user_sid
+        and "IO" not in ace.flags
+        and (not directory or ("OI" in ace.flags and "CI" in ace.flags))
+        and ace.mask & 0x001F01FF == 0x001F01FF
+        for ace in aces
+    )

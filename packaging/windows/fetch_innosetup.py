@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -37,11 +39,15 @@ def read_lock() -> dict[str, str]:
 
 def pinned(lock: dict[str, str]) -> bool:
     digest = lock.get("sha256", "")
-    return len(digest) == 64 and all(character in "0123456789abcdef" for character in digest)
+    return bool(re.fullmatch(r"[0-9a-fA-F]{64}", digest))
 
 
 def download(url: str) -> bytes:
-    if not url.startswith("https://files.jrsoftware.org/"):
+    if not re.fullmatch(
+        r"https://github\.com/jrsoftware/issrc/releases/download/is-[0-9_]+/"
+        r"innosetup-[0-9.]+-x64\.exe",
+        url,
+    ):
         raise SystemExit("the compiler is only ever fetched from its publisher's own host")
     with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 - host checked
         data = response.read(MAX_BYTES + 1)
@@ -72,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
             f"Inno Setup {version}: digest {'pinned' if ready else 'NOT pinned'}",
             file=sys.stdout if ready else sys.stderr,
         )
-        return 0
+        return 0 if ready else 1
 
     if not arguments.install:
         parser.print_help()
@@ -90,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Downloading Inno Setup {version}…")
     payload = download(lock["url"])
     digest = hashlib.sha256(payload).hexdigest()
-    if digest != lock["sha256"]:
+    if digest != lock["sha256"].lower():
         print(
             f"the download does not match the pinned digest\n  expected {lock['sha256']}\n"
             f"  received {digest}",
@@ -102,9 +108,26 @@ def main(argv: list[str] | None = None) -> int:
         installer = Path(workspace) / f"innosetup-{version}.exe"
         installer.write_bytes(payload)
         print(f"Verified {digest}; installing…")
+        # Windows validates the certificate chain and the publisher, not merely a
+        # digest obtained from the same download location.
+        verification = subprocess.run(  # noqa: S603 - fixed script and argv
+            [
+                shutil.which("pwsh") or "pwsh",
+                "-NoProfile",
+                "-File",
+                str(LOCK.with_name("verify_publisher.ps1")),
+                "-Path",
+                str(installer),
+            ],
+            check=False,
+            timeout=120,
+        )
+        if verification.returncode != 0:
+            return 1
         completed = subprocess.run(  # noqa: S603 - fixed argv, no shell
             [str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-"],
             check=False,
+            timeout=180,
         )
     if completed.returncode != 0:
         print(f"the compiler installer exited with {completed.returncode}", file=sys.stderr)

@@ -143,7 +143,9 @@ class _InMemoryKeyring(keyring.backend.KeyringBackend):
             raise keyring.errors.PasswordDeleteError("absent")
 
 
-_InMemoryKeyring.__module__ = "keyring.backends.SecretService"
+_InMemoryKeyring.__module__ = (
+    "keyring.backends.Windows" if sys.platform == "win32" else "keyring.backends.SecretService"
+)
 
 
 @pytest.fixture
@@ -176,7 +178,9 @@ def unavailable_keyring(monkeypatch):
 def managed_config_path(tmp_path):
     """An absolute path inside a private directory, as the assistant would create."""
     directory = tmp_path / "config" / "proton-safe-mcp"
-    directory.mkdir(mode=0o700, parents=True)
+    from proton_safe_mcp.platform_services import services
+
+    services().ensure_private_directory(directory)
     return directory / "config.toml"
 
 

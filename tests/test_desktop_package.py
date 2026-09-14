@@ -66,15 +66,14 @@ def test_the_desktop_entry_passes_no_user_value_on_the_command_line(desktop_entr
 # -- locating the runtime inside a bundle -----------------------------------------
 
 
-def test_the_runtime_is_found_beside_the_assistant_in_a_bundle(tmp_path, monkeypatch):
+def test_the_runtime_is_found_beside_the_assistant_in_a_bundle(
+    tmp_path, monkeypatch, make_executable
+):
     """The packaged layout: both executables sit in the same directory."""
     bundle = tmp_path / "opt" / "proton-safe-assistant"
     bundle.mkdir(parents=True)
-    assistant = bundle / "proton-safe-assistant"
-    runtime = bundle / "proton-safe-mcp"
-    for executable in (assistant, runtime):
-        executable.write_text("#!/bin/sh\n")
-        executable.chmod(0o700)
+    assistant = make_executable(bundle, "proton-safe-assistant")
+    runtime = make_executable(bundle, "proton-safe-mcp")
     monkeypatch.setattr(sys, "executable", str(assistant))
 
     located = locate_runtime()

@@ -10,6 +10,7 @@ import pytest
 from proton_safe_mcp import configuration_store as store
 from proton_safe_mcp.errors import ConfigurationError
 from proton_safe_mcp.platform_services import posix as posix_services
+from proton_safe_mcp.platform_services import services
 
 
 def _read_code(path):
@@ -56,7 +57,7 @@ def test_no_credential_or_host_is_ever_rendered(write_managed_config, managed_co
 
 def test_a_missing_file_is_refused_without_creating_anything(tmp_path):
     directory = tmp_path / "config" / "proton-safe-mcp"
-    directory.mkdir(mode=0o700, parents=True)
+    services().ensure_private_directory(directory)
     target = directory / "config.toml"
 
     assert _read_code(target) == "CONFIG_MISSING"
@@ -101,7 +102,7 @@ def test_a_world_readable_directory_is_refused(write_managed_config, managed_con
 
 def test_a_directory_in_place_of_the_file_is_refused(tmp_path):
     directory = tmp_path / "config" / "proton-safe-mcp"
-    directory.mkdir(mode=0o700, parents=True)
+    services().ensure_private_directory(directory)
     target = directory / "config.toml"
     target.mkdir(mode=0o700)
 
@@ -112,7 +113,7 @@ def test_a_future_schema_version_is_refused_without_rewriting(managed_config_pat
     managed_config_path.write_text(
         "schema_version = 99\n[bridge]\nuser = 'person@example.com'\n", encoding="utf-8"
     )
-    managed_config_path.chmod(0o600)
+    services().secure_existing_path(managed_config_path)
     before = managed_config_path.read_bytes()
 
     assert _read_code(managed_config_path) == "CONFIG_SCHEMA_UNSUPPORTED"
@@ -142,14 +143,14 @@ def test_a_future_schema_version_is_refused_without_rewriting(managed_config_pat
 )
 def test_the_schema_is_closed(managed_config_path, body):
     managed_config_path.write_text(body, encoding="utf-8")
-    managed_config_path.chmod(0o600)
+    services().secure_existing_path(managed_config_path)
 
     assert _read_code(managed_config_path) is not None
 
 
 def test_an_oversized_file_is_refused(managed_config_path):
     managed_config_path.write_text("# " + "x" * store.MAX_CONFIG_BYTES + "\n", encoding="utf-8")
-    managed_config_path.chmod(0o600)
+    services().secure_existing_path(managed_config_path)
 
     assert _read_code(managed_config_path) == "CONFIG_INVALID"
 

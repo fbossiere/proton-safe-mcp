@@ -132,11 +132,13 @@ These names sit alongside the Ubuntu `BUILD-PROVENANCE.txt`; neither overwrites 
 ### The pinned compiler
 
 `packaging/windows/innosetup.lock` records the Inno Setup version, its download URL and
-its SHA-256. **The digest is deliberately unset.** Filling it in means someone downloaded
-that exact file from jrsoftware.org, checked the publisher's Authenticode signature on it,
-and recorded what they actually received. Until then
-`packaging/windows/fetch_innosetup.py` refuses to download, and the CI job reports that no
-installer was built rather than building one with an unverified tool.
+its SHA-256. Version 7.1.0 x64 was downloaded from the publisher's immutable GitHub
+release and its release attestation verified on 14 September 2026. Before executing the
+compiler installer, the build also checks its Authenticode chain and publisher
+**Pyrsys B.V.** An absent or invalid digest fails the job. Every Windows packaging job
+must build the setup and exercise installation, repair and uninstall, including a failed
+disconnection and a successful retry, under a disposable standard account.
+See the [publisher's verification instructions](https://jrsoftware.org/isdl-verify.php).
 
 ### Signing
 

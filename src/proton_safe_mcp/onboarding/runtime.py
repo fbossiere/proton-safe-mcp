@@ -184,6 +184,7 @@ def _handshake(process: subprocess.Popen[bytes], *, timeout: float) -> Outcome:
     try:
         return _exchange(process, reader, deadline)
     finally:
+        _terminate(process)
         reader.close()
 
 

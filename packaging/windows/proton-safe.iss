@@ -126,7 +126,7 @@ fr.NotWindows11=Proton Safe nécessite Windows 11 en 64 bits (x64). Windows 10, 
 fr.Elevated=Cet installateur doit être lancé depuis votre compte Windows habituel, sans « Exécuter en tant qu'administrateur » : Proton Safe s'installe pour le compte qui le lance.
 fr.RemovingConnection=Retrait de la connexion dans votre assistant…
 fr.EraseData=Effacer aussi les réglages et le mot de passe Bridge enregistrés par Proton Safe
-fr.RemovalIncomplete=La connexion n'a pas pu être entièrement retirée de votre assistant. Vos réglages et votre mot de passe sont conservés pour pouvoir réessayer. Une entrée peut subsister dans votre assistant.
+fr.RemovalIncomplete=Le programme et vos données seront conservés en cas d'annulation. Réessayer le retrait ? La connexion n'a pas pu être entièrement retirée de votre assistant. Vos réglages et votre mot de passe sont conservés pour pouvoir réessayer. Une entrée peut subsister dans votre assistant.
 
 en.AppTitle=Install Proton Safe
 en.AppIntro=Connect Proton Mail to your assistant. Proton Safe installs for your Windows account only.
@@ -141,7 +141,7 @@ en.NotWindows11=Proton Safe needs Windows 11 on 64-bit (x64). Windows 10, 32-bit
 en.Elevated=Run this installer from your usual Windows account, without "Run as administrator": Proton Safe installs for the account that starts it.
 en.RemovingConnection=Removing the connection from your assistant…
 en.EraseData=Also erase the settings and the Bridge password saved by Proton Safe
-en.RemovalIncomplete=The connection could not be fully removed from your assistant. Your settings and password are kept so you can try again. An entry may remain in your assistant.
+en.RemovalIncomplete=Cancel will keep the program and your data. Retry removal? The connection could not be fully removed from your assistant. Your settings and password are kept so you can try again. An entry may remain in your assistant.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -199,9 +199,10 @@ begin
 
   { An elevated run would install into the administrator's profile, leaving the person
     actually signed in with no Proton Safe at all. }
-  if IsAdminInstallMode then
+  if IsAdmin then
   begin
-    MsgBox(ExpandConstant('{cm:Elevated}'), mbCriticalError, MB_OK);
+    if not WizardSilent then
+      MsgBox(ExpandConstant('{cm:Elevated}'), mbCriticalError, MB_OK);
     Result := False;
     Exit;
   end;
@@ -247,45 +248,46 @@ end;
 
 function InitializeUninstall(): Boolean;
 begin
-  Result := True;
+  Result := not IsAdmin;
+  if not Result then
+  begin
+    Log('Elevated uninstall refused');
+    if not UninstallSilent then
+      MsgBox(ExpandConstant('{cm:Elevated}'), mbCriticalError, MB_OK);
+  end;
   EraseChosen := False;
-
-  { Default: keep the settings and the password so a reinstall finds them. Erasing is
-    an explicit, opt-in choice, and it is carried out by the assistant, the only
-    component that knows which entries Proton Safe actually created. }
-  if not UninstallSilent then
-    EraseChosen := MsgBox(ExpandConstant('{cm:EraseData}'), mbConfirmation, MB_YESNO) = IDYES;
-end;
-
-procedure InitializeUninstallProgressForm();
-begin
-  UninstallProgressForm.StatusLabel.Caption := ExpandConstant('{cm:RemovingConnection}');
 end;
 
 procedure CurUninstallStepChanged(CurStep: TUninstallStep);
 var
   Assistant, Parameters: String;
-  ResultCode: Integer;
+  ResultCode, Choice: Integer;
 begin
   if CurStep <> usUninstall then
     Exit;
 
-  { The assistant owns client registrations, Credential Manager and the configuration
-    format. The uninstaller asks it to disconnect rather than reimplementing any of
-    that, and it reads the exit code: a client that refused the removal must not be
-    reported as disconnected. What is kept when the removal is incomplete are the
-    settings, the password and the journal, which are exactly what a retry needs. }
+  { This runs after confirmation, before Inno removes any program file. Raising an
+    exception aborts uninstall with a nonzero exit code, including silent runs. }
+  if not UninstallSilent then
+    EraseChosen := MsgBox(ExpandConstant('{cm:EraseData}'), mbConfirmation,
+      MB_YESNO or MB_DEFBUTTON2) = IDYES;
   Assistant := ExpandConstant('{app}\{#AssistantExe}');
-  if not FileExists(Assistant) then
-    Exit;
-
   Parameters := '--uninstall-connection';
   if EraseChosen then
     Parameters := Parameters + ' --erase-local';
-
-  if not Exec(Assistant, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  repeat
     ResultCode := 1;
-
-  if (ResultCode <> 0) and (not UninstallSilent) then
-    MsgBox(ExpandConstant('{cm:RemovalIncomplete}'), mbInformation, MB_OK);
+    if FileExists(Assistant) then
+      if not Exec(Assistant, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+        ResultCode := 1;
+    if ResultCode = 0 then
+      Exit;
+    Log('Client removal failed; retaining program files and installation state');
+    if UninstallSilent then
+      RaiseException(ExpandConstant('{cm:RemovalIncomplete}'));
+    Choice := MsgBox(ExpandConstant('{cm:RemovalIncomplete}'), mbError,
+      MB_RETRYCANCEL or MB_DEFBUTTON2);
+    if Choice <> IDRETRY then
+      RaiseException(ExpandConstant('{cm:RemovalIncomplete}'));
+  until False;
 end;

@@ -29,7 +29,11 @@ from proton_safe_mcp.desktop.widgets import (  # noqa: E402
     Disclosure,
     SecretField,
 )
-from proton_safe_mcp.onboarding.messages import OFFICIAL_LINKS, translate  # noqa: E402
+from proton_safe_mcp.onboarding.messages import (  # noqa: E402
+    OFFICIAL_LINKS,
+    explain,
+    translate,
+)
 from proton_safe_mcp.onboarding.models import Check, Code, InstallState  # noqa: E402
 from proton_safe_mcp.onboarding.service import SetupService, Snapshot  # noqa: E402
 
@@ -41,6 +45,13 @@ INTERACTIVE = (
     QtWidgets.QCheckBox,
     QtWidgets.QListWidget,
 )
+
+
+@pytest.fixture(autouse=True)
+def ordinary_desktop_session(monkeypatch):
+    from proton_safe_mcp.platform_services import SessionFacts, services
+
+    monkeypatch.setattr(services(), "session_facts", lambda: SessionFacts("test desktop", False))
 
 
 @pytest.fixture(scope="session")
@@ -160,7 +171,7 @@ def test_a_status_is_never_carried_by_colour_alone():
     description = row.accessibleDescription()
     marks = row.findChildren(QtWidgets.QLabel)
     assert translate("status.fail", "fr") in description
-    assert "verrouillé" in description
+    assert explain("KEYRING_LOCKED", "fr")[0] in description
     assert marks[0].text() == STATUS_MARKS["fail"]
     # Distinct statuses produce distinct text and a distinct mark, not just a colour.
     row.show_check(Check("keyring", "pass", Code.KEYRING_AVAILABLE))
@@ -298,7 +309,7 @@ def test_a_failed_operation_shows_a_translated_code_not_a_raw_message(
     text = window.screens["prerequisites"].status.text()
 
     assert "/home/someone/private" not in text
-    assert "verrouillé" in text
+    assert explain("KEYRING_LOCKED", "fr")[0] in text
 
 
 def test_cancelling_a_running_operation_reports_it_as_cancelled(window, application):
@@ -991,8 +1002,11 @@ def test_the_uninstaller_entry_point_reports_a_client_that_refused_removal(
 
 
 def test_a_second_launch_raises_the_existing_window_instead_of_opening_another(
-    application, service
+    application, service, monkeypatch, tmp_path
 ):
+    from proton_safe_mcp.platform_services import services
+
+    monkeypatch.setattr(services(), "state_dir", lambda: tmp_path / "state")
     """Two assistants would each hold their own view of one configuration and journal."""
     from proton_safe_mcp.desktop.single_instance import (
         SingleInstanceGuard,
@@ -1026,3 +1040,37 @@ def test_the_endpoint_name_carries_no_readable_personal_detail():
 
     assert "/" not in name and "\\" not in name
     assert str(Path.home().name) not in name
+
+
+def test_two_contending_guards_cannot_both_own_the_endpoint(application, tmp_path, monkeypatch):
+    from proton_safe_mcp.desktop.single_instance import (
+        SingleInstanceGuard,
+        signal_existing_instance,
+    )
+    from proton_safe_mcp.platform_services import services
+
+    monkeypatch.setattr(services(), "state_dir", lambda: tmp_path / "state")
+    first, second = SingleInstanceGuard(lambda: None), SingleInstanceGuard(lambda: None)
+    try:
+        assert first.listen()
+        assert not second.listen()
+        second.close()
+        assert signal_existing_instance(), "closing the loser must not unlink the winner"
+        first.close()
+        assert second.listen(), "the next launch can claim a released lock"
+    finally:
+        first.close()
+        second.close()
+
+
+def test_uninstall_entry_point_refuses_elevation_before_touching_state(monkeypatch):
+    from proton_safe_mcp.desktop import app
+    from proton_safe_mcp.platform_services import SessionFacts, services
+
+    monkeypatch.setattr(services(), "session_facts", lambda: SessionFacts("Windows", True))
+
+    def forbidden(**kwargs):
+        pytest.fail("an elevated process must never begin disconnecting")
+
+    monkeypatch.setattr(app, "uninstall_connection", forbidden)
+    assert app.main(["proton-safe-assistant", "--uninstall-connection"]) == 1

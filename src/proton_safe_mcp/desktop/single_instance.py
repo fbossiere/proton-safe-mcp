@@ -19,6 +19,8 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtNetwork
 
+from ..platform_services import services
+
 #: A fixed prefix plus a per-account digest, so two people signed in at once each get
 #: their own endpoint instead of one blocking the other.
 _PREFIX = "proton-safe-assistant"
@@ -58,20 +60,33 @@ class SingleInstanceGuard(QtCore.QObject):
         # Linux the socket is created inside the user's own runtime directory.
         self._server.setSocketOptions(QtNetwork.QLocalServer.SocketOption.UserAccessOption)
         self._server.newConnection.connect(self._knocked)
+        directory = services().state_dir() / "assistant"
+        services().ensure_private_directory(directory)
+        self._lock = QtCore.QLockFile(str(directory / f"{endpoint_name()}.lock"))
+        self._lock.setStaleLockTime(0)
+        self._owns_endpoint = False
 
     def listen(self) -> bool:
         """Claim the endpoint, clearing one left behind by a crash."""
-        name = endpoint_name()
-        if self._server.listen(name):
+        if self._owns_endpoint:
             return True
-        # A previous run that was killed can leave a stale endpoint. Removing it is safe
-        # here precisely because the caller has already checked that nothing answers.
+        if not self._lock.tryLock(0):
+            return False
+        name = endpoint_name()
+        # Only the lock owner can clean a socket left by a crashed process.
         QtNetwork.QLocalServer.removeServer(name)
-        return bool(self._server.listen(name))
+        if self._server.listen(name):
+            self._owns_endpoint = True
+            return True
+        self._lock.unlock()
+        return False
 
     def close(self) -> None:
-        self._server.close()
-        QtNetwork.QLocalServer.removeServer(endpoint_name())
+        if self._owns_endpoint:
+            self._server.close()
+            QtNetwork.QLocalServer.removeServer(endpoint_name())
+            self._owns_endpoint = False
+            self._lock.unlock()
 
     def _knocked(self) -> None:
         connection = self._server.nextPendingConnection()

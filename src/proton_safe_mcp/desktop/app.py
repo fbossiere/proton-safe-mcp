@@ -1007,8 +1007,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if "--verify-bundle" in arguments:
         index = arguments.index("--config")
         return verify_bundle(Path(arguments[index + 1]).resolve())
-    if "--uninstall-connection" in arguments:
-        return uninstall_connection(erase_local="--erase-local" in arguments)
 
     platform = services()
     if platform.session_facts().elevated:
@@ -1018,6 +1016,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         message, action = explain(str(code), detect_language())
         print(f"{message} {action}", file=sys.stderr)
         return 1
+    if "--uninstall-connection" in arguments:
+        return uninstall_connection(erase_local="--erase-local" in arguments)
     # Two assistants would each hold their own view of one configuration, one journal
     # and one client. Asked to open a second time, bring back the first.
     if signal_existing_instance():

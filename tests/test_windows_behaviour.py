@@ -332,6 +332,7 @@ def test_an_elevated_run_is_explained_before_anything_is_written(as_windows, lan
     assert "administra" in (message + action).lower()
 
 
+@pytest.mark.posix_only
 def test_the_linux_wording_is_untouched_by_the_windows_overlay():
     """The overlay must never leak into the Ubuntu build's text."""
     _message, action = messages.explain(str(Code.SYSTEM_UNSUPPORTED), "fr")

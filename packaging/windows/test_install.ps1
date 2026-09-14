@@ -21,11 +21,13 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $InstallerPath = ""
+    [string] $InstallerPath = "",
+    [Parameter(Mandatory)][string] $TestPython
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "process.ps1")
 
 $Root    = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $DistDir = Join-Path $Root "dist\windows"
@@ -39,11 +41,10 @@ function Fail([string] $Message) { Write-Error $Message; exit 1 }
 
 function Invoke-Installer([string] $Path, [string[]] $Arguments, [string] $What) {
     $log = Join-Path ([System.IO.Path]::GetTempPath()) "proton-safe-$What.log"
-    $process = Start-Process -FilePath $Path -ArgumentList ($Arguments + "/LOG=$log") `
-        -Wait -PassThru -NoNewWindow
-    if ($process.ExitCode -ne 0) {
+    $exitCode = Invoke-NativeProcess $Path ($Arguments + "/LOG=$log")
+    if ($exitCode -ne 0) {
         if (Test-Path $log) { Get-Content $log -Tail 40 | Write-Host }
-        Fail "$What returned $($process.ExitCode); it must return 0 unattended."
+        Fail "$What returned $exitCode; it must return 0 unattended."
     }
 }
 
@@ -103,16 +104,27 @@ Step "Reinstalling the same version unattended"
 Invoke-Installer $InstallerPath $Silent "reinstall"
 if (-not (Test-Path $RegKey)) { Fail "the reinstall lost the uninstall entry." }
 $entries = @(Get-ChildItem "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall" |
-    Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq "Proton Safe" })
+    Where-Object { $property = (Get-ItemProperty $_.PSPath).PSObject.Properties["DisplayName"]; $property -and $property.Value -eq "Proton Safe" })
 if ($entries.Count -ne 1) {
     Fail "expected exactly one installed-applications entry, found $($entries.Count)."
 }
 
 # -- uninstall --------------------------------------------------------------------
 
-Step "Uninstalling unattended"
+Step "Refusing uninstall when the managed client cannot be disconnected"
 $uninstaller = Join-Path $AppDir "unins000.exe"
-if (-not (Test-Path $uninstaller)) { Fail "no uninstaller was installed." }
+$marker = Join-Path $env:LOCALAPPDATA "Proton Safe\settings-kept.txt"
+& $TestPython -c "from proton_safe_mcp.onboarding.journal import Journal, ManagedResource, write; write(Journal(client_id='missing-client', resources=[ManagedResource('plugin', 'proton-safe@test', 'openai-local')]))"
+if ($LASTEXITCODE -ne 0) { Fail "Could not arrange the failed-removal scenario." }
+'keep these settings' | Set-Content $marker
+$refused = Invoke-NativeProcess $uninstaller $Silent
+if ($refused -eq 0) { Fail "A failed client removal must fail the uninstall." }
+if (-not (Test-Path (Join-Path $AppDir 'proton-safe-assistant.exe')) -or -not (Test-Path $RegKey)) {
+    Fail "A failed uninstall removed the program or its registration."
+}
+& $TestPython -c "from proton_safe_mcp.onboarding.journal import read, clear; assert read().resources; clear()"
+if ($LASTEXITCODE -ne 0) { Fail "A failed uninstall lost its recovery journal." }
+Step "Retrying uninstall after the client problem is resolved"
 Invoke-Installer $uninstaller $Silent "uninstall"
 
 if (Test-Path (Join-Path $AppDir "proton-safe-assistant.exe")) {
@@ -120,15 +132,8 @@ if (Test-Path (Join-Path $AppDir "proton-safe-assistant.exe")) {
 }
 if (Test-Path $RegKey) { Fail "the uninstall left its installed-applications entry behind." }
 
-# Nothing was ever configured in this run, so nothing should have been created on the
-# way out either: an uninstall must not leave state behind that a fresh install then
-# has to reason about.
-$settings = Join-Path $env:LOCALAPPDATA "Proton Safe"
-if (Test-Path $settings) {
-    $left = Get-ChildItem -Recurse -File $settings -ErrorAction SilentlyContinue
-    if ($left) { Fail "the uninstall left files under $settings for an account that never set up." }
-}
-
+if (-not (Test-Path $marker)) { Fail "Uninstall erased settings without consent." }
+Remove-Item $marker
 Remove-Item -Recurse -Force (Split-Path $config) -ErrorAction SilentlyContinue
 Write-Host ""
 Write-Host "Install, reinstall and uninstall all completed unattended." -ForegroundColor Green

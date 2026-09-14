@@ -193,7 +193,7 @@ jobs:
           if ($signature.Status -ne "Valid") { throw "signature status is $($signature.Status)" }
           Write-Host "Signed by $($signature.SignerCertificate.Subject)"
       - name: Verify the installer installs and uninstalls unattended
-        run: pwsh packaging/windows/test_install.ps1
+        run: pwsh packaging/windows/test_standard_account.ps1
       - name: Show the artefact provenance
         run: Get-Content dist/windows/BUILD-PROVENANCE-windows-x64.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

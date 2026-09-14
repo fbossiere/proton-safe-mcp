@@ -50,6 +50,8 @@ class Journal:
     plugin_dir: str = ""
     client_id: str = ""
     client_adapter: str = ""
+    client_executable: str = ""
+    client_profile: str = ""
     runtime_command: list[str] = field(default_factory=list)
     resources: list[ManagedResource] = field(default_factory=list)
     #: Set only by an explicit "I checked in my assistant" action, never by a probe.

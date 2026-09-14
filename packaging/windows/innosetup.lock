@@ -1,20 +1,7 @@
-# The Inno Setup compiler this project builds its installer with.
-#
-# Pinned, and verified by its digest before it is run, because the compiler decides how
-# the uninstaller is produced, how the architecture directives are enforced and how the
-# signing tool is invoked. None of that may change between two releases without someone
-# deciding that it should.
-#
-# sha256 is deliberately left unset. Filling it in means someone downloaded this exact
-# file from jrsoftware.org, checked the publisher's signature on it, and recorded what
-# they actually got. A digest copied from anywhere else would verify nothing, so the
-# build refuses to run rather than accept a guess.
-#
-# To pin it:
-#     1. download the URL below on a machine you trust;
-#     2. confirm the file's Authenticode signature names Jordan Russell;
-#     3. record its SHA-256 here, and note the date in docs/windows-acceptance.md.
-
+# Verified 2026-09-14 using the publisher's immutable GitHub release attestation:
+# gh release verify-asset innosetup-7.1.0-x64.exe --repo jrsoftware/issrc
+# https://jrsoftware.org/isdl-verify.php
+# Authenticode publisher Pyrsys B.V. is checked again before execution on Windows.
 version = 7.1.0
-url = https://files.jrsoftware.org/is/7/innosetup-7.1.0.exe
-sha256 =
+url = https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
+sha256 = 0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f

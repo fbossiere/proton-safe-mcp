@@ -37,6 +37,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "process.ps1")
 
 $Root       = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $BuildDir   = Join-Path $Root "build\windows"
@@ -96,7 +97,7 @@ foreach ($required in @($Assistant, $Runtime)) {
 # Python modules live inside the archive and cannot be found on disk.
 
 Step "Verifying the bundled runtime and its embedded resources"
-$Verify = Join-Path ([System.IO.Path]::GetTempPath()) ("proton-safe-verify-" + [guid]::NewGuid())
+$Verify = Join-Path ([System.IO.Path]::GetTempPath()) ("proton safe vérification-" + [guid]::NewGuid())
 $ConfigDir = Join-Path $Verify "config"
 New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
 $ConfigFile = Join-Path $ConfigDir "config.toml"
@@ -125,14 +126,10 @@ try {
     # executable, and PowerShell does not wait for one of those. Called with `&`, this
     # check would read $LASTEXITCODE from a process that had not finished, and would
     # pass whatever the bundle turned out to be missing.
-    $check = Start-Process -FilePath $Assistant `
-        -ArgumentList @("--verify-bundle", "--config", $ConfigFile) -Wait -PassThru
-    if ($check.ExitCode -ne 0) {
-        # A windowed build has no stream to report on, so the exit code is the whole
-        # message: 1 means a skill, the plugin resources, the credential backend or the
-        # embedded runtime did not travel with the bundle.
-        Fail "bundle self-verification failed (exit $($check.ExitCode))"
-    }
+    $exitCode = Invoke-NativeProcess -FilePath $Assistant -Arguments @(
+        "--verify-bundle", "--config", $ConfigFile
+    )
+    if ($exitCode -ne 0) { Fail "bundle self-verification failed (exit $exitCode)" }
 } finally {
     Remove-Item Env:\PROTON_MCP_STATE_DIR -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $Verify -ErrorAction SilentlyContinue
@@ -163,7 +160,8 @@ if (-not $SkipInstaller) {
     if (-not $IsccPath) {
         $candidates = @(
             "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
-            "${env:ProgramFiles}\Inno Setup 7\ISCC.exe"
+            "${env:ProgramFiles}\Inno Setup 7\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 7 x64\ISCC.exe"
         )
         $IsccPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     }

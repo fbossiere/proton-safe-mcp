@@ -36,7 +36,7 @@ def _script(tmp_path: Path, name: str, body: str) -> Path:
 def test_a_command_that_succeeds_returns_its_output(tmp_path):
     script = _script(tmp_path, "ok", "print('codex-cli 1.4.0')\n")
 
-    result = run_command([str(script)])
+    result = run_command([sys.executable, str(script)])
 
     assert result.ok
     assert result.returncode == 0
@@ -46,7 +46,7 @@ def test_a_command_that_succeeds_returns_its_output(tmp_path):
 def test_a_failing_command_is_reported_without_raising(tmp_path):
     script = _script(tmp_path, "bad", "import sys\nsys.exit(2)\n")
 
-    result = run_command([str(script)])
+    result = run_command([sys.executable, str(script)])
 
     assert not result.ok
     assert result.returncode == 2
@@ -56,7 +56,7 @@ def test_a_failing_command_is_reported_without_raising(tmp_path):
 def test_a_hanging_command_is_stopped_by_its_deadline(tmp_path):
     script = _script(tmp_path, "hang", "import time\ntime.sleep(30)\n")
 
-    result = run_command([str(script)], timeout=1.0)
+    result = run_command([sys.executable, str(script)], timeout=1.0)
 
     assert not result.ok
     assert result.timed_out
@@ -66,7 +66,7 @@ def test_a_hanging_command_is_stopped_by_its_deadline(tmp_path):
 def test_a_flooding_command_cannot_exhaust_memory(tmp_path):
     script = _script(tmp_path, "flood", "import sys\nsys.stdout.write('x' * (4 * 1024 * 1024))\n")
 
-    result = run_command([str(script)], timeout=30.0)
+    result = run_command([sys.executable, str(script)], timeout=30.0)
 
     assert len(result.stdout) <= 2 * MAX_OUTPUT_BYTES + 1
 
@@ -78,7 +78,7 @@ def test_stderr_is_captured_too_so_a_refusal_is_classified(tmp_path):
         "import sys\nsys.stderr.write('unrecognized subcommand')\nsys.exit(1)\n",
     )
 
-    result = run_command([str(script)])
+    result = run_command([sys.executable, str(script)])
 
     assert not result.ok
     assert "unrecognized subcommand" in result.stdout
@@ -106,7 +106,7 @@ def test_arguments_never_reach_a_shell(tmp_path):
     marker = tmp_path / "pwned"
     script = _script(tmp_path, "echoer", "import sys\nprint(repr(sys.argv[1:]))\n")
 
-    result = run_command([str(script), f"; touch {marker}"])
+    result = run_command([sys.executable, str(script), f"; touch {marker}"])
 
     assert result.ok
     assert not marker.exists()
@@ -118,7 +118,7 @@ def test_the_child_environment_carries_no_proton_value(tmp_path, monkeypatch):
     monkeypatch.setenv("PROTON_BRIDGE_PASSWORD", "leaked-secret")
     script = _script(tmp_path, "dumper", "import os\nprint(' '.join(sorted(os.environ)))\n")
 
-    result = run_command([str(script)])
+    result = run_command([sys.executable, str(script)])
 
     assert "PROTON_BRIDGE_USER" not in result.stdout
     assert "PROTON_BRIDGE_PASSWORD" not in result.stdout
@@ -128,8 +128,8 @@ def test_the_child_environment_carries_no_proton_value(tmp_path, monkeypatch):
 # -- candidate selection -----------------------------------------------------------
 
 
-def test_only_real_executable_files_become_candidates(tmp_path):
-    executable = _script(tmp_path, "codex", "print('x')\n")
+def test_only_real_executable_files_become_candidates(tmp_path, make_executable):
+    executable = make_executable(tmp_path, "codex")
     not_executable = tmp_path / "codex-text"
     not_executable.write_text("#!/bin/sh\n")
     not_executable.chmod(0o600)
@@ -247,14 +247,15 @@ def test_a_missing_bridge_application_warns_rather_than_blocking(monkeypatch):
     assert check.code is Code.BRIDGE_APP_UNKNOWN
 
 
-def test_a_detected_bridge_application_passes(monkeypatch, tmp_path):
-    bridge = _script(tmp_path, "protonmail-bridge", "print('x')\n")
+def test_a_detected_bridge_application_passes(monkeypatch, tmp_path, make_executable):
+    bridge = make_executable(tmp_path, "protonmail-bridge")
     monkeypatch.setattr(inventory.shutil, "which", lambda _name: None)
-    monkeypatch.setattr(inventory, "BRIDGE_EXECUTABLES", (str(bridge),))
+    monkeypatch.setattr(inventory.shutil, "which", lambda _name: str(bridge))
 
     assert inventory.bridge_check().code is Code.BRIDGE_APP_DETECTED
 
 
+@pytest.mark.posix_only
 def test_a_bridge_desktop_entry_alone_is_enough_to_report_it_installed(monkeypatch, tmp_path):
     entry = tmp_path / "protonmail-bridge.desktop"
     entry.write_text("[Desktop Entry]\n", encoding="utf-8")

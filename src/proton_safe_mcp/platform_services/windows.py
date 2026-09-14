@@ -20,7 +20,9 @@ import stat
 import sys
 import threading
 from ctypes import wintypes
+from functools import lru_cache
 from pathlib import Path, PurePath, PureWindowsPath
+from types import SimpleNamespace
 from typing import IO, Any, ClassVar, Final
 
 from .base import (
@@ -29,9 +31,8 @@ from .base import (
     PrivacyError,
     SessionFacts,
     UnsupportedPlatformError,
-    _chunk_limit,
 )
-from .winacl import allowed_sids_for, foreign_grants, inherits_from_parent, private_sddl
+from .winacl import private_descriptor, private_sddl
 
 #: Windows 11 starts at build 22000. Windows 10 is a deliberate product exclusion.
 MINIMUM_BUILD: Final = 22000
@@ -77,17 +78,63 @@ PRODUCT_FOLDER: Final = "Proton Safe"
 LAUNCHABLE_SUFFIXES: Final = frozenset({".exe", ".com"})
 
 
+@lru_cache(maxsize=1)
 def _require_windows() -> Any:
-    """Return the Windows API namespace, or refuse plainly off Windows.
-
-    ``ctypes.windll`` exists only on Windows, so its absence is the check. Reading it
-    through ``getattr`` is also what keeps this module importable, and type-checkable,
-    on the Linux machine where most of it is written.
-    """
-    windll = getattr(ctypes, "windll", None)
-    if windll is None:  # pragma: no cover - platform guard
+    """Bind pointer-width-correct Win32 signatures and preserve GetLastError."""
+    loader = getattr(ctypes, "WinDLL", None)
+    if loader is None:
         raise UnsupportedPlatformError("This operation needs Windows.", code="SYSTEM_UNSUPPORTED")
-    return windll
+    api = SimpleNamespace(
+        **{
+            name: loader(name, use_last_error=True)
+            for name in ("kernel32", "advapi32", "ole32", "shell32")
+        }
+    )
+    pointer, dword, boolean = ctypes.c_void_p, wintypes.DWORD, wintypes.BOOL
+    signatures: dict[str, dict[str, tuple[Any, list[Any]]]] = {
+        "kernel32": {
+            "GetCurrentProcess": (pointer, []),
+            "CloseHandle": (boolean, [pointer]),
+            "LocalFree": (pointer, [pointer]),
+            "GetNativeSystemInfo": (None, [pointer]),
+        },
+        "advapi32": {
+            "OpenProcessToken": (boolean, [pointer, dword, pointer]),
+            "GetTokenInformation": (boolean, [pointer, dword, pointer, dword, pointer]),
+            "ConvertSidToStringSidW": (boolean, [pointer, pointer]),
+            "GetNamedSecurityInfoW": (
+                dword,
+                [wintypes.LPCWSTR, dword, dword, pointer, pointer, pointer, pointer, pointer],
+            ),
+            "SetNamedSecurityInfoW": (
+                dword,
+                [wintypes.LPCWSTR, dword, dword, pointer, pointer, pointer, pointer],
+            ),
+            "ConvertSecurityDescriptorToStringSecurityDescriptorW": (
+                boolean,
+                [pointer, dword, dword, pointer, pointer],
+            ),
+            "ConvertStringSecurityDescriptorToSecurityDescriptorW": (
+                boolean,
+                [wintypes.LPCWSTR, dword, pointer, pointer],
+            ),
+            "GetSecurityDescriptorDacl": (boolean, [pointer, pointer, pointer, pointer]),
+            "GetSecurityDescriptorOwner": (boolean, [pointer, pointer, pointer]),
+        },
+        "ole32": {
+            "IIDFromString": (ctypes.c_long, [wintypes.LPCWSTR, pointer]),
+            "CoTaskMemFree": (None, [pointer]),
+        },
+        "shell32": {
+            "SHGetKnownFolderPath": (ctypes.c_long, [pointer, dword, pointer, pointer]),
+        },
+    }
+    for library, functions in signatures.items():
+        for name, (result, arguments) in functions.items():
+            function = getattr(getattr(api, library), name)
+            function.restype = result
+            function.argtypes = arguments
+    return api
 
 
 def _last_error(operation: str) -> PrivacyError:
@@ -144,7 +191,7 @@ def is_elevated() -> bool:
     if not windll.advapi32.OpenProcessToken(
         windll.kernel32.GetCurrentProcess(), _TOKEN_QUERY, ctypes.byref(token)
     ):
-        return False
+        raise _last_error("Reading this session's privileges")
     try:
         elevation = wintypes.DWORD()
         size = wintypes.DWORD()
@@ -155,7 +202,7 @@ def is_elevated() -> bool:
             ctypes.sizeof(elevation),
             ctypes.byref(size),
         ):
-            return False
+            raise _last_error("Reading this session's privileges")
         return bool(elevation.value)
     finally:
         windll.kernel32.CloseHandle(token)
@@ -255,7 +302,8 @@ def apply_private_dacl(path: Path, *, directory: bool) -> None:
     a profile with inherited permissions — cannot grant access to this product's files.
     """
     windll = _require_windows()
-    sddl = private_sddl(current_user_sid(), directory=directory)
+    user_sid = current_user_sid()
+    sddl = f"O:{user_sid}" + private_sddl(user_sid, directory=directory)
     descriptor = ctypes.c_void_p()
     if not windll.advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW(
         ctypes.c_wchar_p(sddl), _SDDL_REVISION_1, ctypes.byref(descriptor), None
@@ -269,11 +317,18 @@ def apply_private_dacl(path: Path, *, directory: bool) -> None:
             descriptor, ctypes.byref(present), ctypes.byref(acl), ctypes.byref(defaulted)
         ):
             raise _last_error("Preparing the permissions for this file")
+        owner = ctypes.c_void_p()
+        if not windll.advapi32.GetSecurityDescriptorOwner(
+            descriptor, ctypes.byref(owner), ctypes.byref(defaulted)
+        ):
+            raise _last_error("Preparing file ownership")
         status = windll.advapi32.SetNamedSecurityInfoW(
             ctypes.c_wchar_p(str(path)),
             _SE_FILE_OBJECT,
-            _DACL_SECURITY_INFORMATION | _PROTECTED_DACL_SECURITY_INFORMATION,
-            None,
+            _OWNER_SECURITY_INFORMATION
+            | _DACL_SECURITY_INFORMATION
+            | _PROTECTED_DACL_SECURITY_INFORMATION,
+            owner,
             None,
             acl,
             None,
@@ -313,35 +368,45 @@ class WindowsLineReader(LineReader):
 
     def __init__(self, stream: IO[bytes], *, budget: int) -> None:
         super().__init__(stream, budget=budget)
-        self._queue: queue.Queue[bytes | None] = queue.Queue()
+        self._queue: queue.Queue[bytes | None] = queue.Queue(maxsize=2)
+        self._producer_budget = budget + 1
         self._closed = threading.Event()
         self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
 
-    def _pump(self) -> None:
+    def _put(self, item: bytes | None) -> bool:
         while not self._closed.is_set():
             try:
-                chunk = os.read(self._stream.fileno(), 65536)
+                self._queue.put(item, timeout=0.05)
+                return True
+            except queue.Full:
+                continue
+        return False
+
+    def _pump(self) -> None:
+        remaining = self._producer_budget
+        while remaining > 0 and not self._closed.is_set():
+            try:
+                chunk = os.read(self._stream.fileno(), min(65536, remaining))
             except (OSError, ValueError):
                 break
-            if not chunk:
+            if not chunk or not self._put(chunk):
                 break
-            self._queue.put(chunk)
-        self._queue.put(None)
+            remaining -= len(chunk)
+        self._put(None)
 
     def _receive(self, timeout: float) -> bytes | None:
         try:
             item = self._queue.get(timeout=min(timeout, 0.5))
         except queue.Empty:
             return None
-        if item is None:
-            return b""
-        # The budget is enforced by the caller; a single oversized frame is truncated
-        # here only so one read cannot allocate without bound.
-        return item[: _chunk_limit(self._budget)]
+        return b"" if item is None else item
 
     def close(self) -> None:
         self._closed.set()
+        # The caller terminates the child before closing its reader, so a blocked
+        # native read has reached EOF. A full queue is interruptible via _closed.
+        self._thread.join(timeout=1)
         with contextlib.suppress(OSError, ValueError):
             self._stream.close()
 
@@ -420,10 +485,11 @@ class WindowsServices(PlatformServices):
             )
         existed = directory.is_dir()
         directory.mkdir(parents=True, exist_ok=True)
-        if not existed or inherits_from_parent(describe_security(directory)):
-            # Only the leaf is tightened. Parent folders keep the permissions Windows
-            # and the user chose for the profile.
+        if not existed or not private_descriptor(
+            describe_security(directory), current_user_sid(), directory=True
+        ):
             apply_private_dacl(directory, directory=True)
+        self._require_private(directory)
 
     def verify_private_directory(self, directory: Path) -> None:
         if not directory.exists():
@@ -439,8 +505,7 @@ class WindowsServices(PlatformServices):
 
     def _require_private(self, path: Path) -> None:
         sddl = describe_security(path)
-        offenders = foreign_grants(sddl, allowed_sids=allowed_sids_for(current_user_sid()))
-        if offenders:
+        if not private_descriptor(sddl, current_user_sid(), directory=path.is_dir()):
             raise PrivacyError(
                 "Other accounts on this computer can open this item.",
                 code="CONFIG_PERMISSIONS",
@@ -460,7 +525,7 @@ class WindowsServices(PlatformServices):
             return "unreadable", str(exc)
         except OSError as exc:
             return "unreadable", f"could not inspect permissions ({type(exc).__name__})"
-        if foreign_grants(sddl, allowed_sids=allowed_sids_for(current_user_sid())):
+        if not private_descriptor(sddl, current_user_sid(), directory=True):
             return "not_private", shared
         return "private", ""
 
@@ -518,17 +583,18 @@ class WindowsServices(PlatformServices):
             raise
 
     def create_private_file(self, path: Path, data: bytes = b"") -> None:
+        self.verify_private_directory(path.parent)
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | _O_BINARY | _O_NOINHERIT
         descriptor = os.open(path, flags, 0o600)
         try:
+            # The verified parent restricts inheritance from creation; seal the file
+            # before any data is written, then verify Windows accepted the change.
+            apply_private_dacl(path, directory=False)
+            self._require_private(path)
             _write_all(descriptor, data)
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
-        # The file was created inside a directory whose protected DACL is already
-        # private, so it is never exposed in between; this makes that explicit and
-        # survives a directory whose inheritance is later widened.
-        apply_private_dacl(path, directory=False)
 
     def append_to_private_file(self, path: Path, data: bytes) -> None:
         if _is_reparse_point(path):
@@ -536,6 +602,7 @@ class WindowsServices(PlatformServices):
                 "This file is a link to somewhere else, which Proton Safe will not write to.",
                 code="CONFIG_PERMISSIONS",
             )
+        self._require_private(path)
         descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | _O_BINARY | _O_NOINHERIT)
         try:
             _write_all(descriptor, data)

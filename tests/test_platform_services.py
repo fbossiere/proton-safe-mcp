@@ -482,3 +482,85 @@ def test_the_managed_state_override_must_be_absolute(tmp_path):
 def test_pure_windows_paths_are_used_for_windows_path_questions():
     assert WindowsServices().path_flavour is PureWindowsPath
     assert os.name != "nt" or services().path_flavour is PureWindowsPath
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    [
+        "",
+        f"O:{USER_SID}",
+        f"O:{USER_SID}D:NO_ACCESS_CONTROL",
+        f"O:{USER_SID}D:P",
+        f"O:{USER_SID}D:P(garbage)",
+        f"O:{USER_SID}D:P(A;;FA;;;WD)",
+        "O:S-1-5-21-1-2-3-1002" + private_sddl(USER_SID, directory=True),
+        f"O:{USER_SID}D:P(XA;;FA;;;{USER_SID};(@User.flag == 1))",
+    ],
+)
+def test_incomplete_or_foreign_descriptors_never_pass_privacy(
+    windows_platform, tmp_path, descriptor
+):
+    windows_platform.descriptors[tmp_path] = descriptor
+    assert windows_platform.directory_privacy(tmp_path)[0] == "not_private"
+    with pytest.raises(PrivacyError):
+        windows_platform.verify_private_directory(tmp_path)
+
+
+def test_a_protected_shared_directory_is_repaired_before_writing(windows_platform, tmp_path):
+    windows_platform.descriptors[tmp_path] = f"O:{USER_SID}D:P(A;OICI;FA;;;WD)"
+    windows_platform.ensure_private_directory(tmp_path)
+    assert (tmp_path, True) in windows_platform.tightened
+    windows_platform.create_private_file(tmp_path / "attachment", b"private contents")
+    assert (tmp_path / "attachment", False) in windows_platform.tightened
+
+
+def test_a_failed_acl_change_prevents_the_first_data_write(windows_platform, tmp_path, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise PrivacyError("ACL refused", code="CONFIG_PERMISSIONS")
+
+    monkeypatch.setattr(windows_services, "apply_private_dacl", refuse)
+    target = tmp_path / "attachment"
+    with pytest.raises(PrivacyError):
+        windows_platform.create_private_file(target, b"must never be written")
+    assert not target.read_bytes()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="native Windows ACL integration")
+def test_native_identity_and_private_storage(tmp_path):
+    platform = WindowsServices()
+    sid = windows_services.current_user_sid()
+    assert sid.startswith("S-1-5-")
+    assert isinstance(windows_services.is_elevated(), bool)
+    target = tmp_path / "private" / "config.toml"
+    platform.write_private_file(target, b"native private file")
+    assert platform.read_private_file(target, max_bytes=100) == b"native private file"
+    assert platform.directory_privacy(target.parent)[0] == "private"
+    # A null DACL really means unrestricted access on Windows, not an empty list.
+    api = windows_services._require_windows()
+    assert api.advapi32.SetNamedSecurityInfoW(str(target.parent), 1, 4, None, None, None, None) == 0
+    assert platform.directory_privacy(target.parent)[0] == "not_private"
+    platform.ensure_private_directory(target.parent)
+    assert platform.directory_privacy(target.parent)[0] == "private"
+
+
+def test_windows_pipe_buffer_respects_the_budget_before_consumption():
+    import subprocess
+    import time
+
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'x' * (8 * 1024 * 1024))"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    assert process.stdout is not None
+    reader = windows_services.WindowsLineReader(process.stdout, budget=64)
+    try:
+        with pytest.raises(ValueError):
+            reader.read_line(time.monotonic() + 5)
+        assert reader._producer_budget == 65
+        assert reader._queue.maxsize == 2
+    finally:
+        process.terminate()
+        process.wait(timeout=5)
+        reader.close()
+    assert not reader._thread.is_alive()

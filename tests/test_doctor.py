@@ -127,6 +127,9 @@ def test_doctor_reports_state_directory_inspection_failure(monkeypatch, capsys):
     monkeypatch.setattr(doctor.platform, "system", lambda: "Linux")
 
     class UnreadableStateDirectory:
+        def exists(self):
+            raise PermissionError("private path not printed")
+
         def stat(self):
             raise PermissionError("private path not printed")
 

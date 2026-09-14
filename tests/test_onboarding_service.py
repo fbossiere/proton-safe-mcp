@@ -1202,3 +1202,41 @@ def test_registering_again_withdraws_an_outstanding_disconnect(service, bridge, 
     # A withdrawn disconnect must not erase the local data later on.
     assert recorded.erase_local_requested is False
     assert reopened.snapshot().state is InstallState.CLIENT_VERIFICATION_PENDING
+
+
+def test_a_manually_chosen_client_can_be_removed_after_reopening(service, client, bridge):
+    assert service.save_bridge(BridgeCandidate(ACCOUNT, password=GOOD_SECRET)).ok
+    adapter = service.adapters[0]
+    executable = service.discover()[0].executable
+    chosen = adapter.inspect(executable)
+    assert chosen is not None
+    plan, assets = service.plan_client(chosen)
+    assert service.activate(plan, assets).ok
+    recorded = service.journal()
+    assert recorded.client_executable == str(executable.resolve())
+    # The executable is now outside discovery, just as with the Locate button.
+    adapter._candidate_paths = ()
+    reopened = SetupService(
+        config_path=service.config_path,
+        journal_path=service.journal_path,
+        plugin_dir=service.plugin_dir,
+        adapters=(adapter,),
+        runtime=service.runtime,
+    )
+    assert reopened._recorded_installation(recorded).executable == executable
+    assert reopened.disconnect().ok
+    assert client.plugins == []
+    assert client.marketplaces == []
+
+
+def test_a_changed_client_profile_never_removes_another_profiles_resources(
+    service, client, bridge, tmp_path
+):
+    assert service.save_bridge(BridgeCandidate(ACCOUNT, password=GOOD_SECRET)).ok
+    plan, assets = service.plan_client(service.discover()[0])
+    assert service.activate(plan, assets).ok
+    service.adapters[0]._config_home = tmp_path / "another-profile"
+    before = list(client.calls)
+    assert not service.disconnect().ok
+    assert client.calls == before
+    assert service.journal().resources

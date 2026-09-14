@@ -74,6 +74,7 @@ def test_received_attachment_extraction_limit_is_configurable(monkeypatch, tmp_p
     assert settings.max_received_attachment_bytes == 123456
 
 
+@pytest.mark.posix_only
 def test_state_directories_are_private(monkeypatch, tmp_path):
     monkeypatch.setenv("PROTON_BRIDGE_USER", "user@example.com")
     monkeypatch.setenv("PROTON_MCP_STATE_DIR", str(tmp_path / "state"))

@@ -8,6 +8,7 @@ driven blind.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import tomllib
@@ -162,6 +163,13 @@ class OpenAILocalAdapter:
         # driving one would mean building a command line out of user-controlled paths.
         return executable_candidates(paths)
 
+    def profile_path(self) -> Path:
+        return (self._config_home or codex_home()).resolve()
+
+    def _installation_id(self, executable: Path) -> str:
+        identity = f"{executable.resolve()}\0{self.profile_path()}"
+        return f"{ADAPTER_ID}:{hashlib.sha256(identity.encode('utf-8')).hexdigest()}"
+
     def inspect(self, executable: Path) -> ClientInstallation | None:
         """Describe one installation the user pointed at explicitly.
 
@@ -178,7 +186,7 @@ class OpenAILocalAdapter:
             return None
         plugin = self._run([str(resolved), "plugin", "--help"])
         return ClientInstallation(
-            id=f"{ADAPTER_ID}:chosen",
+            id=self._installation_id(resolved),
             adapter=ADAPTER_ID,
             display_name=self.display_name,
             executable=resolved,
@@ -195,7 +203,7 @@ class OpenAILocalAdapter:
         selects.
         """
         installations: list[ClientInstallation] = []
-        for index, executable in enumerate(self._candidates()):
+        for executable in self._candidates():
             version = self._run([str(executable), "--version"])
             if not version.ok:
                 continue
@@ -203,7 +211,7 @@ class OpenAILocalAdapter:
             capabilities = {CAP_PLUGIN} if plugin.ok else set()
             installations.append(
                 ClientInstallation(
-                    id=f"{ADAPTER_ID}:{index}",
+                    id=self._installation_id(executable),
                     adapter=ADAPTER_ID,
                     display_name=self.display_name,
                     executable=executable,

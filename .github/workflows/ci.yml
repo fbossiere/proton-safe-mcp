@@ -153,6 +153,7 @@ jobs:
   windows-tests:
     name: Tests (Windows 11 x64)
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -183,6 +184,7 @@ jobs:
   windows-package:
     name: Windows installer (Windows 11 x64)
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -192,43 +194,16 @@ jobs:
           python-version: "3.12"
           version: "latest-known"
       - run: uv sync --frozen --extra dev --extra desktop --extra packaging
-      # The bundle is built and made to prove what it embedded on every run: this is
-      # what catches a missing Credential Manager backend or a lost plugin resource.
-      - name: Build and verify the bundle
-        run: |
-          $env:PYINSTALLER = "$PWD\.venv\Scripts\pyinstaller.exe"
-          $env:PROTON_SAFE_PYTHON = "$PWD\.venv\Scripts\python.exe"
-          pwsh packaging/windows/build_windows.ps1 -SkipInstaller
-      # The compiler is pinned by digest. Until that digest has been recorded by someone
-      # who checked the publisher's signature, the installer is not built rather than
-      # built with an unverified tool. The job stays honest about which of the two
-      # happened instead of reporting success either way.
-      - name: Check the pinned Inno Setup digest
-        id: pin
-        run: uv run python packaging/windows/fetch_innosetup.py --check-pin
-      - name: Install the pinned Inno Setup
-        if: steps.pin.outputs.ready == 'true'
+      - name: Verify and install the pinned Inno Setup
         run: uv run python packaging/windows/fetch_innosetup.py --install
-      - name: Build the installer
-        if: steps.pin.outputs.ready == 'true'
+      - name: Build and verify the installer
         run: |
           $env:PYINSTALLER = "$PWD\.venv\Scripts\pyinstaller.exe"
           $env:PROTON_SAFE_PYTHON = "$PWD\.venv\Scripts\python.exe"
-          pwsh packaging/windows/build_windows.ps1 -InnoSetupVersion ${{ steps.pin.outputs.version }}
-      # Install, reinstall and uninstall without a single window, into a profile of this
-      # run's own, checking the exit code each time. What this does NOT prove is that no
-      # UAC prompt appears: the runner's account is an administrator, so the absence of
-      # a prompt here means nothing. Scenario W01 covers that, on a standard account.
-      - name: Silent install, reinstall and uninstall
-        if: steps.pin.outputs.ready == 'true'
-        run: pwsh packaging/windows/test_install.ps1
-      - name: Report that the installer was not built
-        if: steps.pin.outputs.ready != 'true'
-        run: |
-          Write-Host "::notice::Inno Setup has no pinned digest yet, so no installer was built."
-          Write-Host "::notice::The bundle above was still built and verified."
+          pwsh packaging/windows/build_windows.ps1
+      - name: Install, repair and uninstall as a standard account
+        run: pwsh packaging/windows/test_standard_account.ps1
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: steps.pin.outputs.ready == 'true'
         with:
           name: windows-installer
           path: |
