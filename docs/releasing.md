@@ -32,12 +32,12 @@ manually upload the same version first.
 2. Run the complete quality gate from [Development](development.md).
 3. Merge the release changes to `main`.
 4. Create and push a signed tag at the merged release commit, exactly `v` followed by the
-   package version (for example `v2.1.2`). Create a **draft** GitHub Release for that tag,
+   package version (for example `v2.2.0`). Create a **draft** GitHub Release for that tag,
    with the release notes. Do not publish it yet: this repository uses immutable releases.
 5. Start the **Release** workflow on the **tag**, with its `tag` input set to the same value:
 
    ```bash
-   gh workflow run release.yml --ref v2.1.2 -f tag=v2.1.2
+   gh workflow run release.yml --ref v2.2.0 -f tag=v2.2.0
    ```
 
    Add `-f include_windows=true` **only** once a Windows client is qualified and the
@@ -92,5 +92,5 @@ The site may keep offering the previous verified installer until that follow-up 
 - Clean installation:
 
   ```bash
-  uvx --from proton-safe-mcp==2.1.2 proton-safe-mcp --help
+  uvx --from proton-safe-mcp==2.2.0 proton-safe-mcp --help
   ```

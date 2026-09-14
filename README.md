@@ -76,6 +76,9 @@ and its [acceptance sheet](https://fbossiere.github.io/proton-safe-mcp/windows-a
 
 ### Desktop assistant — Ubuntu 24.04, x86_64
 
+The desktop links below still target the last verified installer, v2.1.2. They will move
+to v2.2.0 once its published artifacts have been verified.
+
 [Download the installer](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb),
 open it with Ubuntu's package installer, then launch **Proton Safe**. The assistant guides
 you through Bridge connection and plugin activation in a compatible local ChatGPT desktop
@@ -98,7 +101,7 @@ identity usable from CI.
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==2.1.2
+uv tool install proton-safe-mcp==2.2.0
 ```
 
 For development from source instead:

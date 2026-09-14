@@ -1,3 +1,3 @@
 """Secure Proton Mail MCP server."""
 
-__version__ = "2.1.2"
+__version__ = "2.2.0"
