@@ -7,11 +7,11 @@
 ## Choose your system
 
 **Ubuntu 24.04 · Intel / AMD 64-bit (x86_64) — available.**
-Version 2.1.2, a 68 MB `.deb`, published by François Bossière as an independent project:
+Version 2.2.0, a 71 MB `.deb`, published by François Bossière as an independent project:
 free, MIT licensed, hosted on the official GitHub Release. Proton Mail Bridge and a
 compatible paid Proton plan are required.
 [Go to the installer](#get-the-installer) ·
-[Release notes](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2)
+[Release notes](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.2.0)
 
 **Windows 11 · 64-bit (x64) — not available yet.**
 No Windows installer is published, and this page will not offer a build nobody has run:
@@ -46,14 +46,14 @@ Python and `uv` are included. You do not need to install them or edit a configur
 
 ## Get the installer
 
-[Download for Ubuntu — v2.1.2 · .deb · 68 MB](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb){ .md-button .md-button--primary }
+[Download for Ubuntu — v2.2.0 · .deb · 71 MB](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.2.0/proton-safe-assistant_2.2.0_amd64.deb){ .md-button .md-button--primary }
 
 Free, MIT licensed, hosted on the project's **official GitHub Release**. No GitHub account
 is needed to download it. This is an independent project, not affiliated with or endorsed by Proton.
 
-[Release notes and all files](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2)
-· [Checksum file](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb.sha256)
-· [Build provenance](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/BUILD-PROVENANCE.txt)
+[Release notes and all files](https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.2.0)
+· [Checksum file](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.2.0/proton-safe-assistant_2.2.0_amd64.deb.sha256)
+· [Build provenance](https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.2.0/BUILD-PROVENANCE.txt)
 
 ## Install, connect, try
 
@@ -77,7 +77,7 @@ is needed to download it. This is an independent project, not affiliated with or
     Downloads folder and run:
 
     ```bash
-    sudo apt install ./proton-safe-assistant_2.1.2_amd64.deb
+    sudo apt install ./proton-safe-assistant_2.2.0_amd64.deb
     ```
 
     Then launch **Proton Safe** normally, never with `sudo`.
@@ -86,16 +86,16 @@ is needed to download it. This is an independent project, not affiliated with or
     Put the `.deb` and its `.sha256` file in the same folder. In a terminal in that folder:
 
     ```bash
-    sha256sum -c proton-safe-assistant_2.1.2_amd64.deb.sha256
+    sha256sum -c proton-safe-assistant_2.2.0_amd64.deb.sha256
     ```
 
-    The published v2.1.2 installer has SHA-256:
+    The published v2.2.0 installer has SHA-256:
 
     ```text
-    66ab3963e4ab0985d86a1d25dcbaea483e30bd0febd8ed1ec56183c96f83a567
+    cce212933570b21f1f4ecf092dacf798a9b0a6a88bc181bd331c38e8a76cd523
     ```
 
-    The published file is 71,015,644 bytes. The checksum detects a damaged or mismatched
+    The published file is 71,112,616 bytes. The checksum detects a damaged or mismatched
     download. Obtain both files from the official release; a checksum is not a separate
     guarantee of the publisher's identity.
 

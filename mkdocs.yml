@@ -91,13 +91,13 @@ exclude_docs: |
   /overrides/
 extra:
   desktop_release:
-    version: "2.1.2"
-    url: https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.1.2/proton-safe-assistant_2.1.2_amd64.deb
+    version: "2.2.0"
+    url: https://github.com/fbossiere/proton-safe-mcp/releases/download/v2.2.0/proton-safe-assistant_2.2.0_amd64.deb
     # The size of the published asset, read from the release itself, not from a local
     # rebuild. Update it with the version at every release.
-    size: "68 MB"
-    size_bytes: 71015644
-    notes: https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.1.2
+    size: "71 MB"
+    size_bytes: 71112616
+    notes: https://github.com/fbossiere/proton-safe-mcp/releases/tag/v2.2.0
   windows_release:
     # No Windows artefact exists. While this is false the site offers no Windows
     # download anywhere: it names the system, states the status and links to it.
