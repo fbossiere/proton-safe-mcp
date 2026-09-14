@@ -58,8 +58,8 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
     },
     "prereq.bridge_help": {"fr": "Obtenir Proton Mail Bridge", "en": "Get Proton Mail Bridge"},
     "bridge.advanced": {
-        "fr": "Options avancées · port et autres adresses",
-        "en": "Advanced options · port and other addresses",
+        "fr": "Options avancées",
+        "en": "Advanced options",
     },
     # -- application ---------------------------------------------------------
     "app.title": {

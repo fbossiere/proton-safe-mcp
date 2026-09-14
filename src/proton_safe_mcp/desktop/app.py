@@ -176,7 +176,7 @@ class PrerequisitesScreen(Screen):
             self.rows[check_id] = row
             self.body.addWidget(row)
 
-        links = QtWidgets.QHBoxLayout()
+        links = QtWidgets.QVBoxLayout()
         self.bridge_link = QtWidgets.QPushButton(translate("prereq.bridge_help", self.language))
         self.bridge_link.setAccessibleName("proton.me/mail/bridge")
         self.bridge_link.clicked.connect(lambda: window.open_official("bridge"))
@@ -184,7 +184,6 @@ class PrerequisitesScreen(Screen):
         self.recheck.clicked.connect(self.refresh)
         links.addWidget(self.bridge_link)
         links.addWidget(self.recheck)
-        links.addStretch(1)
         self.body.addLayout(links)
 
         self.primary.clicked.connect(lambda: window.show_screen("bridge"))

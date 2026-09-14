@@ -227,3 +227,27 @@ def test_the_built_bundle_verifies_itself(tmp_path, write_managed_config):
 
     assert completed.returncode == 0, completed.stderr
     assert "runtime 13 tools" in completed.stdout
+
+
+def test_windowed_verification_reports_failure_without_an_exception_dialog(tmp_path, monkeypatch):
+    import runpy
+    import sys
+    from types import ModuleType
+
+    report = tmp_path / "rapport de vérification.log"
+    app = ModuleType("proton_safe_mcp.desktop.app")
+
+    def fail():
+        raise RuntimeError("intentional bundle failure")
+
+    app.main = fail
+    monkeypatch.setitem(sys.modules, "proton_safe_mcp.desktop.app", app)
+    monkeypatch.setattr(
+        sys, "argv", ["assistant", "--verify-bundle", "--verification-report", str(report)]
+    )
+    with pytest.raises(SystemExit) as exited:
+        runpy.run_path(
+            str(Path(__file__).parents[1] / "packaging/entry_assistant.py"), run_name="__main__"
+        )
+    assert exited.value.code == 1
+    assert "intentional bundle failure" in report.read_text(encoding="utf-8")

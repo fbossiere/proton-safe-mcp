@@ -111,6 +111,8 @@ aliases = []
 "@ | Set-Content -Path $ConfigFile -Encoding utf8
 
 try {
+    & $Python -c "import sys; from pathlib import Path; from proton_safe_mcp.platform_services import services; p=Path(sys.argv[1]); services().ensure_private_directory(p.parent); services().secure_existing_path(p)" $ConfigFile
+    if ($LASTEXITCODE -ne 0) { Fail "The verification configuration could not be made private." }
     $report = & $Runtime doctor --config $ConfigFile 2>&1 | Out-String
     if ($report -notmatch "Proton Safe MCP doctor") {
         Fail "the bundled runtime did not produce a diagnosis"
@@ -122,13 +124,13 @@ try {
     }
 
     $env:PROTON_MCP_STATE_DIR = Join-Path $Verify "state"
-    # Start-Process -Wait, not the call operator: the assistant is a Windows-subsystem
-    # executable, and PowerShell does not wait for one of those. Called with `&`, this
-    # check would read $LASTEXITCODE from a process that had not finished, and would
-    # pass whatever the bundle turned out to be missing.
+    # Wait for the GUI executable explicitly and capture its build-only report.
+    # A failure must return a status, never open a bootloader exception dialog.
+    $verificationReport = Join-Path $Verify "bundle-verification.log"
     $exitCode = Invoke-NativeProcess -FilePath $Assistant -Arguments @(
-        "--verify-bundle", "--config", $ConfigFile
+        "--verify-bundle", "--config", $ConfigFile, "--verification-report", $verificationReport
     )
+    if (Test-Path $verificationReport) { Get-Content $verificationReport | Write-Host }
     if ($exitCode -ne 0) { Fail "bundle self-verification failed (exit $exitCode)" }
 } finally {
     Remove-Item Env:\PROTON_MCP_STATE_DIR -ErrorAction SilentlyContinue

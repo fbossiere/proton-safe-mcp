@@ -916,8 +916,9 @@ def test_the_managed_server_needs_neither_uvx_nor_proton_variables(service, brid
     config = json.loads((assets.plugin_dir / ".mcp.json").read_text(encoding="utf-8"))
     server = config["mcpServers"]["proton-safe"]
 
-    assert server["command"].endswith("proton-safe-mcp")
-    assert server["command"].startswith("/")
+    assert service.runtime is not None
+    assert server["command"] == service.runtime.command[0]
+    assert Path(server["command"]).is_absolute()
     assert server["args"][:2] == ["serve", "--config"]
     assert "uvx" not in json.dumps(config)
     assert not [name for name in server["env_vars"] if name.startswith("PROTON_")]

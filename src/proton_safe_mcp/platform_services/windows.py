@@ -572,6 +572,8 @@ class WindowsServices(PlatformServices):
             raise PrivacyError(
                 f"The file cannot be inspected ({type(exc).__name__}).", code="CONFIG_INVALID"
             ) from exc
+        if not stat.S_ISREG(before.st_mode):
+            raise PrivacyError("The path is not a regular file.", code="CONFIG_INVALID")
         self._require_private(path)
         try:
             descriptor = os.open(path, os.O_RDONLY | _O_BINARY | _O_NOINHERIT)
