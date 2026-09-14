@@ -29,9 +29,8 @@ from .base import (
     PrivacyError,
     SessionFacts,
     UnsupportedPlatformError,
-    _chunk_limit,
 )
-from .winacl import allowed_sids_for, foreign_grants, inherits_from_parent, private_sddl
+from .winacl import PrivacyReport, assess_privacy, private_sddl
 
 #: Windows 11 starts at build 22000. Windows 10 is a deliberate product exclusion.
 MINIMUM_BUILD: Final = 22000
@@ -311,23 +310,47 @@ class WindowsLineReader(LineReader):
     away from. The child is terminated by the caller, which is what actually ends it.
     """
 
+    #: One read. Small enough that the bounded queue below holds little, large enough
+    #: that an ordinary handshake arrives in one or two reads.
+    _CHUNK: ClassVar[int] = 16 * 1024
+
     def __init__(self, stream: IO[bytes], *, budget: int) -> None:
         super().__init__(stream, budget=budget)
-        self._queue: queue.Queue[bytes | None] = queue.Queue()
+        # Bounded on purpose. With an unbounded queue the reading thread runs ahead of
+        # the consumer, so a child that floods its output has the whole flood in memory
+        # before the budget in read_line ever gets to look at it. Here the thread blocks
+        # once two chunks are waiting, and stops entirely once it has read one byte more
+        # than the budget allows — enough for the consumer to detect the overrun.
+        self._queue: queue.Queue[bytes | None] = queue.Queue(maxsize=2)
+        self._allowance = budget + 1
         self._closed = threading.Event()
         self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
 
     def _pump(self) -> None:
+        try:
+            while not self._closed.is_set() and self._allowance > 0:
+                try:
+                    chunk = os.read(self._stream.fileno(), min(self._CHUNK, self._allowance))
+                except (OSError, ValueError):
+                    return
+                if not chunk:
+                    return
+                self._allowance -= len(chunk)
+                if not self._offer(chunk):
+                    return
+        finally:
+            self._offer(None)
+
+    def _offer(self, item: bytes | None) -> bool:
+        """Hand one item to the consumer, giving up once the reader has been closed."""
         while not self._closed.is_set():
             try:
-                chunk = os.read(self._stream.fileno(), 65536)
-            except (OSError, ValueError):
-                break
-            if not chunk:
-                break
-            self._queue.put(chunk)
-        self._queue.put(None)
+                self._queue.put(item, timeout=0.1)
+            except queue.Full:
+                continue
+            return True
+        return False
 
     def _receive(self, timeout: float) -> bytes | None:
         try:
@@ -336,14 +359,18 @@ class WindowsLineReader(LineReader):
             return None
         if item is None:
             return b""
-        # The budget is enforced by the caller; a single oversized frame is truncated
-        # here only so one read cannot allocate without bound.
-        return item[: _chunk_limit(self._budget)]
+        return item
 
     def close(self) -> None:
         self._closed.set()
         with contextlib.suppress(OSError, ValueError):
             self._stream.close()
+        # Closing the pipe unblocks a thread waiting in os.read; draining unblocks one
+        # waiting to hand over a chunk. Both are needed, or the thread outlives the probe.
+        with contextlib.suppress(queue.Empty):
+            while True:
+                self._queue.get_nowait()
+        self._thread.join(timeout=2.0)
 
 
 class WindowsServices(PlatformServices):
@@ -420,10 +447,28 @@ class WindowsServices(PlatformServices):
             )
         existed = directory.is_dir()
         directory.mkdir(parents=True, exist_ok=True)
-        if not existed or inherits_from_parent(describe_security(directory)):
+        if not existed:
             # Only the leaf is tightened. Parent folders keep the permissions Windows
             # and the user chose for the profile.
             apply_private_dacl(directory, directory=True)
+            return
+        report = self._assess(directory)
+        if report.private and not report.inherits:
+            return
+        if not report.owner_ok:
+            # Writing a DACL here would not make the folder private: whoever owns it can
+            # put the old one back, and this account may not even be able to set it.
+            raise PrivacyError(
+                f"This folder cannot be made private because {report.reason}.",
+                code="CONFIG_PERMISSIONS",
+            )
+        # A folder that already blocks inheritance is not thereby private: a protected
+        # DACL granting Everyone full access blocks inheritance too. It is rewritten
+        # whenever it is not actually private, not only when it still inherits.
+        apply_private_dacl(directory, directory=True)
+        # And the result is read back, because a DACL can be reapplied by policy or by
+        # another process between these two calls.
+        self._require_private(directory)
 
     def verify_private_directory(self, directory: Path) -> None:
         if not directory.exists():
@@ -437,12 +482,15 @@ class WindowsServices(PlatformServices):
             raise PrivacyError("The path is not a folder.", code="CONFIG_INVALID")
         self._require_private(directory)
 
+    def _assess(self, path: Path) -> PrivacyReport:
+        """What the path's owner and DACL actually establish about its privacy."""
+        return assess_privacy(describe_security(path), user_sid=current_user_sid())
+
     def _require_private(self, path: Path) -> None:
-        sddl = describe_security(path)
-        offenders = foreign_grants(sddl, allowed_sids=allowed_sids_for(current_user_sid()))
-        if offenders:
+        report = self._assess(path)
+        if not report.private:
             raise PrivacyError(
-                "Other accounts on this computer can open this item.",
+                f"Proton Safe will not use this item because {report.reason}.",
                 code="CONFIG_PERMISSIONS",
             )
 
@@ -460,8 +508,11 @@ class WindowsServices(PlatformServices):
             return "unreadable", str(exc)
         except OSError as exc:
             return "unreadable", f"could not inspect permissions ({type(exc).__name__})"
-        if foreign_grants(sddl, allowed_sids=allowed_sids_for(current_user_sid())):
-            return "not_private", shared
+        report = assess_privacy(sddl, user_sid=current_user_sid())
+        if not report.private:
+            # Say which of the ways a folder can be exposed this one is, rather than one
+            # sentence covering a foreign owner, a missing DACL and a shared folder alike.
+            return "not_private", f"{shared} ({report.reason})"
         return "private", ""
 
     def read_private_file(self, path: Path, *, max_bytes: int) -> bytes:
@@ -519,16 +570,26 @@ class WindowsServices(PlatformServices):
 
     def create_private_file(self, path: Path, data: bytes = b"") -> None:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | _O_BINARY | _O_NOINHERIT
+        # O_EXCL, so this call either created the file or failed: what follows is never
+        # applied to a file that was already there.
         descriptor = os.open(path, flags, 0o600)
+        failed = True
         try:
+            # The DACL goes on before a single byte of content does. The parent folder's
+            # permissions are not what protects this file: between creating it and
+            # writing to it is exactly the window a widened parent would expose, and
+            # what is exposed in the remaining gap is an empty file. Windows checks
+            # permissions when a handle is opened, so the descriptor above stays usable.
+            apply_private_dacl(path, directory=False)
             _write_all(descriptor, data)
             os.fsync(descriptor)
+            failed = False
         finally:
             os.close(descriptor)
-        # The file was created inside a directory whose protected DACL is already
-        # private, so it is never exposed in between; this makes that explicit and
-        # survives a directory whose inheritance is later widened.
-        apply_private_dacl(path, directory=False)
+            if failed:
+                # A file whose permissions could not be set is not left on disk.
+                with contextlib.suppress(OSError):
+                    path.unlink(missing_ok=True)
 
     def append_to_private_file(self, path: Path, data: bytes) -> None:
         if _is_reparse_point(path):
@@ -589,6 +650,22 @@ class WindowsServices(PlatformServices):
 
     def open_line_reader(self, stream: IO[bytes], *, budget: int) -> LineReader:
         return WindowsLineReader(stream, budget=budget)
+
+    def try_lock(self, descriptor: int) -> bool:
+        """``_locking``, which Windows drops when the handle closes with the process."""
+        import msvcrt  # Windows only, so imported where it is used.
+
+        # Read through getattr for the same reason as the open flags above: this module
+        # is developed and type-checked on Linux, where these names do not exist.
+        locking = getattr(msvcrt, "locking", None)
+        non_blocking = getattr(msvcrt, "LK_NBLCK", None)
+        if locking is None or non_blocking is None:  # pragma: no cover - platform guard
+            return False
+        try:
+            locking(descriptor, non_blocking, 1)
+        except OSError:
+            return False
+        return True
 
     # -- keyring -----------------------------------------------------------------
 

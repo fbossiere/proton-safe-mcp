@@ -5,16 +5,30 @@
 # signing tool is invoked. None of that may change between two releases without someone
 # deciding that it should.
 #
-# sha256 is deliberately left unset. Filling it in means someone downloaded this exact
-# file from jrsoftware.org, checked the publisher's signature on it, and recorded what
-# they actually got. A digest copied from anywhere else would verify nothing, so the
-# build refuses to run rather than accept a guess.
+# What was verified, on 14 September 2026, and how:
 #
-# To pin it:
-#     1. download the URL below on a machine you trust;
-#     2. confirm the file's Authenticode signature names Jordan Russell;
-#     3. record its SHA-256 here, and note the date in docs/windows-acceptance.md.
+#   1. https://jrsoftware.org/isdl.php links Inno Setup 7.1.0 to the two files below,
+#      hosted on the project's own GitHub release. There is no such download under
+#      files.jrsoftware.org; that path returns 404.
+#   2. The file was fetched over HTTPS from that release and its SHA-256 computed.
+#   3. The publisher ships innosetup-7.1.0-x64.exe.issig beside it, which records
+#      file-size 14304168 and file-hash 0362a383… in plain text under its own signature.
+#      Both match the file that was downloaded, byte count included.
+#
+# What was NOT verified, and is left for the machine that builds the release:
+#
+#   * the ECDSA signature inside the .issig, which needs the publisher's key and
+#     ISSigTool, a Windows program;
+#   * the Authenticode signature on the executable. Per
+#     https://jrsoftware.org/isdl-verify.php it must read "Pyrsys B.V." — not
+#     "Jordan Russell", who is the author and copyright holder but not the signer, and
+#     not "Open Source Developer, Martijn Laan", which is what releases before 6.4.2
+#     carried. Confirm this on Windows before the first signed release.
+#
+# To move to a new version, repeat all of the above rather than editing the digest.
 
 version = 7.1.0
-url = https://files.jrsoftware.org/is/7/innosetup-7.1.0.exe
-sha256 =
+url = https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
+size = 14304168
+sha256 = 0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f
+authenticode_publisher = Pyrsys B.V.

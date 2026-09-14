@@ -131,12 +131,25 @@ These names sit alongside the Ubuntu `BUILD-PROVENANCE.txt`; neither overwrites 
 
 ### The pinned compiler
 
-`packaging/windows/innosetup.lock` records the Inno Setup version, its download URL and
-its SHA-256. **The digest is deliberately unset.** Filling it in means someone downloaded
-that exact file from jrsoftware.org, checked the publisher's Authenticode signature on it,
-and recorded what they actually received. Until then
-`packaging/windows/fetch_innosetup.py` refuses to download, and the CI job reports that no
-installer was built rather than building one with an unverified tool.
+`packaging/windows/innosetup.lock` records the Inno Setup version, its download URL, its
+size and its SHA-256, and states in full what was verified to arrive at them.
+
+The download is hosted on the project's **GitHub release**, which is where
+[jrsoftware.org/isdl.php](https://jrsoftware.org/isdl.php) links; `files.jrsoftware.org`
+serves no installer for this version. Beside it the publisher ships an `.issig` file
+recording the same size and hash in plain text under its own signature, and the pinned
+values match it.
+
+Two checks remain for the machine that builds a release, and the lock file says so: the
+ECDSA signature inside the `.issig`, which needs the publisher's key and the Windows-only
+ISSigTool, and the Authenticode signature on the executable. Per
+[the publisher's verification page](https://jrsoftware.org/isdl-verify.php) that signature
+must read **Pyrsys B.V.** — not Jordan Russell, who is the author but not the signer.
+
+`packaging/windows/fetch_innosetup.py` refuses to download anything whose size or digest
+does not match, and refuses outright if the digest is unset. An unset digest **fails** the
+CI job: a run that never compiled the setup, installed it and uninstalled it must not be
+able to report that the Windows packaging works.
 
 ### Signing
 
@@ -188,9 +201,20 @@ Windows is never restarted, and no restart is scheduled.
 Uninstalling runs `proton-safe-assistant.exe --uninstall-connection` in the user's own
 session **before** the program files are removed. The uninstaller never edits a client
 configuration or touches Credential Manager itself: the assistant owns the journal, the
-adapters and the store, so it is the only thing that knows what Proton Safe created. Its
-exit code decides what is reported — a client that refused the removal is not announced as
-disconnected, and the settings, the credential and the journal are kept for a retry.
+adapters and the store, so it is the only thing that knows what Proton Safe created.
+
+Its exit code decides whether the uninstall proceeds at all. A refused removal stops it
+where nothing has yet been deleted, and offers **Retry** or **Cancel**; removing the
+program at that point would strand the client entry with the only tool that can remove it
+gone, while reporting a clean uninstall. Uninstalling the software on its own remains
+possible, as an explicit answer to a question that says what will be left behind. A silent
+uninstall, which can ask nothing, removes nothing and returns a failure. On every path
+that does not complete, the program, the settings, the credential and the journal are all
+kept — exactly what a retry needs.
+
+The uninstaller refuses an elevated run for the same reason the installer does: it would
+look for the administrator's configuration, journal and credential, find none, and report
+a connection as removed while it stayed exactly where it was.
 
 Settings and the password are kept by default. Erasing them is an explicit, opt-in choice,
 it is strictly targeted, and it is deferred while any client entry is still registered.

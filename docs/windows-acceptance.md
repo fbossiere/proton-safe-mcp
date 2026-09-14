@@ -36,8 +36,10 @@ is a test build and must never be published or handed to a non-technical tester 
 Windows download".
 
 Compiling the installer also needs the pinned Inno Setup recorded in
-`packaging/windows/innosetup.lock`. Its digest is unset, so the build refuses to run an
-unverified compiler. Pinning it is the first task below.
+`packaging/windows/innosetup.lock`. Its version, URL, size and SHA-256 are pinned, and
+the lock file records exactly what was checked to arrive at them — including the two
+checks left for the machine that builds a release: the ECDSA signature inside the
+publisher's `.issig`, and the Authenticode signature, which must read **Pyrsys B.V.**
 
 ## Test environment
 
@@ -99,8 +101,8 @@ that.
 
 1. **Settle the unknowns before finishing the installer.** Credential Manager with local
    persistence; the native file protections; the embedded STDIO server started by a real
-   Windows client; activation in that client. Produce evidence for each, then pin the
-   Inno Setup digest in `packaging/windows/innosetup.lock`.
+   Windows client; activation in that client. Produce evidence for each. The Inno Setup
+   digest is pinned; confirm its Authenticode publisher on Windows at the same time.
 2. **Port the platform services**, keeping the Linux security tests and adding their
    Windows equivalents. Largely done: see `src/proton_safe_mcp/platform_services/`,
    `tests/test_platform_services.py` and `tests/test_windows_behaviour.py`.

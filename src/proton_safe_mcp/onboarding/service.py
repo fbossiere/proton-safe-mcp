@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -71,6 +71,17 @@ class CancelToken:
     def checkpoint(self) -> None:
         if self._event.is_set():
             raise Cancelled("Cancelled before any change was made", code=Code.CANCELLED)
+
+
+def _profile_of(adapter: ClientAdapter) -> str:
+    """The client profile an adapter works in, when it exposes one."""
+    profile = getattr(adapter, "profile_dir", None)
+    if callable(profile):
+        try:
+            return str(profile())
+        except OSError:
+            return ""
+    return ""
 
 
 def mask_address(address: str) -> str:
@@ -401,6 +412,11 @@ class SetupService:
         recorded.plugin_dir = str(assets.marketplace_dir)
         recorded.client_id = plan.installation.id
         recorded.client_adapter = plan.installation.adapter
+        # The identity that survives: an absolute path, and the profile it was written
+        # to. The discovery identifier alone describes a position in a candidate list,
+        # which an installation chosen by the user never occupies at all.
+        recorded.client_executable = str(plan.installation.executable)
+        recorded.client_profile = _profile_of(adapter)
         recorded.runtime_command = list(self.serve_command())
         self._save_journal(recorded)
 
@@ -492,11 +508,34 @@ class SetupService:
         return Check("client", "pass", Code.CLIENT_VERIFIED_MANUALLY)
 
     def _recorded_installation(self, recorded: Journal) -> ClientInstallation | None:
+        """Find the installation this account registered with, and revalidate it.
+
+        The recorded absolute path is tried first. It is the only identity that survives
+        an installation the user pointed at explicitly, which discovery never produces,
+        and a probed one that has since moved position in the candidate list. Being
+        recorded does not make it trusted: it is re-inspected, so a path whose executable
+        is gone or no longer answers reports nothing rather than a stale installation.
+        """
         if not recorded.client_id:
             return None
+        if recorded.client_executable:
+            adapter = self._adapter_named(recorded.client_adapter)
+            inspect = getattr(adapter, "inspect", None) if adapter is not None else None
+            if callable(inspect):
+                found = inspect(Path(recorded.client_executable))
+                if isinstance(found, ClientInstallation):
+                    # Keep the recorded identifier so the journal stays self-consistent;
+                    # everything else comes from the installation just revalidated.
+                    return replace(found, id=recorded.client_id)
         for installation in self.discover():
             if installation.id == recorded.client_id:
                 return installation
+        return None
+
+    def _adapter_named(self, adapter_id: str) -> ClientAdapter | None:
+        for adapter in self.adapters:
+            if adapter.id == adapter_id:
+                return adapter
         return None
 
     # -- removal -----------------------------------------------------------------

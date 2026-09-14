@@ -9,6 +9,7 @@ platforms could satisfy.
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import os
 import platform
 import select
@@ -271,6 +272,14 @@ class PosixServices(PlatformServices):
 
     def open_line_reader(self, stream: IO[bytes], *, budget: int) -> LineReader:
         return PosixLineReader(stream, budget=budget)
+
+    def try_lock(self, descriptor: int) -> bool:
+        """``flock``, which the kernel drops when this process ends, however it ends."""
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return False
+        return True
 
 
 def _write_all(descriptor: int, data: bytes) -> None:

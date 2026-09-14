@@ -96,7 +96,12 @@ foreach ($required in @($Assistant, $Runtime)) {
 # Python modules live inside the archive and cannot be found on disk.
 
 Step "Verifying the bundled runtime and its embedded resources"
-$Verify = Join-Path ([System.IO.Path]::GetTempPath()) ("proton-safe-verify-" + [guid]::NewGuid())
+# A space and an accent on purpose: this is the argument path a profile such as
+# "C:\Users\Jane Doe" produces, so a quoting mistake fails the build here rather than on
+# the machine of the first person whose account name has a space in it. The character is
+# built from its code point to keep this file pure ASCII whatever reads it.
+$Verify = Join-Path ([System.IO.Path]::GetTempPath()) `
+    ("proton safe v" + [char]0xE9 + "rif " + [guid]::NewGuid())
 $ConfigDir = Join-Path $Verify "config"
 New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
 $ConfigFile = Join-Path $ConfigDir "config.toml"
@@ -125,8 +130,13 @@ try {
     # executable, and PowerShell does not wait for one of those. Called with `&`, this
     # check would read $LASTEXITCODE from a process that had not finished, and would
     # pass whatever the bundle turned out to be missing.
+    # The path is quoted here, not left to Start-Process: it joins -ArgumentList with
+    # spaces into a single command line and quotes nothing itself, so a build running
+    # under a profile such as "Jane Doe" would hand --config a path cut at the space.
+    # Windows reassembles the quoted argument on the other side, and a Windows path
+    # cannot contain a quotation mark, so there is nothing to escape.
     $check = Start-Process -FilePath $Assistant `
-        -ArgumentList @("--verify-bundle", "--config", $ConfigFile) -Wait -PassThru
+        -ArgumentList @("--verify-bundle", "--config", "`"$ConfigFile`"") -Wait -PassThru
     if ($check.ExitCode -ne 0) {
         # A windowed build has no stream to report on, so the exit code is the whole
         # message: 1 means a skill, the plugin resources, the credential backend or the

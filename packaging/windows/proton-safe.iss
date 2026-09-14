@@ -124,9 +124,12 @@ fr.NeedsBridge=Proton Mail Bridge et un assistant compatible sont nécessaires p
 fr.Downgrade=Une version plus récente de Proton Safe (%1) est déjà installée. Cet installateur (%2) ne peut pas la remplacer. Désinstallez d'abord la version installée si vous voulez vraiment revenir en arrière.
 fr.NotWindows11=Proton Safe nécessite Windows 11 en 64 bits (x64). Windows 10, les versions 32 bits et les processeurs ARM ne sont pas pris en charge.
 fr.Elevated=Cet installateur doit être lancé depuis votre compte Windows habituel, sans « Exécuter en tant qu'administrateur » : Proton Safe s'installe pour le compte qui le lance.
+fr.ElevatedUninstall=Cette désinstallation doit être lancée depuis votre compte Windows habituel, sans « Exécuter en tant qu'administrateur » : la connexion à retirer appartient au compte qui a installé Proton Safe.
 fr.RemovingConnection=Retrait de la connexion dans votre assistant…
 fr.EraseData=Effacer aussi les réglages et le mot de passe Bridge enregistrés par Proton Safe
-fr.RemovalIncomplete=La connexion n'a pas pu être entièrement retirée de votre assistant. Vos réglages et votre mot de passe sont conservés pour pouvoir réessayer. Une entrée peut subsister dans votre assistant.
+fr.RemovalFailed=La connexion n'a pas pu être retirée de votre assistant. Rien n'a encore été désinstallé, et vos réglages et votre mot de passe sont conservés. Voulez-vous réessayer ?
+fr.RemoveAnyway=Désinstaller quand même le logiciel seul ? Une entrée Proton Safe restera dans votre assistant et devra être retirée à la main. Vos réglages et votre mot de passe sont conservés pour pouvoir la réparer.
+fr.RemovalCancelled=Désinstallation annulée. Proton Safe, vos réglages et votre mot de passe sont conservés ; vous pouvez réessayer plus tard.
 
 en.AppTitle=Install Proton Safe
 en.AppIntro=Connect Proton Mail to your assistant. Proton Safe installs for your Windows account only.
@@ -139,9 +142,12 @@ en.NeedsBridge=Proton Mail Bridge and a compatible assistant are needed to use t
 en.Downgrade=A newer version of Proton Safe (%1) is already installed. This installer (%2) cannot replace it. Uninstall the installed version first if you really want to go back.
 en.NotWindows11=Proton Safe needs Windows 11 on 64-bit (x64). Windows 10, 32-bit versions and ARM processors are not supported.
 en.Elevated=Run this installer from your usual Windows account, without "Run as administrator": Proton Safe installs for the account that starts it.
+en.ElevatedUninstall=Run this uninstaller from your usual Windows account, without "Run as administrator": the connection to remove belongs to the account that installed Proton Safe.
 en.RemovingConnection=Removing the connection from your assistant…
 en.EraseData=Also erase the settings and the Bridge password saved by Proton Safe
-en.RemovalIncomplete=The connection could not be fully removed from your assistant. Your settings and password are kept so you can try again. An entry may remain in your assistant.
+en.RemovalFailed=The connection could not be removed from your assistant. Nothing has been uninstalled yet, and your settings and password are kept. Try again?
+en.RemoveAnyway=Uninstall the software on its own anyway? A Proton Safe entry will remain in your assistant and will have to be removed by hand. Your settings and password are kept so it can be repaired.
+en.RemovalCancelled=Uninstall cancelled. Proton Safe, your settings and your password are all kept; you can try again later.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -162,6 +168,34 @@ Filename: "{app}\{#AssistantExe}"; Description: "{cm:LaunchApp}"; Flags: nowait 
 [Code]
 var
   EraseChosen: Boolean;
+
+function HasSwitch(const Switch: String): Boolean;
+var
+  Index: Integer;
+begin
+  Result := False;
+  for Index := 1 to ParamCount do
+    if CompareText(ParamStr(Index), Switch) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function ElevationRefused(): Boolean;
+begin
+  { IsAdmin, not IsAdminInstallMode. With PrivilegesRequired=lowest the install mode is
+    never administrative, whatever privileges the process actually holds, so asking
+    about the mode would answer "not elevated" for a run started with "Run as
+    administrator" — the exact case this is here to refuse. IsAdmin reports the
+    privileges the process is running with.
+
+    /ALLOWELEVATED exists for one caller: packaging/windows/test_install.ps1, because a
+    CI runner signs in as an administrator and could not exercise install or uninstall
+    at all otherwise. It is never given to a person and it proves nothing about the
+    real path — scenario W01, on a standard account, is what settles that. }
+  Result := IsAdmin and (not HasSwitch('/ALLOWELEVATED'));
+end;
 
 function IsWindows11OrNewer(): Boolean;
 var
@@ -199,7 +233,7 @@ begin
 
   { An elevated run would install into the administrator's profile, leaving the person
     actually signed in with no Proton Safe at all. }
-  if IsAdminInstallMode then
+  if ElevationRefused then
   begin
     MsgBox(ExpandConstant('{cm:Elevated}'), mbCriticalError, MB_OK);
     Result := False;
@@ -250,6 +284,16 @@ begin
   Result := True;
   EraseChosen := False;
 
+  { Elevated, this would ask the assistant to disconnect the administrator's account
+    rather than the one that installed Proton Safe, and would report a connection as
+    removed while it stayed in place. }
+  if ElevationRefused then
+  begin
+    MsgBox(ExpandConstant('{cm:ElevatedUninstall}'), mbCriticalError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+
   { Default: keep the settings and the password so a reinstall finds them. Erasing is
     an explicit, opt-in choice, and it is carried out by the assistant, the only
     component that knows which entries Proton Safe actually created. }
@@ -262,22 +306,24 @@ begin
   UninstallProgressForm.StatusLabel.Caption := ExpandConstant('{cm:RemovingConnection}');
 end;
 
-procedure CurUninstallStepChanged(CurStep: TUninstallStep);
+function RemoveConnection(): Integer;
 var
   Assistant, Parameters: String;
   ResultCode: Integer;
 begin
-  if CurStep <> usUninstall then
-    Exit;
-
   { The assistant owns client registrations, Credential Manager and the configuration
     format. The uninstaller asks it to disconnect rather than reimplementing any of
     that, and it reads the exit code: a client that refused the removal must not be
-    reported as disconnected. What is kept when the removal is incomplete are the
-    settings, the password and the journal, which are exactly what a retry needs. }
+    reported as disconnected. }
   Assistant := ExpandConstant('{app}\{#AssistantExe}');
   if not FileExists(Assistant) then
+  begin
+    { There is no assistant left to ask, so there is no connection this uninstaller
+      could remove and nothing to keep the program for. Refusing here would leave the
+      person with a broken installation they cannot remove. }
+    Result := 0;
     Exit;
+  end;
 
   Parameters := '--uninstall-connection';
   if EraseChosen then
@@ -285,7 +331,37 @@ begin
 
   if not Exec(Assistant, Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     ResultCode := 1;
+  Result := ResultCode;
+end;
 
-  if (ResultCode <> 0) and (not UninstallSilent) then
-    MsgBox(ExpandConstant('{cm:RemovalIncomplete}'), mbInformation, MB_OK);
+procedure CurUninstallStepChanged(CurStep: TUninstallStep);
+begin
+  if CurStep <> usUninstall then
+    Exit;
+
+  { usUninstall runs after the confirmation and before a single file is removed, which
+    is the last point where stopping still leaves everything intact. A failed removal
+    must stop here: deleting the program now would strand the client entry with the
+    only tool that can remove it gone, while reporting a clean uninstall.
+
+    What is kept on every path that does not complete is the program, the settings, the
+    password and the journal — exactly what a retry needs. }
+  while RemoveConnection() <> 0 do
+  begin
+    if UninstallSilent then
+      { Nothing can be asked and nothing may be assumed, so nothing is removed. Aborting
+        is what turns this into a failure the caller can see rather than a silent one. }
+      Abort;
+
+    if MsgBox(ExpandConstant('{cm:RemovalFailed}'), mbError, MB_RETRYCANCEL) = IDRETRY then
+      Continue;
+
+    { Removing the software while its client entry stays behind is a real choice, but
+      it is the user's to make, in full knowledge of what is left over. }
+    if MsgBox(ExpandConstant('{cm:RemoveAnyway}'), mbConfirmation, MB_YESNO) = IDYES then
+      Exit;
+
+    MsgBox(ExpandConstant('{cm:RemovalCancelled}'), mbInformation, MB_OK);
+    Abort;
+  end;
 end;

@@ -21,14 +21,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   credential store policy, and starting and reading a child process. The mail engine, the
   tool limits, the draft rules and the whole onboarding flow stay single-implementation.
 - Windows private storage as an explicit protected DACL, with reparse points refused and
-  the opened file confirmed to be the inspected one, standing in for `O_NOFOLLOW`.
+  the opened file confirmed to be the inspected one, standing in for `O_NOFOLLOW`. A
+  descriptor is read for what it actually establishes: an absent DACL, a null one — which
+  Windows treats as granting every account full access, the opposite of an empty one — an
+  unreadable one and a foreign owner are each refused by name, and a folder that blocks
+  inheritance while granting Everyone is corrected rather than mistaken for a tightened
+  one. A new file carries its DACL before it carries any content.
+- One assistant per account, held by an exclusive file lock rather than by the endpoint
+  alone. Two launches can each find nothing answering and then each claim the endpoint,
+  the second clearing the first's; the lock is what makes that impossible, and what makes
+  clearing an endpoint left by a killed process safe.
+- The registered client is recorded by absolute path and profile, not only by the
+  identifier discovery gave it. An installation the user pointed at is never rediscovered,
+  so a later repair or disconnect had no way to find it again; it is now looked up by path
+  and revalidated like any other.
 - The Bridge password on Windows in Credential Manager, with persistence pinned to this
   computer instead of the library default, which asks Windows to roam it.
 - An explicit **Locate an assistant installed elsewhere…** choice on the client screen,
   for an installation the bounded probes do not reach. It is verified like any other.
 - `--uninstall-connection` on the assistant, so the Windows uninstaller asks the component
   that owns the journal, the client adapters and the credential store to disconnect rather
-  than reimplementing any of it. Its exit code decides what the uninstaller reports.
+  than reimplementing any of it. Its exit code decides whether the uninstall proceeds at
+  all: a refused removal stops before a single file is deleted and offers Retry or Cancel,
+  removing the software on its own stays available as an explicit answer, and a silent
+  uninstall that can ask nothing removes nothing and returns a failure.
+- Both the installer and the uninstaller refuse an elevated run, tested on the privileges
+  the process actually holds rather than on the install mode, which stays non
+  administrative under `PrivilegesRequired=lowest` however the process was started.
 - `packaging/make_sbom.py` and `packaging/version.py`, shared by both platforms' builds.
 - The home page and both download pages now present two systems, Ubuntu and Windows, with
   both always visible, and quote the published installer's size alongside its version. A
@@ -47,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   running executable. In a bundle that would have opened a window instead of serving MCP.
 - `doctor` reports the state directory through the platform, so "private" means a Unix
   mode on Linux and an access control list on Windows, each explained in its own terms.
+- The Windows pipe reader is bounded where it reads rather than where it is consumed. Its
+  thread stops one byte past the budget and blocks on a short queue, so a child flooding
+  its output can no longer put megabytes in memory to answer a question bounded at
+  kilobytes, and closing the reader joins the thread instead of leaving it behind.
+- The Inno Setup compiler is pinned to a real download: the publisher's GitHub release,
+  cross-checked against the size and hash in the `.issig` it ships beside it. An unpinned
+  digest now fails the Windows job rather than skipping the setup build, so CI cannot go
+  green without compiling the installer and running install, reinstall and uninstall.
 - The POSIX validations are unchanged. No check was relaxed into a weaker rule both
   systems could satisfy.
 

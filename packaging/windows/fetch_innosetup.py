@@ -23,6 +23,9 @@ from pathlib import Path
 LOCK = Path(__file__).resolve().parent / "innosetup.lock"
 #: A compiler download is a few tens of megabytes; anything far larger is not one.
 MAX_BYTES = 200 * 1024 * 1024
+#: Where the publisher's own download page sends people. It is a GitHub release, not
+#: files.jrsoftware.org, which serves no installer at all for this version.
+RELEASE_PREFIX = "https://github.com/jrsoftware/issrc/releases/download/"
 
 
 def read_lock() -> dict[str, str]:
@@ -41,8 +44,8 @@ def pinned(lock: dict[str, str]) -> bool:
 
 
 def download(url: str) -> bytes:
-    if not url.startswith("https://files.jrsoftware.org/"):
-        raise SystemExit("the compiler is only ever fetched from its publisher's own host")
+    if not url.startswith(RELEASE_PREFIX):
+        raise SystemExit("the compiler is only ever fetched from its publisher's own release")
     with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 - host checked
         data = response.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
@@ -61,8 +64,6 @@ def main(argv: list[str] | None = None) -> int:
     ready = pinned(lock)
 
     if arguments.check_pin:
-        # Written for a CI step to read, so the job can report the state instead of
-        # failing on something nobody has been asked to do yet.
         output = os.environ.get("GITHUB_OUTPUT")
         if output:
             with Path(output).open("a", encoding="utf-8") as handle:
@@ -72,7 +73,11 @@ def main(argv: list[str] | None = None) -> int:
             f"Inno Setup {version}: digest {'pinned' if ready else 'NOT pinned'}",
             file=sys.stdout if ready else sys.stderr,
         )
-        return 0
+        # An unpinned compiler is a build that cannot produce an installer, so it is a
+        # failure rather than a state to report and carry on from. A green run that
+        # skipped compiling the setup, installing it and uninstalling it would say the
+        # Windows packaging works while never having exercised any of it.
+        return 0 if ready else 1
 
     if not arguments.install:
         parser.print_help()
@@ -89,6 +94,15 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Downloading Inno Setup {version}…")
     payload = download(lock["url"])
+    # Size first, because a mismatch there names the problem more usefully than a digest
+    # that simply differs, and the publisher records both in the .issig beside the file.
+    expected_size = int(lock.get("size", "0"))
+    if expected_size and len(payload) != expected_size:
+        print(
+            f"the download is {len(payload)} bytes, not the pinned {expected_size}",
+            file=sys.stderr,
+        )
+        return 1
     digest = hashlib.sha256(payload).hexdigest()
     if digest != lock["sha256"]:
         print(

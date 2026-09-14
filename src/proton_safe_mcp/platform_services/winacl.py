@@ -14,10 +14,20 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Literal
 
 #: SDDL ACE types that grant access. Deny and audit entries never widen access.
 _ALLOW_TYPES: Final = frozenset({"A", "OA", "XA", "ZA"})
+
+#: What the ``D:`` section of a descriptor turned out to be. The five cases are kept
+#: apart because Windows treats two of them as opposites that look alike: an object
+#: with *no* DACL grants every account full access, while an object with an *empty*
+#: DACL grants none. Collapsing them would report a wide-open path as private.
+#: https://learn.microsoft.com/en-us/windows/win32/secauthz/null-dacls-and-empty-dacls
+DaclState = Literal["invalid", "absent", "null", "empty", "present"]
+
+#: How SDDL spells a NULL DACL — an object with no access control at all.
+NULL_DACL_KEYWORD: Final = "NO_ACCESS_CONTROL"
 
 #: Two-letter SDDL rights and the access mask each one stands for.
 _RIGHTS: Final[dict[str, int]] = {
@@ -58,6 +68,7 @@ HARMLESS_MASK: Final = (
 )
 
 #: SDDL aliases for the accounts a private path may legitimately grant.
+EVERYONE_SID: Final = "S-1-1-0"
 SYSTEM_SID: Final = "S-1-5-18"
 ADMINISTRATORS_SID: Final = "S-1-5-32-544"
 CREATOR_OWNER_SID: Final = "S-1-3-0"
@@ -70,7 +81,7 @@ _SID_ALIASES: Final[dict[str, str]] = {
     "LA": "S-1-5-21-0-0-0-500",
     "CO": CREATOR_OWNER_SID,
     "OW": OWNER_RIGHTS_SID,
-    "WD": "S-1-1-0",  # Everyone
+    "WD": EVERYONE_SID,
     "BU": "S-1-5-32-545",  # Users
     "AU": "S-1-5-11",  # Authenticated Users
     "IU": "S-1-5-4",  # Interactive
@@ -159,24 +170,42 @@ def split_sections(sddl: str) -> dict[str, str]:
     return sections
 
 
-def parse_security_descriptor(sddl: str) -> tuple[str, list[Ace], bool]:
-    """Return the owner SID, the DACL entries and whether inheritance is blocked.
+@dataclass(frozen=True, slots=True)
+class Descriptor:
+    """A security descriptor reduced to what a privacy decision needs."""
 
-    A descriptor with no DACL section is reported as inheriting with no entries, which
-    every caller treats as "not established" rather than as "safe".
+    owner: str
+    dacl: DaclState
+    aces: tuple[Ace, ...] = ()
+    protected: bool = False
+
+
+def parse_security_descriptor(sddl: str) -> Descriptor:
+    """Return the owner, the state of the DACL and its entries.
+
+    The DACL state is never guessed. ``absent`` means the descriptor carried no ``D:``
+    section, ``null`` means it carried one saying there is no access control at all, and
+    ``empty`` means it listed no entries. Only the last of those three denies access.
     """
+    if not sddl.strip():
+        return Descriptor("", "invalid")
     sections = split_sections(sddl)
     owner = normalise_sid(sections["O"]) if sections.get("O") else ""
     body = sections.get("D")
     if body is None:
-        return owner, [], False
-    flags = body.split("(", 1)[0]
-    protected = "P" in flags.upper()
+        return Descriptor(owner, "absent")
+    flags = body.split("(", 1)[0].strip().upper()
+    if NULL_DACL_KEYWORD in flags:
+        # Not an empty DACL: an object with no DACL is open to every account.
+        return Descriptor(owner, "null")
+    protected = "P" in flags
     aces: list[Ace] = []
     for raw in _ACE_RE.findall(body):
         fields = raw.split(";")
         if len(fields) < 6:
-            continue
+            # An entry this code cannot read is not an entry it may ignore: the whole
+            # descriptor is reported as unreadable rather than parsed around.
+            return Descriptor(owner, "invalid")
         aces.append(
             Ace(
                 kind=fields[0].strip().upper(),
@@ -185,18 +214,19 @@ def parse_security_descriptor(sddl: str) -> tuple[str, list[Ace], bool]:
                 sid=normalise_sid(fields[5]),
             )
         )
-    return owner, aces, protected
+    if not aces:
+        return Descriptor(owner, "empty", (), protected)
+    return Descriptor(owner, "present", tuple(aces), protected)
 
 
-def foreign_grants(sddl: str, *, allowed_sids: frozenset[str]) -> list[str]:
-    """List the SIDs that are granted meaningful access and should not be.
+def granted_to_others(descriptor: Descriptor, *, allowed_sids: frozenset[str]) -> list[str]:
+    """The SIDs the listed entries grant meaningful access to and should not.
 
-    ``allowed_sids`` is this account plus the system accounts Windows needs. Everything
-    else — Everyone, Users, Authenticated Users, another person's account — is reported.
+    This reads entries only. It says nothing about a descriptor whose DACL is absent or
+    null, which is why every privacy decision goes through ``assess_privacy`` instead.
     """
-    _, aces, _ = parse_security_descriptor(sddl)
     offenders: list[str] = []
-    for ace in aces:
+    for ace in descriptor.aces:
         if not ace.allows or ace.sid in allowed_sids:
             continue
         if ace.mask & ~HARMLESS_MASK == 0:
@@ -206,10 +236,63 @@ def foreign_grants(sddl: str, *, allowed_sids: frozenset[str]) -> list[str]:
     return offenders
 
 
+@dataclass(frozen=True, slots=True)
+class PrivacyReport:
+    """Whether a path is private to one account, and what is wrong when it is not."""
+
+    private: bool
+    #: The DACL still takes entries from the parent, so a widened profile reaches it.
+    inherits: bool
+    #: The owner is this account or a system account. An owner can always rewrite the
+    #: DACL, so a foreign owner is never corrected in place — it is refused.
+    owner_ok: bool
+    #: Empty when private; otherwise one clause naming what is wrong.
+    reason: str = ""
+    offenders: tuple[str, ...] = ()
+
+
+def assess_privacy(sddl: str, *, user_sid: str) -> PrivacyReport:
+    """Decide whether a path is private to ``user_sid``, and say why when it is not.
+
+    This is the single decision point. Callers must not reason about entries on their
+    own: the cases that matter here are the ones an entry list cannot express — a
+    descriptor that could not be read, one with no DACL of its own, and one explicitly
+    saying there is no access control at all.
+    """
+    descriptor = parse_security_descriptor(sddl)
+    allowed = allowed_sids_for(user_sid)
+    if descriptor.dacl == "invalid":
+        return PrivacyReport(False, True, False, "its permissions could not be read")
+    if not descriptor.owner:
+        return PrivacyReport(False, True, False, "its owner could not be established")
+    owner_ok = descriptor.owner in allowed
+    if not owner_ok:
+        return PrivacyReport(
+            False, True, False, "it belongs to another account", (descriptor.owner,)
+        )
+    if descriptor.dacl == "absent":
+        return PrivacyReport(False, True, True, "it carries no permissions of its own")
+    if descriptor.dacl == "null":
+        return PrivacyReport(
+            False, True, True, "every account on this computer can open it", (EVERYONE_SID,)
+        )
+    inherits = not descriptor.protected
+    offenders = granted_to_others(descriptor, allowed_sids=allowed)
+    if offenders:
+        return PrivacyReport(
+            False, inherits, True, "other accounts on this computer can open it", tuple(offenders)
+        )
+    return PrivacyReport(True, inherits, True)
+
+
 def inherits_from_parent(sddl: str) -> bool:
-    """Whether the DACL is still open to whatever the parent directory grants."""
-    _, _, protected = parse_security_descriptor(sddl)
-    return not protected
+    """Whether the DACL is still open to whatever the parent directory grants.
+
+    A descriptor with no usable DACL of its own counts as inheriting: there is nothing
+    protecting it, whatever the reason.
+    """
+    descriptor = parse_security_descriptor(sddl)
+    return not descriptor.protected
 
 
 def private_sddl(user_sid: str, *, directory: bool) -> str:

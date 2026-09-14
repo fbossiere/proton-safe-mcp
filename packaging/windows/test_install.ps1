@@ -32,14 +32,21 @@ $DistDir = Join-Path $Root "dist\windows"
 $AppDir  = Join-Path $env:LOCALAPPDATA "Programs\Proton Safe"
 $AppId   = "{7F3A6C21-58D4-4E0B-9E2E-3B7D1C9A4F58}"
 $RegKey  = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\${AppId}_is1"
-$Silent  = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-")
+# /ALLOWELEVATED is here because a GitHub runner signs in as an administrator, and the
+# installer refuses an elevated run — the check that protects a real user from installing
+# Proton Safe into somebody else's profile. Passing it is what lets this test exercise
+# install and uninstall at all, and it is the reason this script proves nothing about UAC.
+$Silent  = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/ALLOWELEVATED")
 
 function Step([string] $Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 function Fail([string] $Message) { Write-Error $Message; exit 1 }
 
 function Invoke-Installer([string] $Path, [string[]] $Arguments, [string] $What) {
     $log = Join-Path ([System.IO.Path]::GetTempPath()) "proton-safe-$What.log"
-    $process = Start-Process -FilePath $Path -ArgumentList ($Arguments + "/LOG=$log") `
+    # Quoted explicitly: Start-Process joins -ArgumentList with spaces into one command
+    # line and quotes nothing itself, so a profile such as "Jane Doe" would otherwise
+    # split the log path in two and hand the installer a switch it never sent.
+    $process = Start-Process -FilePath $Path -ArgumentList ($Arguments + "/LOG=`"$log`"") `
         -Wait -PassThru -NoNewWindow
     if ($process.ExitCode -ne 0) {
         if (Test-Path $log) { Get-Content $log -Tail 40 | Write-Host }

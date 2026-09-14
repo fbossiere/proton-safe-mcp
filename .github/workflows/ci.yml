@@ -192,43 +192,31 @@ jobs:
           python-version: "3.12"
           version: "latest-known"
       - run: uv sync --frozen --extra dev --extra desktop --extra packaging
-      # The bundle is built and made to prove what it embedded on every run: this is
-      # what catches a missing Credential Manager backend or a lost plugin resource.
-      - name: Build and verify the bundle
-        run: |
-          $env:PYINSTALLER = "$PWD\.venv\Scripts\pyinstaller.exe"
-          $env:PROTON_SAFE_PYTHON = "$PWD\.venv\Scripts\python.exe"
-          pwsh packaging/windows/build_windows.ps1 -SkipInstaller
-      # The compiler is pinned by digest. Until that digest has been recorded by someone
-      # who checked the publisher's signature, the installer is not built rather than
-      # built with an unverified tool. The job stays honest about which of the two
-      # happened instead of reporting success either way.
+      # The compiler is pinned by digest and verified before it runs. An unpinned digest
+      # fails this step rather than reporting a state and carrying on: a run that never
+      # compiled the setup, installed it or uninstalled it must not be able to go green
+      # while saying the Windows packaging works.
       - name: Check the pinned Inno Setup digest
         id: pin
         run: uv run python packaging/windows/fetch_innosetup.py --check-pin
       - name: Install the pinned Inno Setup
-        if: steps.pin.outputs.ready == 'true'
         run: uv run python packaging/windows/fetch_innosetup.py --install
-      - name: Build the installer
-        if: steps.pin.outputs.ready == 'true'
+      # Builds the bundle, makes it prove what it embedded by running it — this is what
+      # catches a missing Credential Manager backend or a lost plugin resource — and
+      # then compiles the setup around it.
+      - name: Build and verify the bundle, then compile the installer
         run: |
           $env:PYINSTALLER = "$PWD\.venv\Scripts\pyinstaller.exe"
           $env:PROTON_SAFE_PYTHON = "$PWD\.venv\Scripts\python.exe"
           pwsh packaging/windows/build_windows.ps1 -InnoSetupVersion ${{ steps.pin.outputs.version }}
       # Install, reinstall and uninstall without a single window, into a profile of this
       # run's own, checking the exit code each time. What this does NOT prove is that no
-      # UAC prompt appears: the runner's account is an administrator, so the absence of
-      # a prompt here means nothing. Scenario W01 covers that, on a standard account.
+      # UAC prompt appears: the runner's account is an administrator, which is also why
+      # the script has to pass /ALLOWELEVATED past the installer's own refusal of an
+      # elevated run. Scenario W01, on a standard account, is what settles that.
       - name: Silent install, reinstall and uninstall
-        if: steps.pin.outputs.ready == 'true'
         run: pwsh packaging/windows/test_install.ps1
-      - name: Report that the installer was not built
-        if: steps.pin.outputs.ready != 'true'
-        run: |
-          Write-Host "::notice::Inno Setup has no pinned digest yet, so no installer was built."
-          Write-Host "::notice::The bundle above was still built and verified."
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: steps.pin.outputs.ready == 'true'
         with:
           name: windows-installer
           path: |
