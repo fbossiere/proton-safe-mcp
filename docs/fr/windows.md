@@ -7,9 +7,9 @@ locale: fr
 [English](../windows-installer.md)
 
 !!! warning "Pas encore disponible"
-    **Au 13 septembre 2026, il n'existe aucun téléchargement Windows.** Le code
-    spécifique à Windows, l'installateur et la chaîne de fabrication sont écrits et
-    relus, mais rien n'a été validé sur une machine Windows : la
+    **Au 14 septembre 2026, il n'existe aucun téléchargement Windows.** Des contrôles
+    automatiques exercent le code et la fabrication sur Windows Server. La validation
+    complète sur Windows 11, avec Bridge et un assistant réel, reste à faire : la
     [fiche de recette](../windows-acceptance.md) est entièrement au statut « non testé ».
 
     Tant que ce n'est pas le cas, Proton Safe ne doit pas être présenté comme compatible

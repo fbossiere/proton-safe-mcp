@@ -1,8 +1,8 @@
 # Windows installer
 
 Status: **in development, not released.** The Windows platform layer, the installer and
-the build pipeline exist in this repository; no part of the Windows path has been
-validated on Windows. [Every acceptance scenario is Not tested](windows-acceptance.md),
+the build pipeline are exercised by automated Windows Server checks. End-to-end
+Windows 11 acceptance with Bridge and a real AI client is still outstanding. [Every acceptance scenario is Not tested](windows-acceptance.md),
 and Proton Safe must not be described as available for Windows until that changes.
 
 This page is for maintainers and contributors. It describes what has been built, the

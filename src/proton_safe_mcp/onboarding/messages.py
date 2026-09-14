@@ -36,7 +36,7 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
     "activate.start": {"fr": "Activer la connexion", "en": "Activate connection"},
     "verify.dashboard": {"fr": "Voir ma connexion", "en": "View my connection"},
     "dashboard.erase.short": {
-        "fr": "Effacer aussi les données de connexion",
+        "fr": "Effacer les données de connexion",
         "en": "Also erase saved connection details",
     },
     "progress.step": {"fr": "Étape {current} sur {total}", "en": "Step {current} of {total}"},

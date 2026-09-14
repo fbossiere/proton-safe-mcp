@@ -15,7 +15,7 @@ compatible paid Proton plan are required.
 
 **Windows 11 · 64-bit (x64) — not available yet.**
 No Windows installer is published, and this page will not offer a build nobody has run:
-the code is written but has not been validated on Windows. When it lands it will be a
+end-to-end Windows 11 validation is still outstanding. When it lands it will be a
 signed `ProtonSafe-Setup-<version>-x64.exe` in the same release, installing for your
 Windows account with no administrator password.
 [Where the Windows version stands](windows-installer.md) ·

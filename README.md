@@ -67,8 +67,8 @@ These controls reduce risk but do not make email trusted. Never expose unrelated
 - [`uv`](https://docs.astral.sh/uv/) for the command-line installation.
 - A working Secret Service keyring (`gnome-keyring` or compatible).
 
-Windows 11 x64 support is implemented in this repository but **not released**: nothing on
-the Windows path has been validated on Windows yet. See the
+Windows 11 x64 support is implemented in this repository but **not released**: automated
+checks run on Windows Server, while end-to-end Windows 11 acceptance remains untested. See the
 [Windows installer notes](https://fbossiere.github.io/proton-safe-mcp/windows-installer/)
 and its [acceptance sheet](https://fbossiere.github.io/proton-safe-mcp/windows-acceptance/).
 

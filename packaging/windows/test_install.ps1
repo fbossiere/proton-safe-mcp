@@ -14,10 +14,9 @@
       * the uninstaller completes unattended, removes the program and its entry,
         and leaves the user's settings behind by default.
 
-    What it does NOT prove, and must never be read as proving: that no UAC prompt
-    appears. A GitHub runner signs in as an administrator, so the absence of a prompt
-    here says nothing about a standard account. Scenario W01 in
-    docs/windows-acceptance.md is the only thing that settles that.
+    CI invokes this script under a disposable standard account on Windows Server.
+    These unattended checks do not replace scenario W01 on a real Windows 11 desktop
+    or the interactive UAC, Bridge and AI-client acceptance scenarios.
 #>
 [CmdletBinding()]
 param(
@@ -28,6 +27,20 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "process.ps1")
+
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
+if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw "Installer integration tests require a standard account."
+}
+# A process launched with credentials can inherit its caller's environment. Resolve
+# this account's own known folders, as the installer and Python platform layer do.
+$env:LOCALAPPDATA = [Environment]::GetFolderPath('LocalApplicationData')
+$env:USERPROFILE = [Environment]::GetFolderPath('UserProfile')
+$env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
+Write-Host "Testing account: $($identity.Name); profile: $env:USERPROFILE"
 
 $Root    = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $DistDir = Join-Path $Root "dist\windows"

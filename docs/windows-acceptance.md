@@ -6,10 +6,10 @@ something similar, because a screenshot looks right, or because a fake client an
 expected. This sheet is about the real path: Windows 11 x64, a real Proton Mail Bridge, a
 real AI client, and a real standard Windows account.
 
-!!! warning "Status: nothing here has been validated"
-    **13 September 2026 — every scenario below is Not tested.** The Windows platform
-    layer, the installer script, the build pipeline and this sheet exist; no Windows
-    machine has run any of it. Two external dependencies are still open and both block a
+!!! warning "Status: Windows 11 product acceptance is outstanding"
+    **14 September 2026 — every scenario below is Not tested.** Automated checks now
+    exercise the Windows code and build on Windows Server runners. They do not establish
+    the complete Windows 11 desktop scenarios below. Two external dependencies are still open and both block a
     stable Windows release:
 
     - **at least one Windows AI client whose full path is qualified** (W08, W09);

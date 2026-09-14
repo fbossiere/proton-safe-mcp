@@ -26,7 +26,7 @@
     Without it the build still completes, and every artefact is named "-unsigned".
 
 .PARAMETER SkipInstaller
-    Build and verify the bundle only. Used by the test job, which has no Inno Setup.
+    Build and verify the bundle only for local development. CI always compiles the setup.
 #>
 [CmdletBinding()]
 param(

@@ -89,7 +89,6 @@ RestartIfNeededByRun=no
 ; and never force one shut: a running assistant, Bridge or AI client belongs to the
 ; person using it, and an update is not a reason to end their work.
 CloseApplications=yes
-ForceCloseApplications=no
 RestartApplications=no
 SetupLogging=yes
 

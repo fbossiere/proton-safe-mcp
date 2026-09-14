@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Windows 11 x64 support in the repository: a platform services layer, a per-user Inno
   Setup installer, a Windows build and packaging pipeline, CI jobs, and French and English
-  documentation. **Nothing on the Windows path has been validated on Windows**, no Windows
-  installer is published, and Proton Safe is not yet compatible with Windows. Every
+  documentation. Automated checks exercise the Windows code and packaging on Windows
+  Server; Windows 11 product acceptance remains outstanding. No Windows installer is
+  published and Windows compatibility is not yet qualified. Every
   scenario in the new [Windows acceptance sheet](docs/windows-acceptance.md) is Not tested,
   and two external dependencies remain open: a Windows AI client whose full path is
   qualified, and a signing identity usable from CI.
