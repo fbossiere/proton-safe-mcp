@@ -1040,8 +1040,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Another launch took this account's slot between the check above and here.
         # Losing that race is not a reason to open a second window: ask the one that
         # won to come forward, exactly as the early check would have done.
-        signal_existing_instance()
-        return 0
+        if signal_existing_instance():
+            return 0
+        QtWidgets.QMessageBox.critical(
+            window,
+            translate("app.title", detect_language()),
+            translate("app.start_failed", detect_language()),
+        )
+        return 1
     application.aboutToQuit.connect(guard.close)
     window.start()
     window.show()

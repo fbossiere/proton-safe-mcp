@@ -173,8 +173,10 @@ if (-not $SkipInstaller) {
     # The compiler version is pinned: a different one may change the uninstaller, the
     # architecture directives or the signing behaviour, none of which may drift
     # silently between releases.
-    $found = (Get-Item $IsccPath).VersionInfo.ProductVersion
-    if ($found -notlike "$InnoSetupVersion*") {
+    # ISCC.exe is a frontend whose PE ProductVersion can be 0.0.0.0. Ask the
+    # compiler engine itself; Inno Setup 7 provides this stable version command.
+    $found = (& $IsccPath --version | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $found -ne $InnoSetupVersion) {
         Fail "Inno Setup $InnoSetupVersion is required; this machine has $found."
     }
 

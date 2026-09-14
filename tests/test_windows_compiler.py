@@ -38,3 +38,16 @@ def test_a_different_download_cannot_be_executed(monkeypatch):
 
     monkeypatch.setattr(main.__globals__["subprocess"], "run", forbidden)
     assert main(["--install"]) == 1
+
+
+@pytest.mark.parametrize("size", ["", "0", "invalid", "100"])
+def test_bad_compiler_sizes_fail_with_a_diagnostic(monkeypatch, capsys, size):
+    main = FETCH["main"]
+    monkeypatch.setitem(
+        main.__globals__,
+        "read_lock",
+        lambda: {"version": "7.1.0", "sha256": "a" * 64, "size": size, "url": "unused"},
+    )
+    monkeypatch.setitem(main.__globals__, "download", lambda _url: b"short")
+    assert main(["--install"]) == 1
+    assert "size" in capsys.readouterr().err

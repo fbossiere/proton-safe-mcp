@@ -1172,3 +1172,20 @@ def test_unsafe_instance_lock_directory_refuses_startup(application, monkeypatch
     guard = SingleInstanceGuard(lambda: None)
     assert not guard.listen()
     guard.close()
+
+
+@pytest.mark.parametrize("other_instance", [False, True])
+def test_startup_distinguishes_a_real_failure_from_another_instance(
+    window, application, monkeypatch, other_instance
+):
+    from proton_safe_mcp.desktop import app
+
+    attempts = iter([False, other_instance])
+    monkeypatch.setattr(app, "signal_existing_instance", lambda: next(attempts))
+    monkeypatch.setattr(app.QtWidgets, "QApplication", lambda _args: application)
+    monkeypatch.setattr(app, "MainWindow", lambda: window)
+    monkeypatch.setattr(app.SingleInstanceGuard, "listen", lambda _self: False)
+    messages = []
+    monkeypatch.setattr(app.QtWidgets.QMessageBox, "critical", lambda *args: messages.append(args))
+    assert app.main(["proton-safe-assistant"]) == (0 if other_instance else 1)
+    assert bool(messages) is not other_instance

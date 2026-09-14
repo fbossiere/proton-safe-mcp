@@ -62,6 +62,16 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
         "en": "Advanced options",
     },
     # -- application ---------------------------------------------------------
+    "app.start_failed": {
+        "fr": (
+            "Proton Safe n'a pas pu démarrer. Vérifiez que votre dossier de données est "
+            "accessible et qu'aucune autre ouverture n'est en cours, puis réessayez."
+        ),
+        "en": (
+            "Proton Safe could not start. Check that your data folder is accessible "
+            "and no other launch is in progress, then try again."
+        ),
+    },
     "app.title": {
         "fr": "Connecter Proton Mail à votre assistant",
         "en": "Connect Proton Mail to your assistant",
@@ -167,8 +177,8 @@ CATALOGUE: Final[dict[str, dict[str, str]]] = {
         ),
     },
     "client.locate": {
-        "fr": "Localiser un assistant installé ailleurs…",
-        "en": "Locate an assistant installed elsewhere…",
+        "fr": "Choisir un assistant…",
+        "en": "Locate an assistant…",
     },
     "uninstall.nothing_to_remove": {
         "fr": "Aucune connexion Proton Safe n'était enregistrée pour ce compte.",

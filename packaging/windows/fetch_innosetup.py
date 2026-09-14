@@ -93,9 +93,21 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
+    try:
+        expected_size = int(lock.get("size", ""))
+        if not 0 < expected_size <= MAX_BYTES:
+            raise ValueError
+    except ValueError:
+        print(f"{LOCK.name} needs a valid positive compiler size in bytes.", file=sys.stderr)
+        return 1
     print(f"Downloading Inno Setup {version}…")
     payload = download(lock["url"])
-    if len(payload) != int(lock["size"]):
+    if len(payload) != expected_size:
+        print(
+            f"the compiler size does not match: expected {expected_size} bytes, "
+            f"received {len(payload)} bytes",
+            file=sys.stderr,
+        )
         return 1
     digest = hashlib.sha256(payload).hexdigest()
     if digest != lock["sha256"].lower():
