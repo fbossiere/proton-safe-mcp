@@ -21,6 +21,7 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 LOCK = Path(__file__).resolve().parent / "innosetup.lock"
 #: A compiler download is a few tens of megabytes; anything far larger is not one.
@@ -42,6 +43,19 @@ def pinned(lock: dict[str, str]) -> bool:
     return bool(re.fullmatch(r"[0-9a-fA-F]{64}", digest))
 
 
+class CompilerRedirects(urllib.request.HTTPRedirectHandler):
+    """Permit GitHub's release CDN, but refuse redirects to arbitrary hosts."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target = urlsplit(newurl)
+        if target.scheme != "https" or target.netloc not in {
+            "github.com",
+            "release-assets.githubusercontent.com",
+        }:
+            raise SystemExit("the compiler download redirected outside GitHub's release hosts")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def download(url: str) -> bytes:
     if not re.fullmatch(
         r"https://github\.com/jrsoftware/issrc/releases/download/is-[0-9_]+/"
@@ -49,7 +63,8 @@ def download(url: str) -> bytes:
         url,
     ):
         raise SystemExit("the compiler is only ever fetched from its publisher's own host")
-    with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 - host checked
+    opener = urllib.request.build_opener(CompilerRedirects())
+    with opener.open(url, timeout=120) as response:
         data = response.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise SystemExit("the download is larger than a compiler installer should be")

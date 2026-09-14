@@ -51,3 +51,31 @@ def test_bad_compiler_sizes_fail_with_a_diagnostic(monkeypatch, capsys, size):
     monkeypatch.setitem(main.__globals__, "download", lambda _url: b"short")
     assert main(["--install"]) == 1
     assert "size" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "http://release-assets.githubusercontent.com/file.exe",
+        "https://example.com/file.exe",
+        "https://github.com.example.com/file.exe",
+        "https://github.com@127.0.0.1/file.exe",
+        "https://github.com:8443/file.exe",
+    ],
+)
+def test_compiler_redirects_cannot_contact_an_unapproved_host(target):
+    from urllib.request import Request
+
+    handler = FETCH["CompilerRedirects"]()
+    with pytest.raises(SystemExit, match="redirected outside"):
+        handler.redirect_request(Request("https://github.com/test"), None, 302, "", {}, target)
+
+
+def test_compiler_redirects_accept_the_github_release_cdn():
+    from urllib.request import Request
+
+    target = "https://release-assets.githubusercontent.com/github-production-release-asset/file.exe"
+    redirect = FETCH["CompilerRedirects"]().redirect_request(
+        Request("https://github.com/test"), None, 302, "", {}, target
+    )
+    assert redirect.full_url == target

@@ -33,10 +33,14 @@ $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "Installer integration tests require a standard account."
 }
-# A process launched with credentials can inherit its caller's environment. Resolve
-# this account's own known folders, as the installer and Python platform layer do.
-$env:LOCALAPPDATA = [Environment]::GetFolderPath('LocalApplicationData')
-$env:USERPROFILE = [Environment]::GetFolderPath('UserProfile')
+# CreateProcessWithLogon can inherit the caller's profile variables. Even known
+# folder expansion can then resolve %USERPROFILE% to the administrator. This test
+# uses a fresh, unredirected local profile: find it by the authenticated account SID
+# in Windows' profile registration before launching either product executable.
+$profileKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$($identity.User.Value)"
+$env:USERPROFILE = Get-ItemPropertyValue -Path $profileKey -Name ProfileImagePath
+$env:LOCALAPPDATA = Join-Path $env:USERPROFILE 'AppData\Local'
+$env:APPDATA = Join-Path $env:USERPROFILE 'AppData\Roaming'
 $env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
