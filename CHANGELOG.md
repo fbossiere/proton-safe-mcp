@@ -71,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its output can no longer put megabytes in memory to answer a question bounded at
   kilobytes, and closing the reader joins the thread instead of leaving it behind.
 - The Inno Setup compiler is pinned to a real download: the publisher's GitHub release,
-  cross-checked against the size and hash in the `.issig` it ships beside it. An unpinned
+  verified against its immutable release attestation, then checked for a valid
+  Authenticode signature from Pyrsys B.V. before execution. An unpinned
   digest now fails the Windows job rather than skipping the setup build, so CI cannot go
   green without compiling the installer and running install, reinstall and uninstall.
 - The POSIX validations are unchanged. No check was relaxed into a weaker rule both

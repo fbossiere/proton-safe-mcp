@@ -127,7 +127,7 @@ def test_the_window_fits_a_1280_by_720_screen_at_200_percent_scaling(
             assert window.width() == 640
             assert window.height() == 330
             scroll = screen.content_scroll
-            assert scroll.horizontalScrollBar().maximum() == 0
+            assert scroll.horizontalScrollBar().maximum() == 0, name
             assert scroll.viewport().height() > 100
             for value in (0, scroll.verticalScrollBar().maximum()):
                 scroll.verticalScrollBar().setValue(value)
@@ -1152,3 +1152,16 @@ def test_uninstall_entry_point_refuses_elevation_before_touching_state(monkeypat
 
     monkeypatch.setattr(app, "uninstall_connection", forbidden)
     assert app.main(["proton-safe-assistant", "--uninstall-connection"]) == 1
+
+
+def test_unsafe_instance_lock_directory_refuses_startup(application, monkeypatch):
+    from proton_safe_mcp.desktop.single_instance import SingleInstanceGuard
+    from proton_safe_mcp.platform_services import PrivacyError, services
+
+    def refuse(_path):
+        raise PrivacyError("private storage unavailable", code="CONFIG_PERMISSIONS")
+
+    monkeypatch.setattr(services(), "ensure_private_directory", refuse)
+    guard = SingleInstanceGuard(lambda: None)
+    assert not guard.listen()
+    guard.close()

@@ -248,16 +248,19 @@ def _exchange(process: subprocess.Popen[bytes], reader: LineReader, deadline: fl
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:
-    """Stop only the process the assistant started. Nothing is matched by name."""
-    for stream in (process.stdin, process.stdout):
-        if stream is not None:
-            with contextlib.suppress(OSError):
-                stream.close()
-    if process.poll() is not None:
-        return
-    process.terminate()
+    """Stop only our child before closing pipes another thread may be reading."""
     try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=5)
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+    finally:
+        # On Windows closing a pipe while a native read is blocked can itself wait.
+        # Terminating first releases that read and lets the helper thread finish.
+        for stream in (process.stdin, process.stdout):
+            if stream is not None:
+                with contextlib.suppress(OSError):
+                    stream.close()

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtNetwork
 
-from ..platform_services import services
+from ..platform_services import PrivacyError, services
 
 #: A fixed prefix plus a per-account digest, so two people signed in at once each get
 #: their own endpoint instead of one blocking the other.
@@ -88,7 +88,7 @@ class SingleInstanceGuard(QtCore.QObject):
         try:
             platform.ensure_private_directory(directory)
             handle = os.open(directory / _LOCK_NAME, os.O_RDWR | os.O_CREAT, 0o600)
-        except OSError:
+        except (OSError, PrivacyError):
             # Without somewhere private to put the lock there is nothing to serialise
             # on, and opening a second window anyway is the worse of the two outcomes.
             return False
