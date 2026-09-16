@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Official mcpservers.org badge in the README linking to the Proton Safe MCP listing.
+
+## [2.2.0] - 2026-09-14
+
+### Added
+
 - Windows 11 x64 support in the repository: a platform services layer, a per-user Inno
   Setup installer, a Windows build and packaging pipeline, CI jobs, and French and English
   documentation. Automated checks exercise the Windows code and packaging on Windows
@@ -38,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and revalidated like any other.
 - The Bridge password on Windows in Credential Manager, with persistence pinned to this
   computer instead of the library default, which asks Windows to roam it.
-- An explicit **Locate an assistant installed elsewhere…** choice on the client screen,
+- An explicit **Locate an assistant…** choice on the client screen,
   for an installation the bounded probes do not reach. It is verified like any other.
 - `--uninstall-connection` on the assistant, so the Windows uninstaller asks the component
   that owns the journal, the client adapters and the credential store to disconnect rather
@@ -440,7 +446,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.2...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.2...v2.2.0
 [2.1.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.0.3...v2.1.0
