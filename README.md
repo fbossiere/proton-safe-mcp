@@ -99,7 +99,7 @@ identity usable from CI.
 Install the reviewed release from PyPI with [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install proton-safe-mcp==2.2.0
+uv tool install proton-safe-mcp==2.3.0
 ```
 
 For development from source instead:
