@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Official mcpservers.org badge in the README linking to the Proton Safe MCP listing.
 
+### Fixed
+
+- Correct the optional reply-threading test protocol in the external testing guide. It still asked
+  testers to confirm that a reply draft appears inside the existing conversation, but a reply target
+  is refused before any IMAP connection unless `allow_unthreaded_reply: true`, so testers reached a
+  refusal instead of the described step and had reason to report it as a defect. The protocol now
+  covers the default refusal and the explicitly accepted separate draft, expects the draft to land
+  outside the conversation, and asks where it landed in either case, since that is the evidence that
+  would let the default refusal be relaxed. Documentation only; no behavior change.
+
 ## [2.2.0] - 2026-09-14
 
 ### Added

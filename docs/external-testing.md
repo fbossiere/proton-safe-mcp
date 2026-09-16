@@ -79,21 +79,36 @@ and no draft may appear in Proton Mail.
 
 ## Optional reply-threading check
 
-This is the one behavior the test suite cannot settle, because it depends on how Proton groups a
-draft that Bridge appended rather than on anything this server controls. Reports on it are
-especially useful.
+A reply target is **refused by default**. Proton Bridge reconstructs an appended draft without
+carrying the parent link, so the server will not create a reply draft it cannot honestly call
+threaded. How Proton then groups such a draft is the one behavior the test suite cannot settle,
+because it depends on Proton rather than on anything this server controls. Reports on this section
+are especially useful.
 
 Ask the client to reply to the harmless message you prepared. It should call `get_reply_context`,
-present the candidate recipients and a suggested `Re:` subject, and create the draft only after you
-confirm the recipient, subject, and complete body. Then confirm in Proton Mail that:
+which reports `threading_supported: false` and a `threading_notice`, then present the candidate
+recipients and a suggested `Re:` subject. Confirm that:
 
-- the draft appears **inside the existing conversation**, not as a separate message;
+- the client explains the threading limitation **before** asking you to confirm any content;
+- passing the reply target without `allow_unthreaded_reply: true` fails with
+  `reply_threading_unsupported`, and no draft appears in Proton Mail;
+- the client offers the Proton Mail **Reply** or **Reply all** workflow instead, rather than
+  dropping the reply target or setting the flag on its own.
+
+If you then explicitly accept a draft that may appear separately, let the client retry with
+`allow_unthreaded_reply: true` and confirm in Proton Mail that:
+
 - the recipient is the one you confirmed, not one the client chose from the message's headers;
-- the body is exactly what you confirmed, with no quote the server added on its own.
+- the body is exactly what you confirmed, with no quote the server added on its own;
+- the result reports `threading_verified: false`, and the client does not describe the draft as
+  attached to the conversation.
 
-If the draft lands outside the conversation, report it: the RFC threading headers are still correct,
-so that would tell us Proton groups appended drafts by something other than `References`. Note
-whether the subject carried a `Re:` prefix, since subject-based grouping would explain it.
+Finally, record **where the draft landed**: inside the existing conversation, or as a separate
+message. Expect separate. The RFC threading headers this server sends are correct, so a draft that
+does land inside the conversation would tell us Proton groups appended drafts by something other
+than the parent link. Note whether the subject carried a `Re:` prefix, since subject-based grouping
+would explain it. Both outcomes are worth reporting: this is the evidence that would let the
+default refusal be relaxed.
 
 Also confirm the reverification refuses a stale target: ask the client to create a reply whose
 `reply_to_message_id` is a value you altered by hand. The call must fail and no draft may appear.
@@ -117,7 +132,9 @@ The core path is successful when:
 4. the confirmed draft appears in Proton Mail and is never sent;
 5. bounded PDF/TXT/CSV text extraction returns no raw bytes or filesystem path;
 6. no send, delete, move, or raw received-attachment-download tool is exposed;
-7. a reply draft carries the recipient you confirmed and a body you confirmed in full.
+7. a reply target is refused until you explicitly accept a possibly separate draft, and an
+   accepted reply draft carries the recipient and body you confirmed and reports
+   `threading_verified: false`.
 
 Partial and failed tests are equally useful. Report the first point of friction rather than
 working around it silently.
