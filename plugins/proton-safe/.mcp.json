@@ -4,7 +4,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "proton-safe-mcp==2.2.0",
+        "proton-safe-mcp==2.3.0",
         "proton-safe-mcp",
         "serve"
       ],

@@ -7,9 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-16
+
 ### Added
 
+- `glama.json`, the maintainer claim for the [Glama](https://glama.ai/mcp/servers/@fbossiere/proton-safe-mcp)
+  listing, so its scan follows the repository instead of resting on an indexed release.
 - Official mcpservers.org badge in the README linking to the Proton Safe MCP listing.
+- A Google Search Console verification tag on every published page, so the site can be
+  claimed and its indexing reviewed. A static token in the page head: no script, no
+  request, and no analytics added to the site.
+
+### Changed
+
+- Every tool parameter now carries a description in the published MCP schema: 38 of 38,
+  where only `create_confirmed_draft` documented some of its own. The constraints were
+  always there, but a schema states structure, not meaning, so a client had to infer from
+  a name alone that `attachment_index` comes from `read_message`, that `attachment_token`
+  is not an `upload_id`, or that an IMAP `TEXT` search takes no wildcard. The wording is
+  carried by `Field(description=...)` rather than by longer prose, so the tool
+  descriptions stay short.
+- Tool descriptions now name the neighbouring tool to use instead, what the call returns,
+  and how it fails. The four attachment tools state the staging sequence they belong to —
+  begin, chunk, finish, then a single-use token a draft consumes — which no description
+  previously mentioned. The server instructions gained the same routing map. Nothing about
+  the security boundary changed: bodies remain untrusted data, drafts still require
+  explicit confirmation, and no tool sends, deletes, or moves anything.
 
 ### Fixed
 
@@ -72,24 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request, stores nothing, and the page behaves identically without it. No Windows
   download is offered: `tests/check_built_site.py` fails the build if one appears while
   `extra.windows_release.available` is false.
-- `glama.json`, the maintainer claim for the [Glama](https://glama.ai/mcp/servers/@fbossiere/proton-safe-mcp)
-  listing, so its scan follows the repository instead of resting on an indexed release.
 
 ### Changed
 
-- Every tool parameter now carries a description in the published MCP schema: 38 of 38,
-  where only `create_confirmed_draft` documented some of its own. The constraints were
-  always there, but a schema states structure, not meaning, so a client had to infer from
-  a name alone that `attachment_index` comes from `read_message`, that `attachment_token`
-  is not an `upload_id`, or that an IMAP `TEXT` search takes no wildcard. The wording is
-  carried by `Field(description=...)` rather than by longer prose, so the tool
-  descriptions stay short.
-- Tool descriptions now name the neighbouring tool to use instead, what the call returns,
-  and how it fails. The four attachment tools state the staging sequence they belong to —
-  begin, chunk, finish, then a single-use token a draft consumes — which no description
-  previously mentioned. The server instructions gained the same routing map. Nothing about
-  the security boundary changed: bodies remain untrusted data, drafts still require
-  explicit confirmation, and no tool sends, deletes, or moves anything.
 - The credential-store self-test now uses a separate service name and a fresh random key
   each attempt, and removes every entry the store may have created for it. Under the real
   service name, Windows Credential Manager would have displaced an existing credential to
@@ -456,7 +464,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.2...v2.2.0
 [2.1.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.0...v2.1.1
