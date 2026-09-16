@@ -89,6 +89,7 @@ include = [
   "/docs",
   "/CHANGELOG.md",
   "/CONTRIBUTING.md",
+  "/glama.json",
   "/LICENSE",
   "/llms-install.md",
   "/mkdocs.yml",
