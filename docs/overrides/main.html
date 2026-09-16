@@ -3,5 +3,6 @@
 {# Google Search Console ownership check, on every themed page so the verification
    holds whichever URL Google fetches. Static token, no script, no request. #}
 {% block extrahead %}
+  {{ super() }}
   <meta name="google-site-verification" content="0yQGP6WBcU8BYMjIC3VIxJtLoiA0FlgNnQxvLOqq98k">
 {% endblock %}
