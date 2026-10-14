@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-10-14
+
+### Security
+
+- Updated locked PyJWT to 2.15.0, pypdf to 6.19.0 and urllib3 to 2.8.0 to address
+  their published security advisories without changing the MCP capability surface.
+
+### Changed
+
+- Updated the Ubuntu download pages, README and desktop guides to the published v2.3.0
+  installer, checksum, provenance and release notes.
+
 ## [2.3.0] - 2026-09-16
 
 ### Added
@@ -464,7 +476,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.2...v2.2.0
 [2.1.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.1...v2.1.2
