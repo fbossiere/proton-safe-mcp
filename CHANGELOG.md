@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Documentation
+### Changed
 
 - Align the public Ubuntu download pages, README and desktop guides with the published
   v2.3.1 installer, checksum, provenance and release notes.
