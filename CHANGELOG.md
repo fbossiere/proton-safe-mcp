@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-10-27
+
+### Security
+
+- Update FastMCP to 3.4.11, pypdf to 6.21.3, certifi to 2026.10.23,
+  Authlib to 1.9.1, dnspython to 2.9.0, filelock to 4.2.4, msgpack to
+  1.2.4, OpenTelemetry API to 1.45.1 and packaging-only setuptools to
+  84.2.1. The package metadata now enforces patched minimums so upgrades
+  cannot retain vulnerable transitive versions already installed.
+
 ### Changed
 
 - Align the public Ubuntu download pages, README and desktop guides with the published
@@ -481,7 +491,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defensive handling for byte-valued IMAP capabilities and short filesystem writes.
 - Per-draft cumulative attachment-size enforcement and CLI draft-ID validation.
 
-[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.2...HEAD
+[2.3.2]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/fbossiere/proton-safe-mcp/compare/v2.1.2...v2.2.0
