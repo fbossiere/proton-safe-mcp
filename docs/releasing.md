@@ -92,5 +92,5 @@ The site may keep offering the previous verified installer until that follow-up 
 - Clean installation:
 
   ```bash
-  uvx --from proton-safe-mcp==2.3.1 proton-safe-mcp --help
+  uvx --from proton-safe-mcp==2.3.2 proton-safe-mcp --help
   ```

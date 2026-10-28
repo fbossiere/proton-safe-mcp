@@ -28,9 +28,15 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "fastmcp==3.4.7",
+  "authlib>=1.9.1",
+  "certifi>=2026.10.23",
+  "dnspython>=2.9.0",
+  "fastmcp==3.4.11",
+  "filelock>=4.2.1",
   "keyring>=25.6,<26",
-  "pypdf>=6.1,<7",
+  "msgpack>=1.2.3",
+  "opentelemetry-api>=1.45.1",
+  "pypdf>=6.21.3,<7",
 ]
 
 [project.urls]
@@ -59,6 +65,7 @@ desktop = [
 ]
 packaging = [
   "pyinstaller>=6.10,<8",
+  "setuptools>=84.1.0",
 ]
 
 [project.scripts]
