@@ -31,7 +31,7 @@ dependencies = [
   "authlib>=1.9.1",
   "certifi>=2026.10.23",
   "dnspython>=2.9.0",
-  "fastmcp==3.4.11",
+  "fastmcp==4.1.4",
   "filelock>=4.2.1",
   "keyring>=25.6,<26",
   "msgpack>=1.2.3",
