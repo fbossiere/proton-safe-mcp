@@ -98,7 +98,7 @@ jobs:
           python-version: "3.12"
           version: "latest-known"
       - run: uv build --no-sources
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
           path: dist/
@@ -141,7 +141,7 @@ jobs:
       # Deliberately upload only. Publishing a release stays a separate, manual decision.
       # The package is never committed; this artefact is how a tester obtains it, together
       # with the source commit and the SHA-256 needed to verify what they downloaded.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-package
           path: |
@@ -203,7 +203,7 @@ jobs:
           pwsh packaging/windows/build_windows.ps1
       - name: Install, repair and uninstall as a standard account
         run: pwsh packaging/windows/test_standard_account.ps1
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-installer
           path: |
