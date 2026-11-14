@@ -36,7 +36,7 @@ dependencies = [
   "keyring>=25.6,<26",
   "msgpack>=1.2.3",
   "opentelemetry-api>=1.45.1",
-  "pypdf>=6.21.3,<7",
+  "pypdf>=6.21.3,<8",
 ]
 
 [project.urls]
